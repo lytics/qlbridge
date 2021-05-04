@@ -187,7 +187,8 @@ func (d *DateConverter) findDateMath(node expr.Node) {
 			d.findDateMath(arg)
 		}
 	case *expr.IncludeNode:
-		if err := resolveInclude(d.ctx, n, 0); err != nil {
+
+		if err := resolveInclude(d.ctx, n, 0, make([]string, 0)); err != nil {
 			d.err = err
 			return
 		}
