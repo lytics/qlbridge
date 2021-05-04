@@ -40,7 +40,7 @@ type EvalBaseContext struct {
 // evaluated against.  It may be a simple reader of  message/data or any
 // object whhich implements EvalContext.
 func Eval(ctx expr.EvalContext, arg expr.Node) (value.Value, bool) {
-	return evalDepth(ctx, arg, 0)
+	return evalDepth(ctx, arg, 0, make([]string, 0))
 }
 
 // creates a new Value with a nil group and given value.
@@ -64,9 +64,9 @@ func numberNodeToValue(t *expr.NumberNode) (value.Value, bool) {
 // InlineIncludes alternative in expr pkg which actually re-writes the expression
 // to remove includes and embed the expressions they refer to as part of this expression.
 func ResolveIncludes(ctx expr.Includer, arg expr.Node) error {
-	return resolveIncludesDepth(ctx, arg, 0)
+	return resolveIncludesDepth(ctx, arg, 0, make([]string, 0))
 }
-func resolveIncludesDepth(ctx expr.Includer, arg expr.Node, depth int) error {
+func resolveIncludesDepth(ctx expr.Includer, arg expr.Node, depth int, visitedIncludes []string) error {
 	if depth > MaxDepth {
 		return ErrMaxDepth
 	}
@@ -74,35 +74,35 @@ func resolveIncludesDepth(ctx expr.Includer, arg expr.Node, depth int) error {
 	switch n := arg.(type) {
 	case *expr.BinaryNode:
 		for _, narg := range n.Args {
-			if err := resolveIncludesDepth(ctx, narg, depth+1); err != nil {
+			if err := resolveIncludesDepth(ctx, narg, depth+1, visitedIncludes); err != nil {
 				return err
 			}
 		}
 	case *expr.BooleanNode:
 		for _, narg := range n.Args {
-			if err := resolveIncludesDepth(ctx, narg, depth+1); err != nil {
+			if err := resolveIncludesDepth(ctx, narg, depth+1, visitedIncludes); err != nil {
 				return err
 			}
 		}
 	case *expr.UnaryNode:
-		if err := resolveIncludesDepth(ctx, n.Arg, depth+1); err != nil {
+		if err := resolveIncludesDepth(ctx, n.Arg, depth+1, visitedIncludes); err != nil {
 			return err
 		}
 	case *expr.TriNode:
 		for _, narg := range n.Args {
-			if err := resolveIncludesDepth(ctx, narg, depth+1); err != nil {
+			if err := resolveIncludesDepth(ctx, narg, depth+1, visitedIncludes); err != nil {
 				return err
 			}
 		}
 	case *expr.ArrayNode:
 		for _, narg := range n.Args {
-			if err := resolveIncludesDepth(ctx, narg, depth+1); err != nil {
+			if err := resolveIncludesDepth(ctx, narg, depth+1, visitedIncludes); err != nil {
 				return err
 			}
 		}
 	case *expr.FuncNode:
 		for _, narg := range n.Args {
-			if err := resolveIncludesDepth(ctx, narg, depth+1); err != nil {
+			if err := resolveIncludesDepth(ctx, narg, depth+1, visitedIncludes); err != nil {
 				return err
 			}
 		}
@@ -110,13 +110,13 @@ func resolveIncludesDepth(ctx expr.Includer, arg expr.Node, depth int) error {
 		*expr.ValueNode, *expr.NullNode:
 		return nil
 	case *expr.IncludeNode:
-		return resolveInclude(ctx, n, depth+1)
+		return resolveInclude(ctx, n, depth+1, visitedIncludes)
 	}
 	return nil
 }
 
-func evalBool(ctx expr.EvalContext, arg expr.Node, depth int) (bool, bool) {
-	val, ok := evalDepth(ctx, arg, depth)
+func evalBool(ctx expr.EvalContext, arg expr.Node, depth int, visitedIncludes []string) (bool, bool) {
+	val, ok := evalDepth(ctx, arg, depth, visitedIncludes)
 	if !ok || val == nil {
 		return false, false
 	}
@@ -126,7 +126,7 @@ func evalBool(ctx expr.EvalContext, arg expr.Node, depth int) (bool, bool) {
 	return false, false
 }
 
-func evalDepth(ctx expr.EvalContext, arg expr.Node, depth int) (value.Value, bool) {
+func evalDepth(ctx expr.EvalContext, arg expr.Node, depth int, visitedIncludes []string) (value.Value, bool) {
 	if depth > MaxDepth {
 		return nil, false
 	}
@@ -135,9 +135,9 @@ func evalDepth(ctx expr.EvalContext, arg expr.Node, depth int) (value.Value, boo
 	case *expr.NumberNode:
 		return numberNodeToValue(argVal)
 	case *expr.BinaryNode:
-		return walkBinary(ctx, argVal, depth)
+		return walkBinary(ctx, argVal, depth, visitedIncludes)
 	case *expr.BooleanNode:
-		return walkBoolean(ctx, argVal, depth)
+		return walkBoolean(ctx, argVal, depth, visitedIncludes)
 	case *expr.UnaryNode:
 		return walkUnary(ctx, argVal, depth)
 	case *expr.TriNode:
@@ -156,7 +156,7 @@ func evalDepth(ctx expr.EvalContext, arg expr.Node, depth int) (value.Value, boo
 		// WHERE (`users.user_id` != NULL)
 		return value.NewNilValue(), true
 	case *expr.IncludeNode:
-		return walkInclude(ctx, argVal, depth+1)
+		return walkInclude(ctx, argVal, depth+1, visitedIncludes)
 	case *expr.ValueNode:
 		if argVal.Value == nil {
 			return nil, false
@@ -175,11 +175,21 @@ func evalDepth(ctx expr.EvalContext, arg expr.Node, depth int) (value.Value, boo
 	}
 }
 
-func resolveInclude(ctx expr.Includer, inc *expr.IncludeNode, depth int) error {
+func resolveInclude(ctx expr.Includer, inc *expr.IncludeNode, depth int, visitedIncludes []string) error {
 
 	if inc.ExprNode != nil {
 		return nil
 	}
+
+	// check if we've already seen this node in our visit stack
+	currentNode := inc.Identity.Text
+	for _, visited := range visitedIncludes {
+		if currentNode == visited {
+			return fmt.Errorf("%w: cycle encountered: %s->%s", ErrMaxDepth, strings.Join(visitedIncludes, "->"), currentNode)
+		}
+	}
+	// add the node to our visit stack
+	visitedIncludes = append(visitedIncludes, currentNode)
 
 	incExpr, err := ctx.Include(inc.Identity.Text)
 	if err != nil {
@@ -193,14 +203,14 @@ func resolveInclude(ctx expr.Includer, inc *expr.IncludeNode, depth int) error {
 		u.Debugf("Includer %T returned a nil filter statement!", inc)
 		return expr.ErrIncludeNotFound
 	}
-	if err = resolveIncludesDepth(ctx, incExpr, depth+1); err != nil {
+	if err = resolveIncludesDepth(ctx, incExpr, depth+1, visitedIncludes); err != nil {
 		return err
 	}
 	inc.ExprNode = incExpr
 	return nil
 }
 
-func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int) (value.Value, bool) {
+func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int, visitedIncludes []string) (value.Value, bool) {
 
 	if inc.ExprNode == nil {
 		incCtx, ok := ctx.(expr.EvalIncludeContext)
@@ -208,7 +218,7 @@ func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int) (value.
 			u.Errorf("No Includer context? %T", ctx)
 			return nil, false
 		}
-		if err := resolveInclude(incCtx, inc, depth); err != nil {
+		if err := resolveInclude(incCtx, inc, depth, visitedIncludes); err != nil {
 			return nil, false
 		}
 	}
@@ -220,7 +230,7 @@ func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int) (value.
 		}
 	}
 
-	matches, ok := evalBool(ctx, inc.ExprNode, depth+1)
+	matches, ok := evalBool(ctx, inc.ExprNode, depth+1, visitedIncludes)
 	if !ok {
 		if inc.Negated() {
 			return value.NewBoolValue(true), true
@@ -233,7 +243,7 @@ func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int) (value.
 	return value.NewBoolValue(matches), true
 }
 
-func walkBoolean(ctx expr.EvalContext, n *expr.BooleanNode, depth int) (value.Value, bool) {
+func walkBoolean(ctx expr.EvalContext, n *expr.BooleanNode, depth int, visitedIncludes []string) (value.Value, bool) {
 	if depth > MaxDepth {
 		u.Warnf("Recursive query death? %v", n)
 		return nil, false
@@ -251,7 +261,7 @@ func walkBoolean(ctx expr.EvalContext, n *expr.BooleanNode, depth int) (value.Va
 
 	for _, bn := range n.Args {
 
-		matches, ok := evalBool(ctx, bn, depth+1)
+		matches, ok := evalBool(ctx, bn, depth+1, visitedIncludes)
 		if !ok && and {
 			return nil, false
 		} else if !ok {
@@ -289,16 +299,16 @@ func walkBoolean(ctx expr.EvalContext, n *expr.BooleanNode, depth int) (value.Va
 //       x > y
 //       x < =
 //
-func walkBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int) (value.Value, bool) {
-	val, ok := evalBinary(ctx, node, depth)
+func walkBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedIncludes []string) (value.Value, bool) {
+	val, ok := evalBinary(ctx, node, depth, visitedIncludes)
 	if !ok {
 		return nil, ok
 	}
 	return val, ok
 }
-func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int) (value.Value, bool) {
-	ar, aok := evalDepth(ctx, node.Args[0], depth+1)
-	br, bok := evalDepth(ctx, node.Args[1], depth+1)
+func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedIncludes []string) (value.Value, bool) {
+	ar, aok := evalDepth(ctx, node.Args[0], depth+1, visitedIncludes)
+	br, bok := evalDepth(ctx, node.Args[1], depth+1, visitedIncludes)
 
 	// If we could not evaluate either we can shortcut
 	if !aok && !bok {
