@@ -1,6 +1,6 @@
 steps:
-- name: 'golang:1.16-buster'
-   id: go-get
+- name: 'gcr.io/cloud-builders/go'
+   id: 'go-get'
    entrypoint: go
    args:
     - get
@@ -8,8 +8,8 @@ steps:
     - -v 
     - ./...
 
-- name: 'golang:1.16-buster'
-   id: test
+- name: 'gcr.io/cloud-builders/go'
+   id: 'test'
    entrypoint: bash
    env:
     - CGO_ENABLED=0
