@@ -12,7 +12,7 @@ steps:
   name: 'gcr.io/cloud-builders/go'
   entrypoint: '/bin/sh'
   env:
-    - CGO_ENABLED=0
+    - CGO_ENABLED=1
     - GOOS=linux
     - GOARCH=amd64
     - GOPRIVATE=github.com/lytics
