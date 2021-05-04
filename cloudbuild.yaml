@@ -1,22 +1,22 @@
 steps:
-- name: 'gcr.io/cloud-builders/go'
-   id: 'go-get'
-   entrypoint: go
-   args:
+- id: 'go-get'
+  name: 'gcr.io/cloud-builders/go'
+  entrypoint: go
+  args:
     - get
     - -t
     - -v 
     - ./...
 
-- name: 'gcr.io/cloud-builders/go'
-   id: 'test'
-   entrypoint: bash
-   env:
+- id: 'test'
+  name: 'gcr.io/cloud-builders/go'
+  entrypoint: '/bin/sh'
+  env:
     - CGO_ENABLED=0
     - GOOS=linux
     - GOARCH=amd64
     - GOPRIVATE=github.com/lytics
     - GOBIN=/workspace/gobin
-   args:
+  args:
     - go.test.sh
   waitFor: ['go-get']
