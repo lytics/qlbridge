@@ -215,7 +215,7 @@ func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int, visited
 	if inc.ExprNode == nil {
 		incCtx, ok := ctx.(expr.EvalIncludeContext)
 		if !ok {
-			u.Errorf("No Includer context? %T", ctx)
+			u.Errorf("No Includer context? %T  stack:%v", ctx, u.PrettyStack(14))
 			return nil, false
 		}
 		if err := resolveInclude(incCtx, inc, depth, visitedIncludes); err != nil {
