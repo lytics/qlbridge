@@ -18,7 +18,8 @@ var (
 	// variable "lextrace=true"
 	//
 	//     export lextrace=true
-	Trace bool
+	Trace         bool
+	tokenMaxDepth = Token{T: TokenError, V: "max stack depth reached"}
 )
 
 func init() {
@@ -109,6 +110,8 @@ type Lexer struct {
 	// Due to nested Expressions and evaluation this allows us to descend/ascend
 	// during lex, using push/pop to add and remove states needing evaluation
 	stack []NamedStateFn
+
+	maxDepthReached bool
 }
 
 func (l *Lexer) init() {
@@ -144,6 +147,9 @@ func (l *Lexer) ErrMsg(t Token, msg string) error {
 func (l *Lexer) NextToken() Token {
 	for {
 		//u.Debugf("token: start=%v  pos=%v  peek5=%s", l.start, l.pos, l.PeekX(5))
+		if l.maxDepthReached {
+			return tokenMaxDepth
+		}
 		select {
 		case token := <-l.tokens:
 			return token
@@ -164,6 +170,7 @@ func (l *Lexer) Push(name string, state StateFn) {
 	if len(l.stack) < 500 {
 		l.stack = append(l.stack, NamedStateFn{name, state})
 	} else {
+		l.maxDepthReached = true
 		out := ""
 		if len(l.input) > 200 {
 			out = strings.Replace(l.input[0:199], "\n", " ", -1)
@@ -1883,6 +1890,7 @@ func LexTableReferenceFirst(l *Lexer) StateFn {
 	if len(l.stack) < 100 {
 		l.Push("LexTableReferenceFirst", LexTableReferenceFirst)
 	} else {
+		l.maxDepthReached = true
 		u.Errorf("Gracefully refusing to add more LexTableReferenceFirst: ")
 	}
 
@@ -2008,6 +2016,7 @@ func LexTableReferences(l *Lexer) StateFn {
 	if len(l.stack) < 100 {
 		l.Push("LexTableReferences", LexTableReferences)
 	} else {
+		l.maxDepthReached = true
 		u.Errorf("Gracefully refusing to add more LexTableReferences: ")
 	}
 
@@ -2100,6 +2109,7 @@ func LexJoinEntry(l *Lexer) StateFn {
 	if len(l.stack) < 100 {
 		l.Push("LexJoinEntry", LexJoinEntry)
 	} else {
+		l.maxDepthReached = true
 		u.Errorf("Gracefully refusing to add more LexJoinEntry: ")
 	}
 
@@ -2636,6 +2646,7 @@ func LexExpression(l *Lexer) StateFn {
 	if len(l.stack) < 1000 {
 		l.Push("LexExpression-clauseStatex", l.clauseState())
 	} else {
+		l.maxDepthReached = true
 		u.LogThrottle(u.WARN, 10, "Gracefully refusing to add more LexExpression: %s", l.input)
 	}
 	return LexExpressionOrIdentity
@@ -2688,6 +2699,7 @@ func LexOrderByColumn(l *Lexer) StateFn {
 			l.Push("LexOrderByColumn", LexOrderByColumn)
 			return LexExpressionOrIdentity
 		} else {
+			l.maxDepthReached = true
 			u.Errorf("Gracefully refusing to add more LexOrderByColumn: ")
 		}
 	}
