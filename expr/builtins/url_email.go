@@ -253,15 +253,12 @@ func HostEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 	if val == "" {
 		return value.EmptyStringValue, false
 	}
+
 	urlstr := strings.ToLower(val)
-	if len(urlstr) < 8 {
-		return value.EmptyStringValue, false
-	}
 	if !strings.HasPrefix(urlstr, "http") {
 		urlstr = "http://" + urlstr
 	}
 	if urlParsed, err := url.Parse(urlstr); err == nil {
-		//u.Infof("url.parse: %#v", urlParsed)
 		return value.NewStringValue(urlParsed.Host), true
 	}
 
@@ -310,14 +307,10 @@ func HostsEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 	hosts := value.NewStringsValue(make([]string, 0))
 	for _, val := range vals.Val() {
 		urlstr := strings.ToLower(val)
-		if len(urlstr) < 8 {
-			continue
-		}
 		if !strings.HasPrefix(urlstr, "http") {
 			urlstr = "http://" + urlstr
 		}
 		if urlParsed, err := url.Parse(urlstr); err == nil {
-			//u.Infof("url.parse: %#v", urlParsed)
 			hosts.Append(urlParsed.Host)
 		}
 	}

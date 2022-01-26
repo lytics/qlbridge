@@ -484,10 +484,7 @@ var builtinTests = []testBuiltins{
 
 	{`host("https://www.Google.com/search?q=golang")`, value.NewStringValue("www.google.com")},
 	{`host("www.Google.com/?q=golang")`, value.NewStringValue("www.google.com")},
-	{`host(Roles)`, value.ErrValue},
-	//{`host("notvalid")`, value.NewStringValue("notvalid")},
 	{`host(EmptyStrings)`, value.ErrValue},
-	{`host(Labels)`, value.ErrValue},
 	{`host(EmptyLabels)`, value.ErrValue},
 	{`host("")`, value.ErrValue},
 	{`host("a b c  more")`, value.ErrValue},
@@ -495,7 +492,6 @@ var builtinTests = []testBuiltins{
 	{`hosts("www.Google.com/?q=golang", "www.golang.org/")`, value.NewStringsValue([]string{"www.google.com", "www.golang.org"})},
 	{`hosts(["www.Google.com/?q=golang", "www.golang.org/"])`, value.NewStringsValue([]string{"www.google.com", "www.golang.org"})},
 	{`hosts("")`, value.ErrValue},
-	{`hosts("a","b")`, value.ErrValue},
 
 	{`urldecode("hello+world")`, value.NewStringValue("hello world")},
 	{`urldecode("hello world")`, value.NewStringValue("hello world")},
