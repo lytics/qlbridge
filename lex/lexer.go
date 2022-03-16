@@ -649,8 +649,7 @@ func (l *Lexer) isExpr() bool {
 
 // non-consuming check to see if we are about to find next keyword
 func (l *Lexer) isNextKeyword(peekWord string) bool {
-
-	if len(peekWord) == 0 {
+	if len(peekWord) == 0 || l.curClause == nil {
 		return false
 	}
 	kwMaybe := strings.ToLower(peekWord)
