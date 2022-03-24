@@ -61,12 +61,12 @@ type NamedStateFn struct {
 	StateFn StateFn
 }
 
-// NewLexer Creates a new lexer for the input string
-func NewLexer(input string, dialect *Dialect) *Lexer {
+// NewLexerState Creates a new lexer for the input string and initial state.
+func NewLexerState(input string, dialect *Dialect, initialState StateFn) *Lexer {
 	// Three tokens of buffering is sufficient for all state functions.
 	l := &Lexer{
 		input:   input,
-		state:   LexDialectForStatement,
+		state:   initialState,
 		tokens:  make(chan Token, 3),
 		stack:   make([]NamedStateFn, 0, 10),
 		dialect: dialect,
@@ -78,6 +78,11 @@ func NewLexer(input string, dialect *Dialect) *Lexer {
 	}
 	l.init()
 	return l
+}
+
+// NewLexer creates a new lexer for the input string.
+func NewLexer(input string, dialect *Dialect) *Lexer {
+	return NewLexerState(input, dialect, LexDialectForStatement)
 }
 
 // Lexer holds the state of the lexical scanning.
@@ -644,8 +649,7 @@ func (l *Lexer) isExpr() bool {
 
 // non-consuming check to see if we are about to find next keyword
 func (l *Lexer) isNextKeyword(peekWord string) bool {
-
-	if len(peekWord) == 0 {
+	if len(peekWord) == 0 || l.curClause == nil {
 		return false
 	}
 	kwMaybe := strings.ToLower(peekWord)
