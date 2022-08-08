@@ -72,6 +72,11 @@ func (m *FuncRegistry) Add(name string, fn CustomFunc) {
 	m.funcs[name] = newFunc
 }
 
+// FuncGet gets a function from the global registry if it exists.
+func FuncGet(name string) (Func, bool) {
+	return funcReg.FuncGet(name)
+}
+
 // FuncGet gets a function from registry if it exists.
 func (m *FuncRegistry) FuncGet(name string) (Func, bool) {
 	m.mu.RLock()
