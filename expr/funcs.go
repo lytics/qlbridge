@@ -4,6 +4,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/lytics/qlbridge/expr/builtins"
 	"github.com/lytics/qlbridge/value"
 )
 
@@ -74,6 +75,7 @@ func (m *FuncRegistry) Add(name string, fn CustomFunc) {
 
 // GetFunc gets a function from the global registry if it exists.
 func GetFunc(name string) (Func, bool) {
+	builtins.LoadAllBuiltins() // This is behind a sync.Once
 	return funcReg.FuncGet(name)
 }
 
