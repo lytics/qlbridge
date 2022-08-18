@@ -32,75 +32,64 @@ const (
 	JsonType           ValueType = 51
 )
 
-func (m ValueType) String() string {
-	switch m {
-	case NilType:
-		return "nil"
-	case ErrorType:
-		return "error"
-	case UnknownType:
-		return "unknown"
-	case ValueInterfaceType:
-		return "value"
-	case NumberType:
-		return "number"
-	case IntType:
-		return "int"
-	case BoolType:
-		return "bool"
-	case TimeType:
-		return "time"
-	case ByteSliceType:
-		return "[]byte"
-	case StringType:
-		return "string"
-	case StringsType:
-		return "[]string"
-	case MapValueType:
-		return "map[string]value"
-	case MapIntType:
-		return "map[string]int"
-	case MapStringType:
-		return "map[string]string"
-	case MapNumberType:
-		return "map[string]number"
-	case MapTimeType:
-		return "map[string]time"
-	case MapBoolType:
-		return "map[string]bool"
-	case SliceValueType:
-		return "[]value"
-	case StructType:
-		return "struct"
-	case JsonType:
-		return "json"
-	default:
-		return "invalid"
+var (
+	typeToStr = map[ValueType]string{
+		NilType:            "nil",
+		ErrorType:          "error",
+		UnknownType:        "unknown",
+		ValueInterfaceType: "value",
+		NumberType:         "number",
+		IntType:            "int",
+		BoolType:           "bool",
+		TimeType:           "time",
+		ByteSliceType:      "[]byte",
+		StringType:         "string",
+		StringsType:        "[]string",
+		MapValueType:       "map[string]value",
+		MapIntType:         "map[string]string",
+		MapStringType:      "map[string]string",
+		MapNumberType:      "map[string]number",
+		MapTimeType:        "map[string]time",
+		MapBoolType:        "map[string]bool",
+		SliceValueType:     "[]value",
+		StructType:         "struct",
+		JsonType:           "json",
 	}
+	mapTypes = map[ValueType]bool{
+		MapValueType:  true,
+		MapIntType:    true,
+		MapStringType: true,
+		MapNumberType: true,
+		MapTimeType:   true,
+		MapBoolType:   true,
+	}
+	sliceTypes = map[ValueType]bool{
+		StringsType:    true,
+		SliceValueType: true,
+	}
+	numTypes = map[ValueType]bool{
+		NumberType: true,
+		IntType:    true,
+	}
+)
+
+func (m ValueType) String() string {
+	if s, ok := typeToStr[m]; ok {
+		return s
+	}
+	return "invalid"
 }
 
 func (m ValueType) IsMap() bool {
-	switch m {
-	case MapValueType, MapIntType, MapStringType, MapNumberType, MapTimeType, MapBoolType:
-		return true
-	}
-	return false
+	return mapTypes[m]
 }
 
 func (m ValueType) IsSlice() bool {
-	switch m {
-	case StringsType, SliceValueType:
-		return true
-	}
-	return false
+	return sliceTypes[m]
 }
 
 func (m ValueType) IsNumeric() bool {
-	switch m {
-	case NumberType, IntType:
-		return true
-	}
-	return false
+	return numTypes[m]
 }
 
 func (m ValueType) Zero() Value {
