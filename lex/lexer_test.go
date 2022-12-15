@@ -52,11 +52,11 @@ func TestLexer(t *testing.T) {
 	verifyIdentity(t, `table_name`, "table_name", true)
 	Trace = orig
 	l := NewSqlLexer("SELECT x from y;")
-	for i := 0; i < 600; i++ {
+	for i := 0; i < maxDepth+100; i++ { // NOTE (2022-12) (mh): Any amount over maxDepth works
 		l.Push("fake", LexNumber)
 	}
 	// Should not infinitely push
-	assert.Equal(t, 500, len(l.stack))
+	assert.Len(t, l.stack, maxDepth)
 
 	l = NewExpressionLexer(`#hello`)
 	assert.True(t, l.IsComment())
@@ -535,8 +535,8 @@ func TestWhereClauses(t *testing.T) {
 		})
 
 	verifyTokens(t, `
-		select 
-			user_id 
+		select
+			user_id
 		FROM stdio
 		WHERE
 			yy(reg_date) == 11 and !(bval == false)`,
@@ -562,8 +562,8 @@ func TestWhereClauses(t *testing.T) {
 		})
 
 	verifyTokens(t, `
-		select 
-			user_id 
+		select
+			user_id
 		FROM stdio
 		WHERE
 			year BETWEEN 1 AND 5`,
@@ -621,7 +621,7 @@ func TestLexGreedyUdf(t *testing.T) {
 	// The lexer should recognize that
 	//   not here is a UDF, not "not"
 	verifyTokenTypes(t, `
-		SELECT 
+		SELECT
 			f1
 			, not(eq(field1))
 		FROM employee`,
@@ -637,7 +637,7 @@ func TestLexUdfSpecialAs(t *testing.T) {
 	// Their is a special case for UDF's that allow an AS
 	//    CAST(field AS int)
 	verifyTokenTypes(t, `
-		SELECT 
+		SELECT
 			name
 			, cast(score AS int)
 		FROM employee`,
@@ -652,10 +652,10 @@ func TestLexUdfSpecialAs(t *testing.T) {
 func TestLexSqlJoin(t *testing.T) {
 
 	verifyTokenTypes(t, `
-		SELECT 
+		SELECT
 			t1.name, t2.salary
-		FROM employee AS t1 
-		INNER JOIN info AS t2 
+		FROM employee AS t1
+		INNER JOIN info AS t2
 		ON t1.name = t2.name;`,
 		[]TokenType{TokenSelect,
 			TokenIdentity, TokenComma, TokenIdentity,
@@ -684,8 +684,8 @@ func TestLexSqlSubQuery(t *testing.T) {
 
 func TestLexSqlPreparedStmt(t *testing.T) {
 	verifyTokens(t, `
-		PREPARE stmt1 
-		FROM 
+		PREPARE stmt1
+		FROM
 			'SELECT SQRT(POW(?,2) + POW(?,2)) AS hypotenuse';`,
 		[]Token{
 			tv(TokenPrepare, "PREPARE"),
@@ -711,8 +711,8 @@ func TestLexGroupBy(t *testing.T) {
 			tv(TokenIdentity, "category"),
 		})
 	verifyTokens(t, `SELECT x FROM p
-	GROUP BY 
-		LOWER(company), 
+	GROUP BY
+		LOWER(company),
 		LOWER(REPLACE(category,"cde","xxx"))
 	`,
 		[]Token{
@@ -912,7 +912,7 @@ func TestLexSelectExpressions(t *testing.T) {
 
 func TestLexSelectIfGuard(t *testing.T) {
 
-	verifyTokens(t, `SELECT 
+	verifyTokens(t, `SELECT
             lol AS notlol IF hey == 0
         FROM nothing`,
 		[]Token{
@@ -977,7 +977,7 @@ func TestLexSelectLogicalColumns(t *testing.T) {
 
 func TestLexSelectNestedExpressions(t *testing.T) {
 
-	verifyTokens(t, `SELECT 
+	verifyTokens(t, `SELECT
 						REPLACE(LOWER(Name),"cde","xxx"),
 						REPLACE(LOWER(email),"@gmail.com","")
 					FROM Product`,
@@ -1033,7 +1033,7 @@ func TestLexAlter(t *testing.T) {
 
 	verifyTokens(t, "ALTER TABLE `quoted_table` "+
 		`CHANGE col1_old col1_new varchar(10),
-		 CHANGE col2_old col2_new TEXT 
+		 CHANGE col2_old col2_new TEXT
 		CHARACTER SET utf8;`,
 		[]Token{
 			tv(TokenAlter, "ALTER"),
@@ -1142,8 +1142,8 @@ func TestLexUpsert(t *testing.T) {
 		      col_name=expr
 		        [, col_name=expr] ... ]
 	*/
-	verifyTokens(t, `UPSERT INTO users (name,email,ct) 
-		VALUES 
+	verifyTokens(t, `UPSERT INTO users (name,email,ct)
+		VALUES
 			("bob", "bob@email.com", 2),
 			("bill", "bill@email.com", 5);`,
 		[]Token{
@@ -1238,8 +1238,8 @@ func TestLexInsert(t *testing.T) {
 			tv(TokenValue, "bob@email.com"),
 		})
 
-	verifyTokens(t, `INSERT INTO users (name,email,ct) 
-		VALUES 
+	verifyTokens(t, `INSERT INTO users (name,email,ct)
+		VALUES
 			("bob", "bob@email.com", 2),
 			("bill", "bill@email.com", 5);`,
 		[]Token{
@@ -1308,7 +1308,7 @@ func TestWithJson(t *testing.T) {
 		SELECT f1 FROM employee
 		WITH {
 			"key1":"value2"
-			,"key2":45, 
+			,"key2":45,
 			"key3":["a",2,"b",true],
 			"key4":{"hello":"value","age":55}
 		}
