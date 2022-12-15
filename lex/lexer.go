@@ -13,6 +13,10 @@ import (
 	u "github.com/araddon/gou"
 )
 
+const (
+	maxDepth = 1000
+)
+
 var (
 	// Trace is a global var to turn on tracing.  can be turned out with env
 	// variable "lextrace=true"
@@ -166,7 +170,7 @@ func (l *Lexer) NextToken() Token {
 // Push a named StateFn onto stack.
 func (l *Lexer) Push(name string, state StateFn) {
 	debugf("push %d %v", len(l.stack)+1, name)
-	if len(l.stack) < 1000 {
+	if len(l.stack) < maxDepth {
 		l.stack = append(l.stack, NamedStateFn{name, state})
 	} else {
 		out := ""
