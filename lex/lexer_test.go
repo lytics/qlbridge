@@ -56,7 +56,7 @@ func TestLexer(t *testing.T) {
 		l.Push("fake", LexNumber)
 	}
 	// Should not infinitely push
-	assert.Equal(t, 500, len(l.stack))
+	assert.Equal(t, 600, len(l.stack))
 
 	l = NewExpressionLexer(`#hello`)
 	assert.True(t, l.IsComment())

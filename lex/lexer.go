@@ -166,7 +166,7 @@ func (l *Lexer) NextToken() Token {
 // Push a named StateFn onto stack.
 func (l *Lexer) Push(name string, state StateFn) {
 	debugf("push %d %v", len(l.stack)+1, name)
-	if len(l.stack) < 500 {
+	if len(l.stack) < 1000 {
 		l.stack = append(l.stack, NamedStateFn{name, state})
 	} else {
 		out := ""
@@ -215,10 +215,9 @@ func (l *Lexer) RawInput() string {
 // Remainder SQL and other string expressions may contain more than one
 // statement such as:
 //
-//    use schema_x;  show tables;
+//	use schema_x;  show tables;
 //
-//    set @my_var = "value"; select a,b from `users` where name = @my_var;
-//
+//	set @my_var = "value"; select a,b from `users` where name = @my_var;
 func (l *Lexer) Remainder() (string, bool) {
 	l.SkipWhiteSpaces()
 	if r := l.Peek(); r == ';' {
@@ -527,7 +526,8 @@ func (l *Lexer) SkipWhiteSpacesNewLine() bool {
 }
 
 // Skips white space characters at end by trimming so we can recognize the end
-//  more easily
+//
+//	more easily
 func (l *Lexer) ReverseTrim() {
 	for i := len(l.input) - 1; i >= 0; i-- {
 		if !unicode.IsSpace(rune(l.input[i])) {
@@ -605,11 +605,11 @@ func (l *Lexer) errorToken(format string, args ...interface{}) StateFn {
 }
 
 // non-consuming isExpression, expressions are defined by
-//  starting with
-//    - negation (!)
-//    - non quoted alpha character
-//    - (   left-paren
 //
+//	starting with
+//	  - negation (!)
+//	  - non quoted alpha character
+//	  - (   left-paren
 func (l *Lexer) isExpr() bool {
 	// Expressions are strings not values, so quoting them means no
 	r := l.Peek()
@@ -736,8 +736,9 @@ func (l *Lexer) LexMatchSkip(tok TokenType, skip int, fn StateFn) StateFn {
 */
 
 // lexer to match expected value returns with args of
-//   @matchState state function if match
-//   if no match, return nil
+//
+//	@matchState state function if match
+//	if no match, return nil
 func (l *Lexer) lexIfMatch(tok TokenType, matchState StateFn) StateFn {
 	l.SkipWhiteSpaces()
 	if l.tryMatch(tok.String()) {
@@ -984,7 +985,7 @@ func LexStatement(l *Lexer) StateFn {
 	return nil
 }
 
-//Doesn't actually lex anything, used for single token clauses
+// Doesn't actually lex anything, used for single token clauses
 func LexEmpty(l *Lexer) StateFn { return nil }
 
 // lex a value:   string, integer, float
@@ -993,13 +994,12 @@ func LexEmpty(l *Lexer) StateFn { return nil }
 // - numerics with no period are integers
 // - numerics with period are floats
 //
-//  "stuff"    -> [string] = stuff
-//  'stuff'    -> [string] = stuff
-//  "items's with quote" -> [string] = items's with quote
-//  1.23  -> [float] = 1.23
-//  100   -> [integer] = 100
-//  ["hello","world"]  -> [array] {"hello","world"}
-//
+//	"stuff"    -> [string] = stuff
+//	'stuff'    -> [string] = stuff
+//	"items's with quote" -> [string] = items's with quote
+//	1.23  -> [float] = 1.23
+//	100   -> [integer] = 100
+//	["hello","world"]  -> [array] {"hello","world"}
 func LexValue(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -1103,10 +1103,9 @@ func LexValue(l *Lexer) StateFn {
 
 // lex a regex:   first character must be a /
 //
-//  /^stats\./i
-//  /.*/
-//  /^stats.*/
-//
+//	/^stats\./i
+//	/.*/
+//	/^stats.*/
 func LexRegex(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -1150,12 +1149,11 @@ func LexRegex(l *Lexer) StateFn {
 
 // look for either an Expression or Identity
 //
-//  expressions:    Legal identity characters, terminated by (
-//  identity:    legal identity characters
+//	expressions:    Legal identity characters, terminated by (
+//	identity:    legal identity characters
 //
-//  REPLACE(name,"stuff")
-//  name
-//
+//	REPLACE(name,"stuff")
+//	name
 func LexExpressionOrIdentity(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -1182,7 +1180,6 @@ func LexExpressionOrIdentity(l *Lexer) StateFn {
 }
 
 // look for either an Identity or Value
-//
 func LexIdentityOrValue(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -1208,9 +1205,9 @@ func LexIdentityOrValue(l *Lexer) StateFn {
 
 // lex Expression looks for an expression, identified by parenthesis, may be nested
 //
-//           |--expr----|
-//    dostuff(name,"arg")    // the left parenthesis identifies it as Expression
-//    eq(trim(name," "),"gmail.com")
+//	       |--expr----|
+//	dostuff(name,"arg")    // the left parenthesis identifies it as Expression
+//	eq(trim(name," "),"gmail.com")
 func LexExpressionParens(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -1274,8 +1271,8 @@ func LexParenLeft(l *Lexer) StateFn {
 
 // lex expression identity keyword, does not consume parenthesis
 //
-//    |--expridentity---|
-//    name_of_expression(name,"arg")
+//	|--expridentity---|
+//	name_of_expression(name,"arg")
 func lexExpressionIdentifier(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -1306,16 +1303,15 @@ func lexExpressionIdentifier(l *Lexer) StateFn {
 // LexListOfArgs list of arguments, comma separated list of args which
 // may be a mixture of expressions, identities, values
 //
-//       REPLACE(LOWER(x),"xyz")
-//       REPLACE(x,"xyz")
-//       COUNT(*)
-//       sum( 4 * toint(age))
-//       IN (a,b,c)
-//       varchar(10)
-//       CAST(field AS int)
+//	REPLACE(LOWER(x),"xyz")
+//	REPLACE(x,"xyz")
+//	COUNT(*)
+//	sum( 4 * toint(age))
+//	IN (a,b,c)
+//	varchar(10)
+//	CAST(field AS int)
 //
-//       (a,b,c,d)   -- For Insert statement, list of columns
-//
+//	(a,b,c,d)   -- For Insert statement, list of columns
 func LexListOfArgs(l *Lexer) StateFn {
 
 	// as we descend into Expressions, we are going to use push/pop to
@@ -1377,32 +1373,32 @@ func LexListOfArgs(l *Lexer) StateFn {
 }
 
 // LexIdentifier scans and finds named things (tables, columns)
-//  and specifies them as TokenIdentity, uses LexIdentifierType
 //
-//  TODO: dialect controls escaping/quoting techniques
+//	and specifies them as TokenIdentity, uses LexIdentifierType
 //
-//  [name]         select [first name] from usertable;
-//  'name'         select 'user' from usertable;
-//  first_name     select first_name from usertable;
-//  usertable      select first_name AS fname from usertable;
-//  _name          select _name AS name from stuff;
+//	TODO: dialect controls escaping/quoting techniques
 //
+//	[name]         select [first name] from usertable;
+//	'name'         select 'user' from usertable;
+//	first_name     select first_name from usertable;
+//	usertable      select first_name AS fname from usertable;
+//	_name          select _name AS name from stuff;
 var LexIdentifier = LexIdentifierOfType(TokenIdentity)
 var LexTableIdentifier = LexIdentifierOfType(TokenTable)
 
 // LexIdentifierOfType scans and finds named things (tables, columns)
-//  supports quoted, bracket, or raw identifiers
 //
-//  TODO: dialect controls escaping/quoting techniques
+//	supports quoted, bracket, or raw identifiers
 //
-//  [name]         select [first name] from usertable;
-//  'name'         select 'user' from usertable;
-//  `user`         select first_name from `user`;
-//  first_name     select first_name from usertable;
-//  usertable      select first_name AS fname from usertable;
-//  _name          select _name AS name from stuff;
-//  @@varname      select @@varname;
+//	TODO: dialect controls escaping/quoting techniques
 //
+//	[name]         select [first name] from usertable;
+//	'name'         select 'user' from usertable;
+//	`user`         select first_name from `user`;
+//	first_name     select first_name from usertable;
+//	usertable      select first_name AS fname from usertable;
+//	_name          select _name AS name from stuff;
+//	@@varname      select @@varname;
 func LexIdentifierOfType(forToken TokenType) StateFn {
 	return func(l *Lexer) StateFn {
 		l.SkipWhiteSpaces()
@@ -1531,10 +1527,9 @@ var LexDataTypeDefinition = LexDataType(TokenTypeDef)
 // LexDataType scans and finds datatypes.
 // `[]` are valid inside of data types, no escaping such as ',"
 //
-//    []string       CREATE table( field []string )
-//    map[string]int
-//    int, string, etc
-//
+//	[]string       CREATE table( field []string )
+//	map[string]int
+//	int, string, etc
 func LexDataType(forToken TokenType) StateFn {
 
 	return func(l *Lexer) StateFn {
@@ -1583,11 +1578,10 @@ func LexEndOfStatement(l *Lexer) StateFn {
 // LexSelectClause Handle start of select statements, specifically looking for
 // @@variables, *, or else we drop into <select_list>
 //
-//     <SELECT> :==
-//         (DISTINCT|ALL)? ( <sql_variable> | * | <select_list> ) [FROM <source_clause>]
+//	<SELECT> :==
+//	    (DISTINCT|ALL)? ( <sql_variable> | * | <select_list> ) [FROM <source_clause>]
 //
-//     <sql_variable> = @@stuff
-//
+//	<sql_variable> = @@stuff
 func LexSelectClause(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -1658,7 +1652,6 @@ func LexSelectClause(l *Lexer) StateFn {
 }
 
 // Handle start of insert, Upsert statements
-//
 func LexUpsertClause(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -1692,7 +1685,6 @@ func LexUpsertClause(l *Lexer) StateFn {
 }
 
 // Handle recursive subqueries
-//
 func LexSubQuery(l *Lexer) StateFn {
 
 	//u.Debugf("LexSubQuery  '%v'", l.PeekX(10))
@@ -1739,7 +1731,6 @@ func LexSubQuery(l *Lexer) StateFn {
 // Handle prepared statements
 //
 // <PREPARE_STMT> := PREPARE <identity>	FROM <string_value>
-//
 func LexPreparedStatement(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -1774,14 +1765,13 @@ func LexPreparedStatement(l *Lexer) StateFn {
 
 // Handle repeating Select List for columns
 //
-//     SELECT <select_list>
+//	   SELECT <select_list>
 //
-//     <select_list> := <select_col> [, <select_col>]*
+//	   <select_list> := <select_col> [, <select_col>]*
 //
-//     <select_col> :== ( <identifier> | <expression> | '*' ) [AS <identifier>] [IF <expression>] [<comment>]
+//	   <select_col> :== ( <identifier> | <expression> | '*' ) [AS <identifier>] [IF <expression>] [<comment>]
 //
-//  Note, our Columns support a non-standard IF guard at a per column basis
-//
+//	Note, our Columns support a non-standard IF guard at a per column basis
 func LexSelectList(l *Lexer) StateFn {
 	l.SkipWhiteSpaces()
 	if l.IsEnd() {
@@ -1806,14 +1796,13 @@ func LexSelectList(l *Lexer) StateFn {
 
 // Handle Source References ie [From table], [SubSelects], Joins
 //
-//    SELECT ...  FROM <sources>
+//	SELECT ...  FROM <sources>
 //
-//    <sources>      := <source> [, <join_clause> <source>]*
-//    <source>       := ( <table_source> | <subselect> ) [AS <identifier>]
-//    <table_source> := <identifier>
-//    <join_clause>  := (INNER | LEFT | OUTER)? JOIN [ON <conditional_clause>]
-//    <subselect>    := '(' <select_stmt> ')'
-//
+//	<sources>      := <source> [, <join_clause> <source>]*
+//	<source>       := ( <table_source> | <subselect> ) [AS <identifier>]
+//	<table_source> := <identifier>
+//	<join_clause>  := (INNER | LEFT | OUTER)? JOIN [ON <conditional_clause>]
+//	<subselect>    := '(' <select_stmt> ')'
 func LexTableReferenceFirst(l *Lexer) StateFn {
 
 	// From has already been consumed
@@ -1896,14 +1885,13 @@ func LexTableReferenceFirst(l *Lexer) StateFn {
 
 // Handle Source References ie [From table], [SubSelects], Joins
 //
-//    SELECT ...  FROM <sources>
+//	SELECT ...  FROM <sources>
 //
-//    <sources>      := <source> [, <join_clause> <source>]*
-//    <source>       := ( <table_source> | <subselect> ) [AS <identifier>]
-//    <table_source> := <identifier>
-//    <join_clause>  := (INNER | LEFT | OUTER)? JOIN [ON <conditional_clause>]
-//    <subselect>    := '(' <select_stmt> ')'
-//
+//	<sources>      := <source> [, <join_clause> <source>]*
+//	<source>       := ( <table_source> | <subselect> ) [AS <identifier>]
+//	<table_source> := <identifier>
+//	<join_clause>  := (INNER | LEFT | OUTER)? JOIN [ON <conditional_clause>]
+//	<subselect>    := '(' <select_stmt> ')'
 func LexTableReferences(l *Lexer) StateFn {
 
 	// From has already been consumed
@@ -2021,14 +2009,13 @@ func LexTableReferences(l *Lexer) StateFn {
 
 // Handle Source References ie [From table], [SubSelects], Joins
 //
-//    SELECT ...  FROM <sources>
+//	SELECT ...  FROM <sources>
 //
-//    <sources>      := <source> [, <join_clause> <source>]*
-//    <source>       := ( <table_source> | <subselect> ) [AS <identifier>]
-//    <table_source> := <identifier>
-//    <join_clause>  := (INNER | LEFT | OUTER)? JOIN [ON <conditional_clause>]
-//    <subselect>    := '(' <select_stmt> ')'
-//
+//	<sources>      := <source> [, <join_clause> <source>]*
+//	<source>       := ( <table_source> | <subselect> ) [AS <identifier>]
+//	<table_source> := <identifier>
+//	<join_clause>  := (INNER | LEFT | OUTER)? JOIN [ON <conditional_clause>]
+//	<subselect>    := '(' <select_stmt> ')'
 func LexJoinEntry(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2113,10 +2100,9 @@ func LexJoinEntry(l *Lexer) StateFn {
 
 // LexColumnNames Handle list of column names on insert/update statements
 //
-//     <insert_into> <col_names> VALUES <col_value_list>
+//	<insert_into> <col_names> VALUES <col_value_list>
 //
-//     <col_names> := '(' <identity> [, <identity>]* ')'
-//
+//	<col_names> := '(' <identity> [, <identity>]* ')'
 func LexColumnNames(l *Lexer) StateFn {
 	l.SkipWhiteSpaces()
 	r := l.Peek()
@@ -2142,17 +2128,16 @@ func LexColumnNames(l *Lexer) StateFn {
 
 // Handle repeating Insert/Upsert/Update statements
 //
-//     <insert_into> <col_names> VALUES <col_value_list>
-//     <set> <upsert_cols> VALUES <col_value_list>
+//	<insert_into> <col_names> VALUES <col_value_list>
+//	<set> <upsert_cols> VALUES <col_value_list>
 //
-//     <upsert_cols> := <upsert_col> [, <upsert_col>]*
-//     <upsert_col> := <identity> = <expr>
+//	<upsert_cols> := <upsert_col> [, <upsert_col>]*
+//	<upsert_col> := <identity> = <expr>
 //
-//     <col_names> := <identity> [, <identity>]*
-//     <col_value_list> := <col_value_row> [, <col_value_row>] *
+//	<col_names> := <identity> [, <identity>]*
+//	<col_value_list> := <col_value_row> [, <col_value_row>] *
 //
-//     <col_value_row> := '(' <expr> [, <expr>]* ')'
-//
+//	<col_value_row> := '(' <expr> [, <expr>]* ')'
 func LexTableColumns(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2228,14 +2213,13 @@ func LexValueColumns(l *Lexer) StateFn {
 // LexConditionalClause Handle logical Conditional Clause used for [WHERE, WITH, JOIN ON]
 // logicaly grouped with parens and/or separated by commas or logic (AND/OR/NOT)
 //
-//     SELECT ... WHERE <conditional_clause>
+//	SELECT ... WHERE <conditional_clause>
 //
-//     <conditional_clause> ::= <expr> [( AND <expr> | OR <expr> | '(' <expr> ')' )]
+//	<conditional_clause> ::= <expr> [( AND <expr> | OR <expr> | '(' <expr> ')' )]
 //
-//     <expr> ::= <predicatekw> '('? <expr> [, <expr>] ')'? | <func> | <subselect>
+//	<expr> ::= <predicatekw> '('? <expr> [, <expr>] ')'? | <func> | <subselect>
 //
 // SEE:  <expr> = LexExpression
-//
 func LexConditionalClause(l *Lexer) StateFn {
 	l.SkipWhiteSpaces()
 	//u.Debugf("lexConditional: %v", l.PeekX(14))
@@ -2289,8 +2273,8 @@ func LexColumns(l *Lexer) StateFn {
 }
 
 // LexLogical is a lex entry function for logical expression language (+-/> etc)
-//   ie, the full logical boolean logic
 //
+//	ie, the full logical boolean logic
 func LexLogical(l *Lexer) StateFn {
 
 	//u.Debugf("in lexLogical: peek: %q  end? %v", l.PeekX(5), l.IsEnd())
@@ -2312,26 +2296,27 @@ func LexLogical(l *Lexer) StateFn {
 }
 
 // <expr>   Handle single logical expression which may be nested and  has
-//           user defined function names that are NOT validated by lexer
+//
+//	user defined function names that are NOT validated by lexer
 //
 // <expr> ::= <predicatekw> '('? <expr> [, <expr>] ')'? | <func> | <subselect>
-//  <func> ::= <identity>'(' <expr> ')'
-//  <predicatekw> ::= [NOT] (IN | INTERSECTS | CONTAINS | RANGE | LIKE | EQUALS )
+//
+//	<func> ::= <identity>'(' <expr> ')'
+//	<predicatekw> ::= [NOT] (IN | INTERSECTS | CONTAINS | RANGE | LIKE | EQUALS )
 //
 // Examples:
 //
-//  (colx = y OR colb = b)
-//  cola = 'a5'
-//  cola != "a5", colb = "a6"
-//  REPLACE(cola,"stuff") != "hello"
-//  FirstName = REPLACE(LOWER(name," "))
-//  cola IN (1,2,3)
-//  cola LIKE "abc"
-//  eq(name,"bob") AND age > 5
-//  time > now() -1h
-//  (4 + 5) > 10
-//  reg_date BETWEEN x AND y
-//
+//	(colx = y OR colb = b)
+//	cola = 'a5'
+//	cola != "a5", colb = "a6"
+//	REPLACE(cola,"stuff") != "hello"
+//	FirstName = REPLACE(LOWER(name," "))
+//	cola IN (1,2,3)
+//	cola LIKE "abc"
+//	eq(name,"bob") AND age > 5
+//	time > now() -1h
+//	(4 + 5) > 10
+//	reg_date BETWEEN x AND y
 func LexExpression(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2647,8 +2632,7 @@ func LexExpression(l *Lexer) StateFn {
 
 // Handle columnar identies with keyword appendate (ASC, DESC)
 //
-//     [ORDER BY] ( <identity> | <expr> ) [(ASC | DESC)]
-//
+//	[ORDER BY] ( <identity> | <expr> ) [(ASC | DESC)]
 func LexOrderByColumn(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2702,9 +2686,8 @@ func LexOrderByColumn(l *Lexer) StateFn {
 
 // Lex either Json or Key/Value pairs
 //
-//    Must start with { or [ for json
-//    Start with identity for key/value pairs
-//
+//	Must start with { or [ for json
+//	Start with identity for key/value pairs
 func LexJsonOrKeyValue(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2729,8 +2712,7 @@ func LexJsonOrKeyValue(l *Lexer) StateFn {
 
 // Lex Valid Json
 //
-//    Must start with { or [
-//
+//	Must start with { or [
 func LexJson(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2756,8 +2738,7 @@ func LexJson(l *Lexer) StateFn {
 
 // LexJsonValue:  Consume values, first consuming Colon
 //
-//  <jsonvalue> ::= ':' ( <value>, <array>, <jsonobject> ) [, ...]
-//
+//	<jsonvalue> ::= ':' ( <value>, <array>, <jsonobject> ) [, ...]
 func LexJsonValue(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2788,8 +2769,7 @@ func LexJsonValue(l *Lexer) StateFn {
 
 // Lex Valid Json Array
 //
-//    Must End with ]
-//
+//	Must End with ]
 func LexJsonArray(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2828,8 +2808,7 @@ func LexJsonArray(l *Lexer) StateFn {
 
 // Lex Valid Json Object
 //
-//    Must End with }
-//
+//	Must End with }
 func LexJsonObject(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2872,11 +2851,10 @@ func LexJsonObject(l *Lexer) StateFn {
 
 // lex a string value value:
 //
-//  strings must be quoted
+//	strings must be quoted
 //
-//  "stuff"    -> stuff
-//  "items's with quote"
-//
+//	"stuff"    -> stuff
+//	"items's with quote"
 func LexJsonIdentity(l *Lexer) StateFn {
 
 	l.SkipWhiteSpaces()
@@ -2931,15 +2909,15 @@ func LexJsonIdentity(l *Lexer) StateFn {
 }
 
 // LexComment looks for valid comments which are any of the following
-//   including the in-line comment blocks
 //
-//  /* hello */
-//  //  hello
-//  -- hello
-//  # hello
-//  SELECT name --name is the combined first-last name
-//         , age FROM `USER` ...
+//	 including the in-line comment blocks
 //
+//	/* hello */
+//	//  hello
+//	-- hello
+//	# hello
+//	SELECT name --name is the combined first-last name
+//	       , age FROM `USER` ...
 func LexComment(l *Lexer) StateFn {
 	//u.Debugf("checking comment: '%s' ", l.input[l.pos:l.pos+2])
 	// TODO:  switch statement instead of strings has prefix
@@ -3048,24 +3026,23 @@ func lexSingleLineComment(l *Lexer) StateFn {
 
 // LexNumber floats, integers, hex, exponential, signed
 //
-//  1.23
-//  100
-//  -827
-//  6.02e23
-//  0X1A2B,  0x1a2b, 0x1A2B.2B
+//	1.23
+//	100
+//	-827
+//	6.02e23
+//	0X1A2B,  0x1a2b, 0x1A2B.2B
 //
 // Floats must be in decimal and must either:
 //
-//     - Have digits both before and after the decimal point (both can be
-//       a single 0), e.g. 0.5, -100.0, or
-//     - Have a lower-case e that represents scientific notation,
-//       e.g. -3e-3, 6.02e23.
+//   - Have digits both before and after the decimal point (both can be
+//     a single 0), e.g. 0.5, -100.0, or
+//   - Have a lower-case e that represents scientific notation,
+//     e.g. -3e-3, 6.02e23.
 //
 // Integers can be:
 //
-//     - decimal (e.g. -827)
-//     - hexadecimal (must begin with 0x and must use capital A-F, e.g. 0x1A2B)
-//
+//   - decimal (e.g. -827)
+//   - hexadecimal (must begin with 0x and must use capital A-F, e.g. 0x1A2B)
 func LexNumber(l *Lexer) StateFn {
 	l.SkipWhiteSpaces()
 	typ, ok := scanNumericOrDuration(l, SUPPORT_DURATION)
@@ -3080,26 +3057,25 @@ func LexNumber(l *Lexer) StateFn {
 
 // LexNumberOrDuration floats, integers, hex, exponential, signed
 //
-//  1.23
-//  100
-//  -827
-//  6.02e23
-//  0X1A2B,  0x1a2b, 0x1A2B.2B
+//	1.23
+//	100
+//	-827
+//	6.02e23
+//	0X1A2B,  0x1a2b, 0x1A2B.2B
 //
 // durations:   45m, 2w, 20y, 22d, 40ms, 100ms, -100ms
 //
 // Floats must be in decimal and must either:
 //
-//     - Have digits both before and after the decimal point (both can be
-//       a single 0), e.g. 0.5, -100.0, or
-//     - Have a lower-case e that represents scientific notation,
-//       e.g. -3e-3, 6.02e23.
+//   - Have digits both before and after the decimal point (both can be
+//     a single 0), e.g. 0.5, -100.0, or
+//   - Have a lower-case e that represents scientific notation,
+//     e.g. -3e-3, 6.02e23.
 //
 // Integers can be:
 //
-//     - decimal (e.g. -827)
-//     - hexadecimal (must begin with 0x and must use capital A-F, e.g. 0x1A2B)
-//
+//   - decimal (e.g. -827)
+//   - hexadecimal (must begin with 0x and must use capital A-F, e.g. 0x1A2B)
 func LexNumberOrDuration(l *Lexer) StateFn {
 	l.SkipWhiteSpaces()
 	typ, ok := scanNumericOrDuration(l, true)
@@ -3114,7 +3090,6 @@ func LexNumberOrDuration(l *Lexer) StateFn {
 // LexDuration floats, integers time-durations
 //
 // durations:   45m, 2w, 20y, 22d, 40ms, 100ms, -100ms
-//
 func LexDuration(l *Lexer) StateFn {
 	l.SkipWhiteSpaces()
 	typ, ok := scanNumericOrDuration(l, true)
@@ -3129,7 +3104,6 @@ func LexDuration(l *Lexer) StateFn {
 //
 // It returns the scanned tokenType (tokenFloat or tokenInteger) and a flag
 // indicating if an error was found.
-//
 func scanNumber(l *Lexer) (typ TokenType, ok bool) {
 	return scanNumericOrDuration(l, false)
 }
@@ -3138,7 +3112,6 @@ func scanNumber(l *Lexer) (typ TokenType, ok bool) {
 //
 // It returns the scanned tokenType (tokenFloat or tokenInteger) and a flag
 // indicating if an error was found.
-//
 func scanNumericOrDuration(l *Lexer, doDuration bool) (typ TokenType, ok bool) {
 	typ = TokenInteger
 	// Optional leading sign.
