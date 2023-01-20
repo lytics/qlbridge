@@ -211,26 +211,36 @@ func resolveInclude(ctx expr.Includer, inc *expr.IncludeNode, depth int, visited
 }
 
 func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int, visitedIncludes []string) (value.Value, bool) {
-
-	if inc.ExprNode == nil {
-		incCtx, ok := ctx.(expr.EvalIncludeContext)
-		if !ok {
-			u.Errorf("No Includer context? %T  stack:%v", ctx, u.PrettyStack(14))
-			return nil, false
+	var matches, ok bool
+	var err error
+	cacheCtx, hasCache := ctx.(expr.IncludeCacheContext)
+	if hasCache {
+		matches, ok, err = cacheCtx.GetCachedResult(inc.Identity.Text)
+	}
+	if err != nil || !hasCache {
+		if inc.ExprNode == nil {
+			incCtx, ok := ctx.(expr.EvalIncludeContext)
+			if !ok {
+				u.Errorf("No Includer context? %T  stack:%v", ctx, u.PrettyStack(14))
+				return nil, false
+			}
+			if err := resolveInclude(incCtx, inc, depth, visitedIncludes); err != nil {
+				return nil, false
+			}
 		}
-		if err := resolveInclude(incCtx, inc, depth, visitedIncludes); err != nil {
-			return nil, false
+
+		switch exp := inc.ExprNode.(type) {
+		case *expr.IdentityNode:
+			if exp.Text == "*" || exp.Text == "match_all" {
+				return value.NewBoolValue(true), true
+			}
+		}
+
+		matches, ok = evalBool(ctx, inc.ExprNode, depth+1, visitedIncludes)
+		if hasCache {
+			cacheCtx.SetCache(inc.Identity.Text, matches, ok)
 		}
 	}
-
-	switch exp := inc.ExprNode.(type) {
-	case *expr.IdentityNode:
-		if exp.Text == "*" || exp.Text == "match_all" {
-			return value.NewBoolValue(true), true
-		}
-	}
-
-	matches, ok := evalBool(ctx, inc.ExprNode, depth+1, visitedIncludes)
 	if !ok {
 		if inc.Negated() {
 			return value.NewBoolValue(true), true

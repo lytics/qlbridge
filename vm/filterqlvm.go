@@ -1,6 +1,8 @@
 package vm
 
 import (
+	"strings"
+
 	u "github.com/araddon/gou"
 
 	"github.com/lytics/qlbridge/expr"
@@ -73,13 +75,24 @@ func EvalFilterSelect(sel *rel.FilterSelect, writeContext expr.ContextWriter, re
 // Matches executes a FilterQL statement against an evaluation context
 // returning true if the context matches.
 func MatchesInc(inc expr.Includer, cr expr.EvalContext, stmt *rel.FilterStatement) (bool, bool) {
-	return matchesExpr(filterql{cr, inc}, stmt.Filter, 0)
+	return Matches(filterql{cr, inc}, stmt)
 }
 
 // Matches executes a FilterQL statement against an evaluation context
 // returning true if the context matches.
 func Matches(cr expr.EvalContext, stmt *rel.FilterStatement) (bool, bool) {
-	return matchesExpr(cr, stmt.Filter, 0)
+	cacheCtx, hasCache := cr.(expr.IncludeCacheContext)
+	if hasCache {
+		matches, ok, err := cacheCtx.GetCachedResult(strings.ToLower(stmt.Alias))
+		if err == nil {
+			return matches, ok
+		}
+	}
+	matches, ok := matchesExpr(cr, stmt.Filter, 0)
+	if hasCache && stmt.Alias != "" {
+		cacheCtx.SetCache(strings.ToLower(stmt.Alias), matches, ok)
+	}
+	return matches, ok
 }
 
 // MatchesExpr executes a expr.Node expression against an evaluation context

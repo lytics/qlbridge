@@ -2,6 +2,7 @@ package vm_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -315,6 +316,76 @@ func TestInclude(t *testing.T) {
 		assert.Equal(t, nil, err)
 		_, ok := matchTest(e1, q) // Should fail to evaluate because no includer
 		assert.True(t, !ok)
+	}
+}
+
+type contextWithCache struct {
+	expr.EvalContext
+	IncludeCalled    bool
+	CachedResultUsed bool
+	SetCacheCalled   bool
+}
+
+func (i *contextWithCache) Include(name string) (expr.Node, error) {
+	if name != "test" {
+		return nil, fmt.Errorf("Expected name 'test' but received: %s", name)
+	}
+	i.IncludeCalled = true
+	f, err := rel.ParseFilterQL("FILTER AND (x > 5)")
+	if err != nil {
+		return nil, err
+	}
+	return f.Filter, nil
+}
+
+func (i *contextWithCache) GetCachedResult(name string) (bool, bool, error) {
+	if name != "cached_include" {
+		return false, false, errors.New("cache miss")
+	}
+	i.CachedResultUsed = true
+	return true, true, nil
+}
+
+func (i *contextWithCache) SetCache(string, bool, bool) {
+	i.SetCacheCalled = true
+}
+
+func TestIncludeCache(t *testing.T) {
+	t.Parallel()
+
+	e := datasource.NewContextSimpleNative(map[string]interface{}{"x": 6})
+
+	q1, err := rel.ParseFilterQL("FILTER INCLUDE cached_include")
+	q2, err := rel.ParseFilterQL("FILTER INCLUDE test")
+	q3, err := rel.ParseFilterQL("FILTER EXISTS does_not_matter_because_cached ALIAS cached_include ")
+	assert.Equal(t, nil, err)
+	{
+		ctx := &contextWithCache{EvalContext: e}
+		match, ok := vm.Matches(ctx, q1)
+		assert.True(t, ok)
+		assert.True(t, match)
+		assert.True(t, ctx.CachedResultUsed)
+		assert.False(t, ctx.SetCacheCalled)
+		assert.False(t, ctx.IncludeCalled)
+	}
+
+	{
+		ctx := &contextWithCache{EvalContext: e}
+		match, ok := vm.Matches(ctx, q2)
+		assert.True(t, ok)
+		assert.True(t, match)
+		assert.False(t, ctx.CachedResultUsed)
+		assert.True(t, ctx.SetCacheCalled)
+		assert.True(t, ctx.IncludeCalled)
+	}
+	{
+		ctx := &contextWithCache{EvalContext: e}
+		match, ok := vm.Matches(ctx, q3)
+		assert.True(t, ok)
+		assert.True(t, match)
+		assert.True(t, ctx.CachedResultUsed)
+		assert.False(t, ctx.SetCacheCalled)
+		assert.False(t, ctx.IncludeCalled)
 	}
 }
 
