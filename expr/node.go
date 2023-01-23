@@ -136,7 +136,11 @@ type (
 		ContextReader
 		Includer
 	}
-
+	// IncludeCacheContext used to cache results of include node evaluations
+	IncludeCacheContext interface {
+		GetCachedResult(name string) (bool, bool, error)
+		SetCache(name string, matches, ok bool)
+	}
 	// ContextReader is a key-value interface to read the context of message/row
 	// using a  Get("key") interface.  Used by vm to evaluate messages
 	ContextReader interface {
