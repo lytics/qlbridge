@@ -82,7 +82,7 @@ func MatchesInc(inc expr.Includer, cr expr.EvalContext, stmt *rel.FilterStatemen
 // returning true if the context matches.
 func Matches(cr expr.EvalContext, stmt *rel.FilterStatement) (bool, bool) {
 	cacheCtx, hasCache := cr.(expr.IncludeCacheContext)
-	if hasCache {
+	if hasCache && stmt.Alias != "" {
 		matches, ok, err := cacheCtx.GetCachedResult(strings.ToLower(stmt.Alias))
 		if err == nil {
 			return matches, ok
