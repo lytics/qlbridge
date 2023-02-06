@@ -1,8 +1,6 @@
 package vm
 
 import (
-	"strings"
-
 	u "github.com/araddon/gou"
 
 	"github.com/lytics/qlbridge/expr"
@@ -19,6 +17,12 @@ var (
 type filterql struct {
 	expr.EvalContext
 	expr.Includer
+}
+
+type filterqlWithCache struct {
+	expr.EvalContext
+	expr.Includer
+	expr.IncludeCacheContext
 }
 
 // EvalFilerSelect evaluates a FilterSelect statement from read, into write context
@@ -75,24 +79,16 @@ func EvalFilterSelect(sel *rel.FilterSelect, writeContext expr.ContextWriter, re
 // Matches executes a FilterQL statement against an evaluation context
 // returning true if the context matches.
 func MatchesInc(inc expr.Includer, cr expr.EvalContext, stmt *rel.FilterStatement) (bool, bool) {
-	return Matches(filterql{cr, inc}, stmt)
+	if cacheCtx, ok := cr.(expr.IncludeCacheContext); ok {
+		return matchesExpr(filterqlWithCache{cr, inc, cacheCtx}, stmt.Filter, 0)
+	}
+	return matchesExpr(filterql{cr, inc}, stmt.Filter, 0)
 }
 
 // Matches executes a FilterQL statement against an evaluation context
 // returning true if the context matches.
 func Matches(cr expr.EvalContext, stmt *rel.FilterStatement) (bool, bool) {
-	cacheCtx, hasCache := cr.(expr.IncludeCacheContext)
-	if hasCache && stmt.Alias != "" {
-		matches, ok, err := cacheCtx.GetCachedResult(strings.ToLower(stmt.Alias))
-		if err == nil {
-			return matches, ok
-		}
-	}
-	matches, ok := matchesExpr(cr, stmt.Filter, 0)
-	if hasCache && stmt.Alias != "" {
-		cacheCtx.SetCache(strings.ToLower(stmt.Alias), matches, ok)
-	}
-	return matches, ok
+	return matchesExpr(cr, stmt.Filter, 0)
 }
 
 // MatchesExpr executes a expr.Node expression against an evaluation context

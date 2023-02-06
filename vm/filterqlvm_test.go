@@ -357,7 +357,6 @@ func TestIncludeCache(t *testing.T) {
 
 	q1, err := rel.ParseFilterQL("FILTER INCLUDE cached_include")
 	q2, err := rel.ParseFilterQL("FILTER INCLUDE test")
-	q3, err := rel.ParseFilterQL("FILTER EXISTS does_not_matter_because_cached ALIAS cached_include ")
 	assert.Equal(t, nil, err)
 	{
 		ctx := &contextWithCache{EvalContext: e}
@@ -377,15 +376,6 @@ func TestIncludeCache(t *testing.T) {
 		assert.False(t, ctx.CachedResultUsed)
 		assert.True(t, ctx.SetCacheCalled)
 		assert.True(t, ctx.IncludeCalled)
-	}
-	{
-		ctx := &contextWithCache{EvalContext: e}
-		match, ok := vm.Matches(ctx, q3)
-		assert.True(t, ok)
-		assert.True(t, match)
-		assert.True(t, ctx.CachedResultUsed)
-		assert.False(t, ctx.SetCacheCalled)
-		assert.False(t, ctx.IncludeCalled)
 	}
 }
 
