@@ -138,7 +138,10 @@ type (
 	}
 	// IncludeCacheContext used to cache results of include node evaluations
 	IncludeCacheContext interface {
+		// GetCachedResult returns cached values for matches and ok as the first two return values respectively
+		// and returns an error in the case of a cache miss
 		GetCachedResult(name string) (bool, bool, error)
+		// SetCache stores matches and ok under the provided identifier name
 		SetCache(name string, matches, ok bool)
 	}
 	// ContextReader is a key-value interface to read the context of message/row
