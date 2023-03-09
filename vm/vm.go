@@ -303,12 +303,11 @@ func walkBoolean(ctx expr.EvalContext, n *expr.BooleanNode, depth int, visitedIn
 
 // Binary operands:   =, ==, !=, OR, AND, >, <, >=, <=, LIKE, contains
 //
-//       x == y,   x = y
-//       x != y
-//       x OR y
-//       x > y
-//       x < =
-//
+//	x == y,   x = y
+//	x != y
+//	x OR y
+//	x > y
+//	x < =
 func walkBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedIncludes []string) (value.Value, bool) {
 	val, ok := evalBinary(ctx, node, depth, visitedIncludes)
 	if !ok {
@@ -684,6 +683,13 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 					}
 				}
 				return value.BoolValueFalse, true
+			case value.BoolValue:
+				for _, val := range at.Val() {
+					if strings.Contains(val, bv.ToString()) {
+						return value.BoolValueTrue, true
+					}
+				}
+				return value.BoolValueFalse, true
 			}
 		case lex.TokenLike:
 
@@ -855,8 +861,7 @@ func walkUnary(ctx expr.EvalContext, node *expr.UnaryNode, depth int) (value.Val
 
 // walkTernary ternary evaluator
 //
-//     A   BETWEEN   B  AND C
-//
+//	A   BETWEEN   B  AND C
 func walkTernary(ctx expr.EvalContext, node *expr.TriNode, depth int) (value.Value, bool) {
 
 	a, aok := Eval(ctx, node.Args[0])
@@ -936,8 +941,7 @@ func walkTernary(ctx expr.EvalContext, node *expr.TriNode, depth int) (value.Val
 
 // walkArray Array evaluator:  evaluate multiple values into an array
 //
-//     (b,c,d)
-//
+//	(b,c,d)
 func walkArray(ctx expr.EvalContext, node *expr.ArrayNode, depth int) (value.Value, bool) {
 
 	vals := make([]value.Value, len(node.Args))
@@ -951,7 +955,7 @@ func walkArray(ctx expr.EvalContext, node *expr.ArrayNode, depth int) (value.Val
 	return value.NewSliceValues(vals), true
 }
 
-//  walkFunc evaluates a function
+// walkFunc evaluates a function
 func walkFunc(ctx expr.EvalContext, node *expr.FuncNode, depth int) (value.Value, bool) {
 
 	if node.F.CustomFunc == nil {
