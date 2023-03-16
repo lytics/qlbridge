@@ -265,7 +265,7 @@ func (t *tree) parse() (_ Node, err error) {
 			err = fmt.Errorf("parse error: %v", p)
 		}
 	}()
-	return t.O(0), err
+	return t.Or(0), err
 }
 
 /*
@@ -286,13 +286,13 @@ TODO:
  - if/else, case, for
  - call stack & vars
 --------------------------------------
-O -> A {( "||" | OR  ) A}
-A -> C {( "&&" | AND ) C}
-C -> P {( "==" | "!=" | ">" | ">=" | "<" | "<=" | "LIKE" | "IN" | "CONTAINS" | "INTERSECTS") P}
-P -> M {( "+" | "-" ) M}
-M -> F {( "*" | "/" ) F}
-F -> v | "(" O ")" | "!" v | "-" O | "NOT" C | "EXISTS" v | "IS" O | "AND (" O ")" | "OR (" O ")"
-v -> value | Func | "INCLUDE" <identity>
+Or(O) -> A {( "||" | OR  ) A}
+And(A) -> C {( "&&" | AND ) C}
+BinaryComparison(C) -> P {( "==" | "!=" | ">" | ">=" | "<" | "<=" | "LIKE" | "IN" | "CONTAINS" | "INTERSECTS") P}
+MathAddSub(P) -> M {( "+" | "-" ) M}
+MathMultiDiv(M) -> F {( "*" | "/" ) F}
+UnaryComparison(F) -> v | "(" O ")" | "!" v | "-" O | "NOT" C | "EXISTS" v | "IS" O | "AND (" O ")" | "OR (" O ")"
+base(v) -> value | Func | "INCLUDE" <identity>
 Func -> <identity> "(" value {"," value} ")"
 value -> number | "string" | O | <identity>
 
@@ -315,16 +315,16 @@ Recursion:  We recurse so the LAST to evaluate is the highest (parent, then or)
 */
 
 // expr:
-func (t *tree) O(depth int) Node {
+func (t *tree) Or(depth int) Node {
 	debugf(depth, "O  pre: %v", t.Cur())
-	n := t.A(depth)
+	n := t.And(depth)
 	debugf(depth, "O post: n:%v cur:%v ", n, t.Cur())
 	for {
 		tok := t.Cur()
 		switch tok.T {
 		case lex.TokenLogicOr, lex.TokenOr:
 			t.Next()
-			n = NewBinaryNode(tok, n, t.A(depth+1))
+			n = NewBinaryNode(tok, n, t.And(depth+1))
 		case lex.TokenCommentSingleLine:
 			t.Next() // consume --
 			t.Next() // consume comment after --
@@ -338,9 +338,9 @@ func (t *tree) O(depth int) Node {
 	}
 }
 
-func (t *tree) A(depth int) Node {
+func (t *tree) And(depth int) Node {
 	debugf(depth, "A  pre: %v", t.Cur())
-	n := t.C(depth)
+	n := t.BinaryComparison(depth)
 	for {
 		debugf(depth, "A post:  cur=%v peek=%v", t.Cur(), t.Peek())
 		switch tok := t.Cur(); tok.T {
@@ -352,7 +352,7 @@ func (t *tree) A(depth int) Node {
 			}
 			t.Next()
 			debugf(depth, "AND pre-binary n=%s", n)
-			n = NewBinaryNode(tok, n, t.C(depth+1))
+			n = NewBinaryNode(tok, n, t.BinaryComparison(depth+1))
 			debugf(depth, "and post %s", n)
 		default:
 			return n
@@ -360,9 +360,9 @@ func (t *tree) A(depth int) Node {
 	}
 }
 
-func (t *tree) C(depth int) Node {
+func (t *tree) BinaryComparison(depth int) Node {
 	debugf(depth, "C  pre: %v", t.Cur())
-	n := t.P(depth)
+	n := t.MathAddSub(depth)
 	for {
 		debugf(depth, "C post: %v peek=%v n=%v", t.Cur(), t.Peek(), n)
 		switch cur := t.Cur(); cur.T {
@@ -375,7 +375,7 @@ func (t *tree) C(depth int) Node {
 			if t.Cur().T == lex.TokenNegate {
 				cur = t.Next()
 				ne := lex.Token{T: lex.TokenNE, V: "!="}
-				return NewBinaryNode(ne, n, t.P(depth+1))
+				return NewBinaryNode(ne, n, t.MathAddSub(depth+1))
 			}
 			u.Warnf("TokenIS?  is this supported?")
 			return NewUnary(cur, t.cInner(n, depth+1))
@@ -392,14 +392,14 @@ func (t *tree) cInner(n Node, depth int) Node {
 		case lex.TokenEqual, lex.TokenEqualEqual, lex.TokenNE, lex.TokenGT, lex.TokenGE,
 			lex.TokenLE, lex.TokenLT, lex.TokenLike, lex.TokenContains:
 			t.Next()
-			n = NewBinaryNode(cur, n, t.P(depth+1))
+			n = NewBinaryNode(cur, n, t.MathAddSub(depth+1))
 		case lex.TokenBetween:
 			// weird syntax:    BETWEEN x AND y     AND is ignored essentially
 			t.Next()
-			n2 := t.P(depth)
+			n2 := t.MathAddSub(depth)
 			t.expect(lex.TokenLogicAnd, "input")
 			t.Next()
-			n = NewTriNode(cur, n, n2, t.P(depth+1))
+			n = NewTriNode(cur, n, n2, t.MathAddSub(depth+1))
 		case lex.TokenIN:
 			t.Next()
 			switch t.Cur().T {
@@ -458,30 +458,30 @@ func (t *tree) cInner(n Node, depth int) Node {
 	}
 }
 
-func (t *tree) P(depth int) Node {
+func (t *tree) MathAddSub(depth int) Node {
 	debugf(depth, "P pre : %v", t.Cur())
-	n := t.M(depth)
+	n := t.MathMultiDiv(depth)
 	debugf(depth, "P post: %v", t.Cur())
 	for {
 		switch cur := t.Cur(); cur.T {
 		case lex.TokenPlus, lex.TokenMinus:
 			t.Next()
-			n = NewBinaryNode(cur, n, t.M(depth+1))
+			n = NewBinaryNode(cur, n, t.MathMultiDiv(depth+1))
 		default:
 			return n
 		}
 	}
 }
 
-func (t *tree) M(depth int) Node {
+func (t *tree) MathMultiDiv(depth int) Node {
 	debugf(depth, "M pre : %v", t.Cur())
-	n := t.F(depth)
+	n := t.UnaryComparison(depth)
 	debugf(depth, "M post: %v  %v", t.Cur(), n)
 	for {
 		switch cur := t.Cur(); cur.T {
 		case lex.TokenStar, lex.TokenMultiply, lex.TokenDivide, lex.TokenModulus:
 			t.Next()
-			n = NewBinaryNode(cur, n, t.F(depth+1))
+			n = NewBinaryNode(cur, n, t.UnaryComparison(depth+1))
 		default:
 			return n
 		}
@@ -489,7 +489,7 @@ func (t *tree) M(depth int) Node {
 }
 
 // F -> v | "(" O ")" | "!" O | "-" O | "NOT" C | "EXISTS" v | "IS" O | "AND (" O ")" | "OR (" O ")"
-func (t *tree) F(depth int) Node {
+func (t *tree) UnaryComparison(depth int) Node {
 	debugf(depth, "F: %v", t.Cur())
 
 	// Urnary operations
@@ -516,14 +516,14 @@ func (t *tree) F(depth int) Node {
 			//
 			// NOT identity > 7
 
-			arg = t.C(depth + 1)
+			arg = t.BinaryComparison(depth + 1)
 		default:
 
 			switch t.Cur().T {
 			case lex.TokenUdfExpr:
-				arg = t.v(depth + 1)
+				arg = t.base(depth + 1)
 			default:
-				arg = t.C(depth + 1)
+				arg = t.BinaryComparison(depth + 1)
 			}
 		}
 		n := NewUnary(cur, arg)
@@ -533,15 +533,15 @@ func (t *tree) F(depth int) Node {
 		// Urnary operations:  require right side value node
 		t.Next() // Consume "EXISTS"
 		debugf(depth, "F PRE  EXISTS:%v   cur:%v", cur, t.Cur())
-		n := NewUnary(cur, t.v(depth+1))
+		n := NewUnary(cur, t.base(depth+1))
 		debugf(depth, "F POST EXISTS: %s  cur:%v", n, t.Cur())
 		return n
 	case lex.TokenIs:
 		nxt := t.Next()
 		if nxt.T == lex.TokenNegate {
-			return NewUnary(cur, t.F(depth+1))
+			return NewUnary(cur, t.UnaryComparison(depth+1))
 		}
-		return NewUnary(cur, t.F(depth+1))
+		return NewUnary(cur, t.UnaryComparison(depth+1))
 	case lex.TokenLogicAnd, lex.TokenLogicOr:
 		debugf(depth, "found boolean and/or (O)? %v", cur)
 		t.Next() // consume AND/OR
@@ -572,12 +572,12 @@ func (t *tree) F(depth int) Node {
 		}
 		t.unexpected(t.Cur(), "Expected Left Paren after AND/OR ()")
 	default:
-		return t.v(depth)
+		return t.base(depth)
 	}
 	panic("unreachable")
 }
 
-func (t *tree) v(depth int) Node {
+func (t *tree) base(depth int) Node {
 	debugf(depth, "v: cur(): %v   peek:%v", t.Cur(), t.Peek())
 	switch cur := t.Cur(); cur.T {
 	case lex.TokenInclude:
@@ -633,7 +633,7 @@ func (t *tree) v(depth int) Node {
 		return t.Func(depth, cur)
 	case lex.TokenLeftParenthesis:
 		t.Next() // Consume  (
-		n := t.O(depth + 1)
+		n := t.Or(depth + 1)
 		debugf(depth, "v: paren  T:%T  %v   cur:%v", n, n, t.Cur())
 		if bn, ok := n.(*BinaryNode); ok {
 			bn.Paren = true
@@ -690,7 +690,7 @@ func (t *tree) Func(depth int, funcTok lex.Token) (fn *FuncNode) {
 		// We are not in a comma style function
 		//  CAST(<expression> AS <identity>)
 
-		node = t.O(depth + 1)
+		node = t.Or(depth + 1)
 		if node != nil {
 			fn.append(node)
 		}
@@ -729,7 +729,7 @@ func (t *tree) Func(depth int, funcTok lex.Token) (fn *FuncNode) {
 				t.Next()
 				continue
 			default:
-				node = t.O(depth + 1)
+				node = t.Or(depth + 1)
 			}
 			lastComma = false
 
@@ -757,7 +757,7 @@ func (t *tree) Func(depth int, funcTok lex.Token) (fn *FuncNode) {
 				lex.TokenLE, lex.TokenLT, lex.TokenStar, lex.TokenMultiply, lex.TokenDivide:
 				// this func arg is an expression
 				//     toint(str_item * 5)
-				node = t.O(depth + 1)
+				node = t.Or(depth + 1)
 				if node != nil {
 					fn.append(node)
 				}
@@ -800,7 +800,7 @@ func (t *tree) ArrayNode(depth int) Node {
 		case lex.TokenComma:
 			t.Next()
 		default:
-			n := t.O(depth)
+			n := t.Or(depth)
 			if n != nil {
 				an.Append(n)
 			} else {
@@ -883,7 +883,7 @@ func nodeArray(t *tree, depth int) ([]Node, error, bool) {
 		}
 
 		debugf(depth, "NodeArray(%d) cur:%v peek:%v", len(nodes), t.Cur().V, t.Peek().V)
-		n := t.O(depth + 1)
+		n := t.Or(depth + 1)
 		if n == nil {
 			return nodes, nil, true
 		}
