@@ -169,8 +169,7 @@ func newTreeFuncs(pager TokenPager, fr FuncResolver) *tree {
 
 // ParseExpression parse a single Expression, returning an Expression Node
 //
-//    ParseExpression("5 * toint(item_name)")
-//
+//	ParseExpression("5 * toint(item_name)")
 func ParseExpression(expressionText string) (Node, error) {
 	l := lex.NewLexer(expressionText, lex.LogicalExpressionDialect)
 	pager := NewLexTokenPager(l)
@@ -183,8 +182,7 @@ func ParseExpression(expressionText string) (Node, error) {
 // MustParse parse a single Expression, returning an Expression Node
 // and panics if it cannot be parsed
 //
-//    MustParse("5 * toint(item_name)")
-//
+//	MustParse("5 * toint(item_name)")
 func MustParse(expressionText string) Node {
 	n, err := ParseExpression(expressionText)
 	if err != nil {
@@ -197,8 +195,7 @@ func MustParse(expressionText string) Node {
 //
 // @fr = function registry with any additional functions
 //
-//    ParseExprWithFuncs("5 * toint(item_name)", funcRegistry)
-//
+//	ParseExprWithFuncs("5 * toint(item_name)", funcRegistry)
 func ParseExprWithFuncs(p TokenPager, fr FuncResolver) (Node, error) {
 	t := newTreeFuncs(p, fr)
 	// Parser panics on unexpected syntax, convert this into an err
@@ -616,7 +613,7 @@ func (t *tree) v(depth int) Node {
 	case lex.TokenNull:
 		t.Next()
 		return NewNull(cur)
-	case lex.TokenStar:
+	case lex.TokenStar, lex.TokenMultiply:
 		n := NewStringNoQuoteNode(cur.V)
 		t.Next()
 		return n
@@ -814,8 +811,9 @@ func (t *tree) ArrayNode(depth int) Node {
 }
 
 // ValueArray
-//     IN ("a","b","c")
-//     ["a","b","c"]
+//
+//	IN ("a","b","c")
+//	["a","b","c"]
 func ValueArray(depth int, pg TokenPager) (value.Value, error) {
 
 	vals := make([]value.Value, 0)
