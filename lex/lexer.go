@@ -1324,7 +1324,6 @@ func LexListOfArgs(l *Lexer) StateFn {
 
 	r := l.Next()
 	//u.Debugf("in LexListOfArgs:  '%s'", string(r))
-
 	switch r {
 	case ')':
 		//l.Emit(TokenRightParenthesis)
@@ -1341,10 +1340,9 @@ func LexListOfArgs(l *Lexer) StateFn {
 		if &l.lastToken != nil && l.lastToken.T == TokenLeftParenthesis {
 			l.Emit(TokenStar)
 			return nil
-		} else {
-			l.backup()
-			return LexExpression
 		}
+		l.backup()
+		return LexExpression
 	case '!', '=', '>', '<', '-', '+', '%', '&', '/', '|':
 		l.backup()
 		return LexExpression
@@ -1369,7 +1367,6 @@ func LexListOfArgs(l *Lexer) StateFn {
 			//u.Warnf("found keyword while looking for arg? %v", string(r))
 			return nil
 		}
-
 		//u.Debugf("LexListOfArgs sending LexExpressionOrIdentity: %v", string(peekWord))
 		l.Push("LexListOfArgs", LexListOfArgs)
 		return LexExpressionOrIdentity

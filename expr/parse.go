@@ -613,6 +613,7 @@ func (t *tree) v(depth int) Node {
 	case lex.TokenNull:
 		t.Next()
 		return NewNull(cur)
+	// This really should be only TokenStar, but the lexer emits TokenMultiply as of (3.16.23).
 	case lex.TokenStar, lex.TokenMultiply:
 		n := NewStringNoQuoteNode(cur.V)
 		t.Next()

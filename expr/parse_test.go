@@ -8,6 +8,8 @@ import (
 	u "github.com/araddon/gou"
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/expr/builtins"
+	"github.com/lytics/qlbridge/lex"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -277,7 +279,7 @@ var exprTests = []exprTest{
 	{
 		`
 		NOT(exists(@@content_whitelist_domains))
-		OR len(@@content_whitelist_domains) == 0 
+		OR len(@@content_whitelist_domains) == 0
 		`,
 		`NOT(exists(@@content_whitelist_domains)) OR len(@@content_whitelist_domains) == 0`,
 		true,
@@ -291,6 +293,11 @@ var exprTests = []exprTest{
 			OR host(url) IN hosts(@@content_whitelist_domains)
 		)`,
 		`version == 4 AND (NOT(exists(@@content_whitelist_domains)) OR len(@@content_whitelist_domains) == 0 OR host(url) IN hosts(@@content_whitelist_domains))`,
+		true,
+	},
+	{
+		`AND ( *, word = "hello" )`,
+		`AND ( *, word = "hello" )`,
 		true,
 	},
 	// Invalid Statements
@@ -354,5 +361,62 @@ func TestParseExpressions(t *testing.T) {
 			t.Errorf("\nGot     :\t%v\nExpected:\t%v", result, test.result)
 			u.Warnf("%#v", exprNode)
 		}
+	}
+}
+
+func TestCur(t *testing.T) {
+	statement := `FILTER AND ( *, word = "hello" )`
+	l := lex.NewFilterQLLexer(statement)
+	pager := expr.NewLexTokenPager(l)
+	for _, tok := range []lex.TokenType{lex.TokenFilter, lex.TokenLogicAnd, lex.TokenLeftParenthesis, lex.TokenMultiply, lex.TokenComma, lex.TokenIdentity, lex.TokenEqual, lex.TokenValue, lex.TokenRightParenthesis} {
+		require.Equal(t, tok, pager.Cur().T)
+		pager.Next()
+	}
+	tests := []struct {
+		name         string
+		stmt         string
+		expectedToks []lex.TokenType
+	}{
+		// The following tests show that the lexer emits "TokenMultiply" instead of "TokenStar"
+		// for clauses that do NOT involve multiplication. Eventually, we should change this
+		// so the token emitted is Star.
+		{
+			name:         "TestStar",
+			stmt:         `FILTER *`,
+			expectedToks: []lex.TokenType{lex.TokenMultiply},
+		},
+		{
+			name:         "TestNestedStar",
+			stmt:         `FILTER AND ( *, word = "hello" )`,
+			expectedToks: []lex.TokenType{lex.TokenLogicAnd, lex.TokenLeftParenthesis, lex.TokenMultiply, lex.TokenComma, lex.TokenIdentity, lex.TokenEqual, lex.TokenValue, lex.TokenRightParenthesis},
+		},
+		{
+			name:         "TestMultiply",
+			stmt:         `FILTER n = 7 * 7`,
+			expectedToks: []lex.TokenType{lex.TokenIdentity, lex.TokenEqual, lex.TokenInteger, lex.TokenMultiply, lex.TokenInteger},
+		},
+		{
+			name:         "TestInListStar",
+			stmt:         `FILTER word IN (a, *)`,
+			expectedToks: []lex.TokenType{lex.TokenIdentity, lex.TokenIN, lex.TokenLeftParenthesis, lex.TokenIdentity, lex.TokenComma, lex.TokenMultiply, lex.TokenRightParenthesis},
+		},
+		{
+			name:         "TestInStar",
+			stmt:         `FILTER word IN (*)`,
+			expectedToks: []lex.TokenType{lex.TokenIdentity, lex.TokenIN, lex.TokenLeftParenthesis, lex.TokenStar, lex.TokenRightParenthesis},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			l := lex.NewFilterQLLexer(test.stmt)
+			pager := expr.NewLexTokenPager(l)
+			// Consume Filter token.
+			pager.Next()
+
+			for _, tok := range test.expectedToks {
+				require.Equal(t, tok, pager.Cur().T)
+				pager.Next()
+			}
+		})
 	}
 }
