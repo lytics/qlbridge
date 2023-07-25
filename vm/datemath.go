@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"regexp"
 	"strings"
 	"time"
 
@@ -114,6 +115,8 @@ func (d *DateConverter) Boundary() time.Time {
 	return d.bt
 }
 
+var nowRegex = regexp.MustCompile(`^now([+-]+.*)*$`)
+
 // Determine if this expression node uses datemath (ie, "now-4h")
 func (d *DateConverter) findDateMath(node expr.Node) {
 
@@ -124,8 +127,8 @@ func (d *DateConverter) findDateMath(node expr.Node) {
 			switch narg := arg.(type) {
 			case *expr.StringNode:
 				val := strings.ToLower(narg.Text)
-				if strings.HasPrefix(val, `now`) {
 
+				if nowRegex.MatchString(val) {
 					d.TimeStrings = append(d.TimeStrings, val)
 
 					// If left side is datemath   "now-3d" < ident then re-write to have ident on left

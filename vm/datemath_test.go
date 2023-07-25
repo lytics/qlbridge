@@ -258,7 +258,23 @@ func TestDateMath(t *testing.T) {
 	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
 	assert.NotEqual(t, nil, err)
 
+	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now-")`)
+	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	assert.NotEqual(t, nil, err)
+
+	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now+")`)
+	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	assert.NotEqual(t, nil, err)
+
+	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now+now")`)
+	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	assert.NotEqual(t, nil, err)
+
 	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now-3d")`)
+	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	assert.Equal(t, nil, err)
+
+	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now")`)
 	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
 	assert.Equal(t, nil, err)
 }
