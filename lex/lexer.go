@@ -55,38 +55,69 @@ const (
 	hexDigits = "0123456789ABCDEF"
 )
 
-// StateFn represents the state of the lexer as a function that returns the
-// next state.
-type StateFn func(*Lexer) StateFn
+type (
+	// StateFn represents the state of the lexer as a function that returns the
+	// next state.
+	StateFn func(*Lexer) StateFn
 
-// NamedStateFn is a StateFn which has a name for tracing debugging.
-type NamedStateFn struct {
-	Name    string
-	StateFn StateFn
+	// NamedStateFn is a StateFn which has a name for tracing debugging.
+	NamedStateFn struct {
+		Name    string
+		StateFn StateFn
+	}
+
+	LexerOption func(*Lexer)
+)
+
+func WithInput(input string) LexerOption {
+	return func(l *Lexer) {
+		l.input = input
+	}
 }
 
-// NewLexerState Creates a new lexer for the input string and initial state.
-func NewLexerState(input string, dialect *Dialect, initialState StateFn) *Lexer {
-	// Three tokens of buffering is sufficient for all state functions.
-	l := &Lexer{
-		input:   input,
-		state:   initialState,
-		tokens:  make(chan Token, 3),
-		stack:   make([]NamedStateFn, 0, 10),
-		dialect: dialect,
+func WithDialect(dialect *Dialect) LexerOption {
+	return func(l *Lexer) {
+		l.dialect = dialect
+		if len(dialect.IdentityQuoting) > 0 {
+			l.identityRunes = dialect.IdentityQuoting
+		} else {
+			l.identityRunes = IdentityQuoting
+		}
 	}
-	if len(dialect.IdentityQuoting) > 0 {
-		l.identityRunes = dialect.IdentityQuoting
-	} else {
-		l.identityRunes = IdentityQuoting
+}
+
+func WithInitialState(initialState StateFn) LexerOption {
+	return func(l *Lexer) {
+		l.state = initialState
+	}
+}
+
+func WithOverrideDepthLimit(override bool) LexerOption {
+	return func(l *Lexer) {
+		l.overrideDepthLimit = override
+	}
+}
+
+// NewLexerWithOptions creates new lexer with provided option
+func NewLexerWithOptions(options ...LexerOption) *Lexer {
+	l := &Lexer{
+		tokens: make(chan Token, 3), // Three tokens of buffering is sufficient for all state functions.
+		stack:  make([]NamedStateFn, 0, 10),
+	}
+
+	for _, opt := range options {
+		opt(l)
 	}
 	l.init()
 	return l
 }
 
 // NewLexer creates a new lexer for the input string.
-func NewLexer(input string, dialect *Dialect) *Lexer {
-	return NewLexerState(input, dialect, LexDialectForStatement)
+func NewLexer(input string, dialect *Dialect, options ...LexerOption) *Lexer {
+	options = append(options, WithInput(input))
+	options = append(options, WithDialect(dialect))
+	options = append(options, WithInitialState(LexDialectForStatement))
+	return NewLexerWithOptions(options...)
 }
 
 // Lexer holds the state of the lexical scanning.
@@ -106,18 +137,17 @@ type Lexer struct {
 	linepos       int        // Position of start of current line
 	lastToken     Token      // last token we emitted
 	tokens        chan Token // channel of scanned tokens we output on
-	doubleDelim   bool       // flag for tags starting with double braces
 	dialect       *Dialect   // Dialect is the syntax-rules for all statement-types of this language
 	statement     *Clause    // Statement type we are lexing
 	curClause     *Clause    // Current clause we are lexing, we descend, ascend, iter()
-	descent       *Clause    // Clause we have descended to
 	peekedWordPos int
 	peekedWord    string
 	lastQuoteMark byte
 
 	// Due to nested Expressions and evaluation this allows us to descend/ascend
 	// during lex, using push/pop to add and remove states needing evaluation
-	stack []NamedStateFn
+	stack              []NamedStateFn
+	overrideDepthLimit bool
 }
 
 func (l *Lexer) init() {
@@ -170,7 +200,7 @@ func (l *Lexer) NextToken() Token {
 // Push a named StateFn onto stack.
 func (l *Lexer) Push(name string, state StateFn) {
 	debugf("push %d %v", len(l.stack)+1, name)
-	if len(l.stack) < maxDepth {
+	if len(l.stack) < maxDepth || l.overrideDepthLimit {
 		l.stack = append(l.stack, NamedStateFn{name, state})
 	} else {
 		out := ""
@@ -253,7 +283,7 @@ func (l *Lexer) PeekX(x int) string {
 	return l.input[l.pos : l.pos+x]
 }
 
-// get single character PAST
+// peekRunePast gets single character PAST
 func (l *Lexer) peekRunePast(skip int) rune {
 	if l.pos+skip+1 > len(l.input) {
 		return rune(0)
@@ -282,24 +312,16 @@ func (l *Lexer) PeekWord() string {
 	//    - move to some type of early bail?  ie, use Accept() wherever possible?
 	skipWs := 0
 	for ; skipWs < len(l.input)-l.pos; skipWs++ {
-		r, ri := utf8.DecodeRuneInString(l.input[l.pos+skipWs:])
-		if ri != 1 {
-			//skipWs += (ri - 1)
-		}
+		r, _ := utf8.DecodeRuneInString(l.input[l.pos+skipWs:])
 		if !unicode.IsSpace(r) {
 			break
 		}
 	}
 	i := skipWs
 	for ; i < len(l.input)-l.pos; i++ {
-		r, ri := utf8.DecodeRuneInString(l.input[l.pos+i:])
-		//u.Debugf("r: %v  identifier?%v", string(r), IsIdentifierRune(r))
-		if ri != 1 {
-			//i += (ri - 1)
-		}
+		r, _ := utf8.DecodeRuneInString(l.input[l.pos+i:])
 		if unicode.IsSpace(r) || (!IsIdentifierRune(r) && r != '@') || r == '(' {
 			if i > 0 {
-				//u.Infof("hm:   '%v'", l.input[l.pos+skipWs:l.pos+i])
 				l.peekedWordPos = l.pos
 				l.peekedWord = l.input[l.pos+skipWs : l.pos+i]
 				return l.peekedWord
@@ -309,63 +331,10 @@ func (l *Lexer) PeekWord() string {
 			}
 		}
 	}
-	//u.Infof("hm:   '%v'", l.input[l.pos+skipWs:l.pos+i])
 	l.peekedWordPos = l.pos
 	l.peekedWord = l.input[l.pos+skipWs : l.pos+i]
 	return l.peekedWord
 }
-
-/*
-// get single character
-func (l *Lexer) peekXrune(x int) rune {
-	if l.pos+x > len(l.input) {
-		return rune(0)
-	}
-	return rune(l.input[l.pos+x])
-}
-
-// PeekWord2 grab the next word (till whitespace, without consuming)
-func (l *Lexer) PeekWord2() string {
-
-	skipWs := 0
-	for ; skipWs < len(l.input)-l.pos; skipWs++ {
-		r, _ := utf8.DecodeRuneInString(l.input[l.pos+skipWs:])
-		if !unicode.IsSpace(r) {
-			break
-		}
-	}
-
-	word := ""
-	for i := skipWs; i < len(l.input)-l.pos; i++ {
-		r, _ := utf8.DecodeRuneInString(l.input[l.pos+i:])
-		if unicode.IsSpace(r) || !IsIdentifierRune(r) {
-			u.Infof("hm:   '%v' word='%s' %v", l.input[l.pos:l.pos+i], word, l.input[l.pos:l.pos+i] == word)
-			return word
-		} else {
-			word = word + string(r)
-		}
-	}
-	return word
-}
-
-// peek word, but using laxIdentifier characters
-func (l *Lexer) peekLaxWord() string {
-	word := ""
-	for i := 0; i < len(l.input)-l.pos; i++ {
-		r, _ := utf8.DecodeRuneInString(l.input[l.pos+i:])
-		if !isLaxIdentifierRune(r) {
-			return word
-		} else {
-			word = word + string(r)
-		}
-	}
-	return word
-}
-// Discard skips over the pending input before this point.
-func (l *Lexer) Discard() {
-	l.start = l.pos
-}
-*/
 
 // backup steps back one rune. Can only be called once per call of next.
 func (l *Lexer) backup() {
@@ -374,14 +343,7 @@ func (l *Lexer) backup() {
 
 // IsEnd have we consumed all input?
 func (l *Lexer) IsEnd() bool {
-	//u.Infof("isEnd? %v:%v", l.pos, len(l.input))
-	if l.pos >= len(l.input) {
-		return true
-	}
-	// if l.Peek() == ';' {
-	// 	return true
-	// }
-	return false
+	return l.pos >= len(l.input)
 }
 
 // IsComment Is this a comment?
@@ -465,19 +427,6 @@ func (l *Lexer) ConsumeWord(word string) {
 	l.pos += len(word)
 }
 
-/*
-// lineNumber reports which line we're on. Doing it this way
-// means we don't have to worry about peek double counting.
-func (l *Lexer) lineNumber() int {
-	//return 1 + strings.Count(l.input[:l.pos], "\n")
-	return l.line
-}
-// Returns remainder of input not yet lexed
-func (l *Lexer) remainder() string {
-	return l.input[l.start : len(l.input)-1]
-}
-*/
-
 // error returns an error token and terminates the scan by passing
 // back a nil pointer that will be the next state, terminating l.nextToken.
 func (l *Lexer) errorf(format string, args ...interface{}) StateFn {
@@ -487,11 +436,6 @@ func (l *Lexer) errorf(format string, args ...interface{}) StateFn {
 
 // columnNumber reports which column in the current line we're on.
 func (l *Lexer) columnNumber() int {
-	// n := strings.LastIndex(l.input[:l.pos], "\n")
-	// if n == -1 {
-	// 	n = 0
-	// }
-	// return l.pos - n
 	return l.pos - l.linepos
 }
 
@@ -723,21 +667,6 @@ func (l *Lexer) isIdentity() bool {
 func (l *Lexer) isIdentityQuoteMark(r rune) bool {
 	return bytes.IndexByte(l.identityRunes, byte(r)) >= 0
 }
-
-/*
-// LexMatchSkip matches expected tokentype emitting the token on success
-// and returning passed state function.
-func (l *Lexer) LexMatchSkip(tok TokenType, skip int, fn StateFn) StateFn {
-	//u.Debugf("lexMatch   t=%s peek=%s", tok, l.PeekWord())
-	if l.match(tok.String(), skip) {
-		//u.Debugf("found match: %s   %v", tok, fn)
-		l.Emit(tok)
-		return fn
-	}
-	u.Error("unexpected token", tok)
-	return l.errorToken("Unexpected token:" + l.current())
-}
-*/
 
 // lexer to match expected value returns with args of
 //
@@ -2623,7 +2552,7 @@ func LexExpression(l *Lexer) StateFn {
 		}
 	}
 	// ensure we don't get into a recursive death spiral here?
-	if len(l.stack) < 1000 {
+	if len(l.stack) < maxDepth || l.overrideDepthLimit {
 		l.Push("LexExpression-clauseStatex", l.clauseState())
 	} else {
 		u.LogThrottle(u.WARN, 10, "Gracefully refusing to add more LexExpression: %s", l.input)

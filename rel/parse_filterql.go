@@ -15,10 +15,11 @@ import (
 type FilterQLParser struct {
 	// can be a FilterStatement, FilterStatements, filterSelect, filterSelects, etc.
 	// Which one is determined by which Parser func you call.
-	statement string
-	fs        *FilterStatement
-	l         *lex.Lexer
-	comment   string
+	statement          string
+	fs                 *FilterStatement
+	l                  *lex.Lexer
+	overrideLexerDepth bool
+	comment            string
 	*filterTokenPager
 	firstToken lex.Token
 	funcs      expr.FuncResolver
@@ -39,11 +40,20 @@ func (f *FilterQLParser) FuncResolver(funcs expr.FuncResolver) *FilterQLParser {
 }
 
 func (f *FilterQLParser) setLexer(statement string) {
-	l := lex.NewFilterQLLexer(statement)
+	l := lex.NewLexerWithOptions(lex.WithInput(statement),
+		lex.WithDialect(lex.FilterQLDialect),
+		lex.WithInitialState(lex.LexDialectForStatement),
+		lex.WithOverrideDepthLimit(f.overrideLexerDepth),
+	)
 	f.l = l
 	f.fs = nil
 	f.comment = ""
 	f.filterTokenPager = newFilterTokenPager(l)
+}
+
+// SetOverrideLexerDepth sets whether to override lexer's depth
+func (f *FilterQLParser) SetOverrideLexerDepth(b bool) {
+	f.overrideLexerDepth = b
 }
 
 // ParseFilterQL Parses a FilterQL statement
@@ -133,16 +143,18 @@ func ParseFilterQL(filter string) (*FilterStatement, error) {
 
 // ParseFilterSelect Parse a single Select-Filter statement from text
 // Select-Filters are statements of following form
-//    "SELECT" [COLUMNS] (FILTER | WHERE) FilterExpression
-//    "FILTER" FilterExpression
+//
+//	"SELECT" [COLUMNS] (FILTER | WHERE) FilterExpression
+//	"FILTER" FilterExpression
 func ParseFilterSelect(query string) (*FilterSelect, error) {
 	return NewFilterParser(query).ParseFilter()
 }
 
 // ParseFilterSelects Parse 1-n Select-Filter statements from text
 // Select-Filters are statements of following form
-//    "SELECT" [COLUMNS] (FILTER | WHERE) FilterExpression
-//    "FILTER" FilterExpression
+//
+//	"SELECT" [COLUMNS] (FILTER | WHERE) FilterExpression
+//	"FILTER" FilterExpression
 func ParseFilterSelects(statement string) (stmts []*FilterSelect, err error) {
 	return NewFilterParser(statement).ParseFilterSelects()
 }

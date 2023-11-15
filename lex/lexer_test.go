@@ -46,6 +46,25 @@ func verifyIdentity(t *testing.T, input, expects string, isIdentity bool) {
 	}
 }
 
+func TestLexerOverrideMaxDepth(t *testing.T) {
+	{
+		l := NewLexerWithOptions(WithInput("SELECT x from y;"), WithOverrideDepthLimit(true), WithDialect(SqlDialect))
+		for i := 0; i < maxDepth+100; i++ {
+			l.Push("fake", LexNumber)
+		}
+		assert.Len(t, l.stack, maxDepth+100)
+	}
+
+	// no override
+	{
+		l := NewLexerWithOptions(WithInput("SELECT x from y;"), WithDialect(SqlDialect))
+		for i := 0; i < maxDepth+100; i++ {
+			l.Push("fake", LexNumber)
+		}
+		assert.Len(t, l.stack, maxDepth)
+	}
+}
+
 func TestLexer(t *testing.T) {
 	orig := Trace
 	Trace = true
