@@ -92,17 +92,22 @@ func WithInitialState(initialState StateFn) LexerOption {
 	}
 }
 
-func WithOverrideDepthLimit(override bool) LexerOption {
+// WithDepthLimit sets the lexer's parse limit. Provide negative, for no depth limit. 0 or nothing to set max depth limit of 1000. Warning: no depth limit can exhaust the memory
+func WithDepthLimit(dl int) LexerOption {
 	return func(l *Lexer) {
-		l.overrideDepthLimit = override
+		if dl == 0 {
+			dl = maxDepth
+		}
+		l.depthLimit = dl
 	}
 }
 
 // NewLexerWithOptions creates new lexer with provided option
 func NewLexerWithOptions(options ...LexerOption) *Lexer {
 	l := &Lexer{
-		tokens: make(chan Token, 3), // Three tokens of buffering is sufficient for all state functions.
-		stack:  make([]NamedStateFn, 0, 10),
+		tokens:     make(chan Token, 3), // Three tokens of buffering is sufficient for all state functions.
+		stack:      make([]NamedStateFn, 0, 10),
+		depthLimit: maxDepth,
 	}
 
 	for _, opt := range options {
@@ -114,9 +119,7 @@ func NewLexerWithOptions(options ...LexerOption) *Lexer {
 
 // NewLexer creates a new lexer for the input string.
 func NewLexer(input string, dialect *Dialect, options ...LexerOption) *Lexer {
-	options = append(options, WithInput(input))
-	options = append(options, WithDialect(dialect))
-	options = append(options, WithInitialState(LexDialectForStatement))
+	options = append(options, WithInput(input), WithDialect(dialect), WithInitialState(LexDialectForStatement))
 	return NewLexerWithOptions(options...)
 }
 
@@ -146,8 +149,8 @@ type Lexer struct {
 
 	// Due to nested Expressions and evaluation this allows us to descend/ascend
 	// during lex, using push/pop to add and remove states needing evaluation
-	stack              []NamedStateFn
-	overrideDepthLimit bool
+	stack      []NamedStateFn
+	depthLimit int
 }
 
 func (l *Lexer) init() {
@@ -200,7 +203,7 @@ func (l *Lexer) NextToken() Token {
 // Push a named StateFn onto stack.
 func (l *Lexer) Push(name string, state StateFn) {
 	debugf("push %d %v", len(l.stack)+1, name)
-	if len(l.stack) < maxDepth || l.overrideDepthLimit {
+	if len(l.stack) < l.depthLimit || l.depthLimit < 0 {
 		l.stack = append(l.stack, NamedStateFn{name, state})
 	} else {
 		out := ""
@@ -2552,7 +2555,7 @@ func LexExpression(l *Lexer) StateFn {
 		}
 	}
 	// ensure we don't get into a recursive death spiral here?
-	if len(l.stack) < maxDepth || l.overrideDepthLimit {
+	if len(l.stack) < l.depthLimit || l.depthLimit < 0 {
 		l.Push("LexExpression-clauseStatex", l.clauseState())
 	} else {
 		u.LogThrottle(u.WARN, 10, "Gracefully refusing to add more LexExpression: %s", l.input)

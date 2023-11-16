@@ -15,11 +15,11 @@ import (
 type FilterQLParser struct {
 	// can be a FilterStatement, FilterStatements, filterSelect, filterSelects, etc.
 	// Which one is determined by which Parser func you call.
-	statement          string
-	fs                 *FilterStatement
-	l                  *lex.Lexer
-	overrideLexerDepth bool
-	comment            string
+	statement       string
+	fs              *FilterStatement
+	l               *lex.Lexer
+	lexerDepthLimit int
+	comment         string
 	*filterTokenPager
 	firstToken lex.Token
 	funcs      expr.FuncResolver
@@ -43,7 +43,7 @@ func (f *FilterQLParser) setLexer(statement string) {
 	l := lex.NewLexerWithOptions(lex.WithInput(statement),
 		lex.WithDialect(lex.FilterQLDialect),
 		lex.WithInitialState(lex.LexDialectForStatement),
-		lex.WithOverrideDepthLimit(f.overrideLexerDepth),
+		lex.WithDepthLimit(f.lexerDepthLimit),
 	)
 	f.l = l
 	f.fs = nil
@@ -52,8 +52,8 @@ func (f *FilterQLParser) setLexer(statement string) {
 }
 
 // SetOverrideLexerDepth sets whether to override lexer's depth
-func (f *FilterQLParser) SetOverrideLexerDepth(b bool) {
-	f.overrideLexerDepth = b
+func (f *FilterQLParser) SetOverrideLexerDepth(dl int) {
+	f.lexerDepthLimit = dl
 }
 
 // ParseFilterQL Parses a FilterQL statement
