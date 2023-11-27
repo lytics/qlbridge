@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/araddon/dateparse"
-	u "github.com/araddon/gou"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/lytics/qlbridge/datasource"
 	td "github.com/lytics/qlbridge/datasource/mockcsvtestdata"
@@ -64,64 +64,60 @@ var sqlNonSelect = []string{
 	WITH stuff = "hello";`,
 }
 
-var sqlStatementsx = []string{
-	`SELECT name FROM orders WHERE name = "bob";`,
-}
-
 func selectPlan(t *testing.T, ctx *plan.Context) *plan.Select {
+	t.Helper()
 	pln := planStmt(t, ctx)
 
 	sp, ok := pln.(*plan.Select)
-	assert.True(t, ok, "must be *plan.Select")
+	require.True(t, ok, "must be *plan.Select")
 	return sp
 }
 
 func planStmt(t *testing.T, ctx *plan.Context) plan.Task {
+	t.Helper()
 	stmt, err := rel.ParseSql(ctx.Raw)
-	assert.True(t, err == nil, "Must parse but got %v", err)
+	require.NoError(t, err)
 	ctx.Stmt = stmt
 
 	planner := plan.NewPlanner(ctx)
 	pln, _ := plan.WalkStmt(ctx, stmt, planner)
 	//assert.True(t, err == nil) // since the FROM doesn't exist it errors
-	assert.True(t, pln != nil, "must have plan")
+	require.NotNil(t, pln, "must have plan")
 	return pln
 }
 
 func TestSqlPlans(t *testing.T) {
 	for _, sqlStatement := range append(sqlStatements, sqlNonSelect...) {
 		ctx := td.TestContext(sqlStatement)
-		u.Infof("running for pb check on: %s", sqlStatement)
+		t.Logf("running for pb check on: %s", sqlStatement)
 		p := planStmt(t, ctx)
-		assert.True(t, p != nil)
+		assert.NotNil(t, p)
 	}
 }
 
 func TestSelectSerialization(t *testing.T) {
 	// Should have error on invalid plan
 	_, err := plan.SelectPlanFromPbBytes([]byte("hello"), td.SchemaLoader)
-	assert.NotEqual(t, nil, err)
+	require.Error(t, err)
 
 	for _, sqlStatement := range sqlStatements {
 		ctx := td.TestContext(sqlStatement)
-		u.Infof("running for pb check on: %s", sqlStatement)
+		t.Logf("running for pb check on: %s", sqlStatement)
 		p := selectPlan(t, ctx)
-		assert.True(t, p != nil)
+		require.NotNil(t, p)
 		pb, err := p.Marshal()
-		assert.True(t, err == nil, "expected no error but got %v", err)
+		require.NoError(t, err)
 		assert.True(t, len(pb) > 10, string(pb))
 		p2, err := plan.SelectPlanFromPbBytes(pb, td.SchemaLoader)
-		assert.True(t, err == nil, "expected no error but got %v", err)
-		assert.True(t, p2 != nil)
-		assert.True(t, p2.PlanBase != nil, "Has plan Base")
-		assert.True(t, p2.Stmt.Raw == p.Stmt.Raw)
+		require.NoError(t, err)
+		require.NotNil(t, p2)
+		assert.NotNil(t, p2.PlanBase, "Has plan Base")
+		assert.Equal(t, p.Stmt.Raw, p2.Stmt.Raw)
 		assert.True(t, p.Equal(p2), "Should be equal plans")
 	}
 }
 
 var (
-	_ = u.EMPTY
-
 	st1, _ = dateparse.ParseAny("12/18/2014")
 	st2, _ = dateparse.ParseAny("12/18/2019")
 
@@ -140,10 +136,6 @@ var (
 		"hits":    value.NewMapIntValue(map[string]int64{"google.com": 5, "bing.com": 1}),
 		"email":   value.NewStringValue("bob@bob.com"),
 	})
-	sqlTestsX = []sqlTest{
-		// Date math
-		st(`select int5 FROM mycontext WHERE created < "now-1M"`, map[string]interface{}{"int5": 5}),
-	}
 	// list of tests
 	sqlTests = []sqlTest{
 		st(`select toint(str5) as sv`, map[string]interface{}{"sv": 5}),
@@ -154,7 +146,6 @@ type sqlTest struct {
 	sql     string
 	context expr.ContextReader
 	result  *datasource.ContextSimple // ?? what is this?
-	rowct   int                       // expected row count
 }
 
 func st(sql string, results map[string]interface{}) sqlTest {
@@ -162,23 +153,21 @@ func st(sql string, results map[string]interface{}) sqlTest {
 }
 
 func TestRunProtoTests(t *testing.T) {
-
 	for _, test := range sqlTests {
-
 		ctx := td.TestContext(test.sql)
 		p := selectPlan(t, ctx)
 		assert.True(t, p != nil)
 		pb, err := p.Marshal()
-		assert.True(t, err == nil, "expected no error but got %v", err)
+		require.NoError(t, err)
 
 		selPlan, err := plan.SelectPlanFromPbBytes(pb, td.SchemaLoader)
-		assert.True(t, err == nil, "expected no error but got %v", err)
+		require.NoError(t, err)
 
 		assert.True(t, selPlan.Stmt != nil, "must have stmt")
 
 		writeContext := datasource.NewContextSimple()
 		_, err = vm.EvalSql(selPlan.Stmt, writeContext, test.context)
-		assert.True(t, err == nil, "expected no error but got ", err, " for ", test.sql)
+		require.NoError(t, err, test.sql)
 
 		for key, v := range test.result.Data {
 			v2, ok := writeContext.Get(key)
