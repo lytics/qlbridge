@@ -57,38 +57,8 @@ func optimizeBooleanNodesDepth(ctx expr.Includer, arg expr.Node, depth int, shar
 		for i, node := range nodes {
 			n.Args[i] = node.node
 		}
-	case *expr.BinaryNode:
-		for _, narg := range n.Args {
-			subTreeResult, err := optimizeBooleanNodesDepth(ctx, narg, depth+1, sharedIncludedNodes)
-			if err != nil {
-				return 0, err
-			}
-			result += subTreeResult
-		}
-	case *expr.UnaryNode:
-		subTreeResult, err := optimizeBooleanNodesDepth(ctx, n.Arg, depth+1, sharedIncludedNodes)
-		if err != nil {
-			return 0, err
-		}
-		result += subTreeResult
-	case *expr.TriNode:
-		for _, narg := range n.Args {
-			subTreeResult, err := optimizeBooleanNodesDepth(ctx, narg, depth+1, sharedIncludedNodes)
-			if err != nil {
-				return 0, err
-			}
-			result += subTreeResult
-		}
-	case *expr.ArrayNode:
-		for _, narg := range n.Args {
-			subTreeResult, err := optimizeBooleanNodesDepth(ctx, narg, depth+1, sharedIncludedNodes)
-			if err != nil {
-				return 0, err
-			}
-			result += subTreeResult
-		}
-	case *expr.FuncNode:
-		for _, narg := range n.Args {
+	case expr.NodeArgs:
+		for _, narg := range n.ChildrenArgs() {
 			subTreeResult, err := optimizeBooleanNodesDepth(ctx, narg, depth+1, sharedIncludedNodes)
 			if err != nil {
 				return 0, err
