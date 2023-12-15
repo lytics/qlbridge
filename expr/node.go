@@ -1541,6 +1541,9 @@ func (m *BooleanNode) Equal(n Node) bool {
 				return false
 			}
 		}
+		if m.Negated() != nt.Negated() {
+			return false
+		}
 		if len(m.Args) != len(nt.Args) {
 			return false
 		}
@@ -1568,7 +1571,7 @@ func (m *TriNode) ReverseNegation() bool {
 }
 func (m *TriNode) String() string {
 	w := NewDefaultWriter()
-	m.writeToString(w, false)
+	m.WriteDialect(w)
 	return w.String()
 }
 func (m *TriNode) StringNegate() string {
@@ -1580,7 +1583,7 @@ func (m *TriNode) WriteNegate(w DialectWriter) {
 	m.writeToString(w, true)
 }
 func (m *TriNode) WriteDialect(w DialectWriter) {
-	m.writeToString(w, false)
+	m.writeToString(w, m.negated)
 }
 func (m *TriNode) writeToString(w DialectWriter, negate bool) {
 	m.Args[0].WriteDialect(w)
@@ -1667,6 +1670,9 @@ func (m *TriNode) Equal(n Node) bool {
 			return false
 		}
 		if len(m.Args) != len(nt.Args) {
+			return false
+		}
+		if nt.Negated() != m.Negated() {
 			return false
 		}
 		for i, arg := range nt.Args {
@@ -1911,7 +1917,7 @@ func (m *IncludeNode) Equal(n Node) bool {
 	if !ok {
 		return false
 	}
-	if m.negated != nt.negated {
+	if m.Negated() != nt.Negated() {
 		return false
 	}
 	if nt.Operator.T != m.Operator.T {
