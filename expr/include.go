@@ -26,12 +26,10 @@ func InlineIncludes(ctx Includer, n Node) (Node, error) {
 	return doInlineIncludes(ctx, n, 0)
 }
 func doInlineIncludes(ctx Includer, n Node, depth int) (Node, error) {
-	// We need to make a copy, so we lazily use the To/From pb
 	// We need the copy because we are going to mutate this node
 	// but AST is assumed to be immuteable, and shared, since we are breaking
 	// this contract we copy
-	npb := n.NodePb()
-	newNode := NodeFromNodePb(npb)
+	newNode := n.Copy()
 	return inlineIncludesDepth(ctx, newNode, depth)
 }
 func inlineIncludesDepth(ctx Includer, arg Node, depth int) (Node, error) {

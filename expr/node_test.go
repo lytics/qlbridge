@@ -2,11 +2,14 @@ package expr_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	u "github.com/araddon/gou"
 	"github.com/gogo/protobuf/proto"
+	"github.com/lytics/qlbridge/lex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/value"
@@ -38,6 +41,46 @@ func TestNodePb(t *testing.T) {
 		assert.True(t, exp.Equal(n2), "Expected Equal but got %v for %v", exp, n2)
 		u.Infof("pre/post: \n\t%s\n\t%s", exp, n2)
 	}
+}
+
+var copyTest = []string{
+	`"Portland" IN ("ohio")`,
+	`"xyz" NOT BETWEEN 10 AND 50`,
+	`name == "bob"`,
+	`name = 'bob'`,
+	`AND ( EXISTS x, EXISTS y )`,
+	`AND ( EXISTS x, INCLUDE ref_name )`,
+	`NOT AND ( EXISTS x, INCLUDE ref_name, NOT OR (x > 5, y < 10) )`,
+	`company = "Toys R"" Us"`,
+	`NOT providers.id != NULL`,
+}
+
+func TestNodeCopy(t *testing.T) {
+	t.Parallel()
+	for _, exprText := range copyTest {
+		exp, err := expr.ParseExpression(exprText)
+		require.NoError(t, err)
+		n2 := exp.Copy()
+		assert.True(t, reflect.DeepEqual(exp, n2), "Expected Equal but got %v for %v", exp, n2)
+		assert.True(t, exp.Equal(n2), "Expected Equal but got %v for %v", exp, n2)
+	}
+	// reflect.DeepEqual always returns false when comparing non-nil functions
+	// So we do not use it here
+	exprWithFuncs := `NOT OR (eq(event,"stuff"), ge(party, 1), todate("1/1/2015"), NOT INCLUDE ref_name)`
+	exp, err := expr.ParseExpression(exprWithFuncs)
+	require.NoError(t, err)
+	n2 := exp.Copy()
+	assert.True(t, exp.Equal(n2), "Expected Equal but got %v for %v", exp, n2)
+	includeNode := &expr.IncludeNode{
+		ExprNode: &expr.NullNode{},
+		Identity: &expr.IdentityNode{
+			Text: "ref_name",
+		},
+		Operator: lex.Token{},
+	}
+	includeNodeCopy := includeNode.Copy()
+	require.IsType(t, &expr.IncludeNode{}, includeNodeCopy)
+	assert.Nil(t, includeNodeCopy.(*expr.IncludeNode).ExprNode)
 }
 
 func TestExprRoundTrip(t *testing.T) {

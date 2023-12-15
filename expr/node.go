@@ -675,6 +675,18 @@ func (m *FuncNode) Equal(n Node) bool {
 		if len(m.Args) != len(nt.Args) {
 			return false
 		}
+		if m.Eval == nil && nt.Eval != nil {
+			return false
+		}
+		if m.Eval != nil && nt.Eval == nil {
+			return false
+		}
+		if m.F.CustomFunc == nil && nt.F.CustomFunc != nil {
+			return false
+		}
+		if m.F.CustomFunc != nil && nt.F.CustomFunc == nil {
+			return false
+		}
 		for i, arg := range nt.Args {
 			if !arg.Equal(m.Args[i]) {
 				return false

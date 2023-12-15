@@ -103,8 +103,8 @@ func TestInlineIncludes(t *testing.T) {
 	}
 	tests = []incTest{
 		{
-			in:  `AND ( lastvisit_ts < "now-3d", NOT INCLUDE nested_includes_yoda )`,
-			out: `AND ( lastvisit_ts < "now-3d", NOT AND ( planet == "Dagobah", name == "Yoda" ) )`,
+			in:  `NOT AND ( lastvisit_ts < "now-3d", NOT INCLUDE nested_includes_yoda )`,
+			out: `NOT AND ( lastvisit_ts < "now-3d", NOT AND ( planet == "Dagobah", name == "Yoda" ) )`,
 		},
 	}
 	for _, tc := range tests {
