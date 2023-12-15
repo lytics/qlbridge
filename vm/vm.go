@@ -891,9 +891,14 @@ func walkTernary(ctx expr.EvalContext, node *expr.TriNode, depth int) (value.Val
 				return nil, false
 			}
 			if av > bv && av < cv {
+				if node.Negated() {
+					return value.NewBoolValue(false), true
+				}
 				return value.NewBoolValue(true), true
 			}
-
+			if node.Negated() {
+				return value.NewBoolValue(true), true
+			}
 			return value.NewBoolValue(false), true
 		case value.NumberValue:
 
@@ -907,9 +912,14 @@ func walkTernary(ctx expr.EvalContext, node *expr.TriNode, depth int) (value.Val
 				return nil, false
 			}
 			if av > bv && av < cv {
+				if node.Negated() {
+					return value.NewBoolValue(false), true
+				}
 				return value.NewBoolValue(true), true
 			}
-
+			if node.Negated() {
+				return value.NewBoolValue(true), true
+			}
 			return value.NewBoolValue(false), true
 
 		case value.TimeValue:
@@ -924,9 +934,14 @@ func walkTernary(ctx expr.EvalContext, node *expr.TriNode, depth int) (value.Val
 				return nil, false
 			}
 			if av.Unix() > bv.Unix() && av.Unix() < cv.Unix() {
+				if node.Negated() {
+					return value.NewBoolValue(false), true
+				}
 				return value.NewBoolValue(true), true
 			}
-
+			if node.Negated() {
+				return value.NewBoolValue(true), true
+			}
 			return value.NewBoolValue(false), true
 
 		default:

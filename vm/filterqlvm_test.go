@@ -105,34 +105,35 @@ func TestFilterQlVm(t *testing.T) {
 	`)
 
 	hits := []string{
-		`FILTER name == "Yoda"`,                                // upper case sensitive name
-		`FILTER name != "yoda"`,                                // we should be case-sensitive by default
-		`FILTER name = "Yoda"`,                                 // is equivalent to ==
-		`FILTER "Yoda" == name`,                                // reverse order of identity/value
-		`FILTER name != "Anakin"`,                              // negation on missing fields == true
-		`FILTER first_name != "Anakin"`,                        // key doesn't exist
-		`FILTER tolower(name) == "yoda"`,                       // use functions in evaluation
-		`FILTER FullName == "Yoda, Jedi"`,                      // use functions on structs in evaluation
-		`FILTER Address.City == "Detroit"`,                     // traverse struct with path.field
-		`FILTER name LIKE "*da"`,                               // LIKE
-		`FILTER name NOT LIKE "*kin"`,                          // LIKE Negation
-		`FILTER name CONTAINS "od"`,                            // Contains
-		`FILTER name NOT CONTAINS "kin"`,                       // Contains
-		`FILTER roles INTERSECTS ("user", "api")`,              // Intersects
-		`FILTER roles IN ("user", "api")`,                      // #14564 IN is now a synonym of INTERSECTS when used with slices
-		`FILTER roles NOT INTERSECTS ("user", "guest")`,        // Intersects
-		`FILTER Created BETWEEN "12/01/2015" AND "01/01/2016"`, // Between Operator
-		`FILTER Created < "now-1d"`,                            // Date Math
-		`FILTER NOT ( Created > "now-1d") `,                    // Date Math (negated)
-		`FILTER NOT ( FakeDate > "now-1d") `,                   // Date Math (negated, missing field)
-		`FILTER Updated > "now-2h"`,                            // Date Math
-		`FILTER transactions < "now-1h"`,                       // Date Compare with []time.Time
-		`FILTER FirstEvent.signedup < "now-2h"`,                // Date Math on map[string]time
-		`FILTER FirstEvent.signedup == "12/18/2015"`,           // Date equality on map[string]time
-		`FILTER lastevent.signedup < "now-2h"`,                 // Date Math on map[string]time
-		`FILTER lastevent.signedup == "12/18/2015"`,            // Date equality on map[string]time
-		"FILTER `lastevent`.`signedup` == \"12/18/2015\"",      // escaping of field names using backticks
-		"FILTER `last.event`.`has.period` == \"12/18/2015\"",   // escaping of field names using backticks
+		`FILTER name == "Yoda"`,                                    // upper case sensitive name
+		`FILTER name != "yoda"`,                                    // we should be case-sensitive by default
+		`FILTER name = "Yoda"`,                                     // is equivalent to ==
+		`FILTER "Yoda" == name`,                                    // reverse order of identity/value
+		`FILTER name != "Anakin"`,                                  // negation on missing fields == true
+		`FILTER first_name != "Anakin"`,                            // key doesn't exist
+		`FILTER tolower(name) == "yoda"`,                           // use functions in evaluation
+		`FILTER FullName == "Yoda, Jedi"`,                          // use functions on structs in evaluation
+		`FILTER Address.City == "Detroit"`,                         // traverse struct with path.field
+		`FILTER name LIKE "*da"`,                                   // LIKE
+		`FILTER name NOT LIKE "*kin"`,                              // LIKE Negation
+		`FILTER name CONTAINS "od"`,                                // Contains
+		`FILTER name NOT CONTAINS "kin"`,                           // Contains
+		`FILTER roles INTERSECTS ("user", "api")`,                  // Intersects
+		`FILTER roles IN ("user", "api")`,                          // #14564 IN is now a synonym of INTERSECTS when used with slices
+		`FILTER roles NOT INTERSECTS ("user", "guest")`,            // Intersects
+		`FILTER Created BETWEEN "12/01/2015" AND "01/01/2016"`,     // Between Operator
+		`FILTER NOT Created BETWEEN "12/01/2012" AND "01/01/2013"`, // negated Between Operator
+		`FILTER Created < "now-1d"`,                                // Date Math
+		`FILTER NOT ( Created > "now-1d") `,                        // Date Math (negated)
+		`FILTER NOT ( FakeDate > "now-1d") `,                       // Date Math (negated, missing field)
+		`FILTER Updated > "now-2h"`,                                // Date Math
+		`FILTER transactions < "now-1h"`,                           // Date Compare with []time.Time
+		`FILTER FirstEvent.signedup < "now-2h"`,                    // Date Math on map[string]time
+		`FILTER FirstEvent.signedup == "12/18/2015"`,               // Date equality on map[string]time
+		`FILTER lastevent.signedup < "now-2h"`,                     // Date Math on map[string]time
+		`FILTER lastevent.signedup == "12/18/2015"`,                // Date equality on map[string]time
+		"FILTER `lastevent`.`signedup` == \"12/18/2015\"",          // escaping of field names using backticks
+		"FILTER `last.event`.`has.period` == \"12/18/2015\"",       // escaping of field names using backticks
 		`FILTER hits INTERSECTS ("bar", "foo")`,
 		`FILTER hits IN ("bar", "foo")`, // IN means the same as INTERSECTS with respect to map keys
 		`FILTER hits NOT IN ("not-gonna-happen")`,
@@ -204,11 +205,13 @@ func TestFilterQlVm(t *testing.T) {
 		`FILTER not_a_field + "yoda"`, // invalid statement
 		"FILTER OR (false, false, AND (true, false))",
 		`FILTER AND (name == "Yoda", city == "xxx", zip == 5)`,
-		`FILTER lastevent.signedup > "now-2h"`,      // Date Math on map[string]time
-		`FILTER lastevent.signedup != "12/18/2015"`, // Date equality on map[string]time
-		`FILTER transactionsnil < "now-1h"`,         // Date Compare with empty slice
-		`FILTER ["hello","apple"] < "now-1h"`,       // Date Compare with left hand strings
-		`FILTER zip * 5 * 2`,                        // invalid statement
+		`FILTER Created BETWEEN "12/01/2012" AND "01/01/2013"`,     // Between Operator
+		`FILTER NOT Created BETWEEN "12/01/2015" AND "01/01/2016"`, // negated Between Operator
+		`FILTER lastevent.signedup > "now-2h"`,                     // Date Math on map[string]time
+		`FILTER lastevent.signedup != "12/18/2015"`,                // Date equality on map[string]time
+		`FILTER transactionsnil < "now-1h"`,                        // Date Compare with empty slice
+		`FILTER ["hello","apple"] < "now-1h"`,                      // Date Compare with left hand strings
+		`FILTER zip * 5 * 2`,                                       // invalid statement
 	}
 
 	for _, q := range misses {
