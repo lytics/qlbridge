@@ -36,7 +36,7 @@ func (m *includectx) Include(name string) (expr.Node, error) {
 func TestOptimizeBooleanNodes(t *testing.T) {
 	nc := datasource.NewNestedContextReader([]expr.ContextReader{}, time.Now())
 	ctx := newIncluderCtx(nc,
-		`FILTER AND (
+		`FILTER NOT AND (
 						OR (
 							zip BETWEEN 1 AND 3
 							city == "Peoria, IL"
@@ -65,6 +65,7 @@ func TestOptimizeBooleanNodes(t *testing.T) {
 	inode := bnode.Args[3].(*expr.IncludeNode)
 	require.IsType(t, &expr.BooleanNode{}, inode.ExprNode)
 	bnode = inode.ExprNode.(*expr.BooleanNode)
+	assert.True(t, bnode.Negated())
 	assert.Equal(t, 2, len(bnode.Args))
 	assert.Equal(t, "*", bnode.Args[0].String())
 	require.IsType(t, &expr.BooleanNode{}, bnode.Args[1])

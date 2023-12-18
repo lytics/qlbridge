@@ -93,6 +93,9 @@ type (
 
 		// NodeType the String, Identity, etc
 		NodeType() string
+
+		// Copy makes a deep copy of this node
+		Copy() Node
 	}
 
 	// NodeArgs is an interface for nodes which have child arguments
@@ -530,6 +533,14 @@ func NewFuncNode(name string, f Func) *FuncNode {
 func (m *FuncNode) append(arg Node) {
 	m.Args = append(m.Args, arg)
 }
+func (m *FuncNode) Copy() Node {
+	n := *m
+	n.Args = make([]Node, len(m.Args))
+	for i, arg := range m.Args {
+		n.Args[i] = arg.Copy()
+	}
+	return &n
+}
 func (m *FuncNode) NodeType() string { return "Func" }
 func (m *FuncNode) String() string {
 	w := NewDefaultWriter()
@@ -664,6 +675,18 @@ func (m *FuncNode) Equal(n Node) bool {
 		if len(m.Args) != len(nt.Args) {
 			return false
 		}
+		if m.Eval == nil && nt.Eval != nil {
+			return false
+		}
+		if m.Eval != nil && nt.Eval == nil {
+			return false
+		}
+		if m.F.CustomFunc == nil && nt.F.CustomFunc != nil {
+			return false
+		}
+		if m.F.CustomFunc != nil && nt.F.CustomFunc == nil {
+			return false
+		}
 		for i, arg := range nt.Args {
 			if !arg.Equal(m.Args[i]) {
 				return false
@@ -723,6 +746,10 @@ func (m *NumberNode) NodeType() string             { return "Number" }
 func (n *NumberNode) String() string               { return n.Text }
 func (m *NumberNode) WriteDialect(w DialectWriter) { w.WriteNumber(m.Text) }
 func (m *NumberNode) Validate() error              { return nil }
+func (m *NumberNode) Copy() Node {
+	n := *m
+	return &n
+}
 func (m *NumberNode) NodePb() *NodePb {
 	n := &NumberNodePb{}
 	n.Text = m.Text
@@ -797,6 +824,10 @@ func (m *StringNode) String() string {
 	}
 	return fmt.Sprintf("%q", m.Text)
 }
+func (m *StringNode) Copy() Node {
+	n := *m
+	return &n
+}
 func (m *StringNode) WriteDialect(w DialectWriter) {
 	w.WriteLiteral(m.Text)
 }
@@ -857,6 +888,10 @@ func (m *StringNode) Equal(n Node) bool {
 
 func NewValueNode(val value.Value) *ValueNode {
 	return &ValueNode{Value: val, rv: reflect.ValueOf(val)}
+}
+func (m *ValueNode) Copy() Node {
+	n := *m
+	return &n
 }
 func (m *ValueNode) NodeType() string { return "Value" }
 func (m *ValueNode) IsArray() bool {
@@ -1005,6 +1040,10 @@ func (m *IdentityNode) load() {
 	} else {
 		m.left, m.right, _ = LeftRight(m.Text)
 	}
+}
+func (m *IdentityNode) Copy() Node {
+	n := *m
+	return &n
 }
 func (m *IdentityNode) NodeType() string { return "Identity" }
 func (m *IdentityNode) String() string {
@@ -1157,6 +1196,10 @@ func (m *IdentityNode) LeftRight() (string, string, bool) {
 func NewNull(operator lex.Token) *NullNode {
 	return &NullNode{}
 }
+func (m *NullNode) Copy() Node {
+	n := *m
+	return &n
+}
 func (m *NullNode) NodeType() string { return "Null" }
 func (m *NullNode) String() string   { return "NULL" }
 func (m *NullNode) WriteDialect(w DialectWriter) {
@@ -1217,6 +1260,14 @@ unary_op   = "+" | "-" | "!" | "^" | "*" | "&" | "<-" .
 func NewBinaryNode(operator lex.Token, lhArg, rhArg Node) *BinaryNode {
 	//u.Debugf("NewBinaryNode: %v %v %v", lhArg, operator, rhArg)
 	return &BinaryNode{Args: []Node{lhArg, rhArg}, Operator: operator}
+}
+func (m *BinaryNode) Copy() Node {
+	n := *m
+	n.Args = make([]Node, len(m.Args))
+	for i, arg := range m.Args {
+		n.Args[i] = arg.Copy()
+	}
+	return &n
 }
 func (m *BinaryNode) NodeType() string { return "Binary" }
 func (m *BinaryNode) String() string {
@@ -1416,6 +1467,14 @@ func NewBooleanNode(operator lex.Token, args ...Node) *BooleanNode {
 	//u.Debugf("NewBinaryNode: %v %v %v", lhArg, operator, rhArg)
 	return &BooleanNode{Args: args, Operator: operator}
 }
+func (m *BooleanNode) Copy() Node {
+	n := *m
+	n.Args = make([]Node, len(m.Args))
+	for i, arg := range m.Args {
+		n.Args[i] = arg.Copy()
+	}
+	return &n
+}
 func (m *BooleanNode) NodeType() string { return "Boolean" }
 func (m *BooleanNode) ReverseNegation() bool {
 	m.negated = !m.negated
@@ -1564,6 +1623,14 @@ func (m *BooleanNode) Equal(n Node) bool {
 func NewTriNode(operator lex.Token, arg1, arg2, arg3 Node) *TriNode {
 	return &TriNode{Args: []Node{arg1, arg2, arg3}, Operator: operator}
 }
+func (m *TriNode) Copy() Node {
+	n := *m
+	n.Args = make([]Node, len(m.Args))
+	for i, arg := range m.Args {
+		n.Args[i] = arg.Copy()
+	}
+	return &n
+}
 func (m *TriNode) NodeType() string { return "Ternary" }
 func (m *TriNode) ReverseNegation() bool {
 	m.negated = !m.negated
@@ -1711,6 +1778,11 @@ func NewUnary(operator lex.Token, arg Node) Node {
 
 	return &UnaryNode{Arg: arg, Operator: operator}
 }
+func (m *UnaryNode) Copy() Node {
+	n := *m
+	n.Arg = m.Arg.Copy()
+	return &n
+}
 func (m *UnaryNode) NodeType() string { return "Unary" }
 func (m *UnaryNode) String() string {
 	w := NewDefaultWriter()
@@ -1822,6 +1894,13 @@ func (m *UnaryNode) Equal(n Node) bool {
 func NewInclude(operator lex.Token, id *IdentityNode) *IncludeNode {
 	return &IncludeNode{Identity: id, Operator: operator}
 }
+func (m *IncludeNode) Copy() Node {
+	n := *m
+	n.Identity = m.Identity.Copy().(*IdentityNode)
+	n.ExprNode = nil
+	n.inlineExpr = nil
+	return &n
+}
 func (m *IncludeNode) NodeType() string { return "Include" }
 func (m *IncludeNode) String() string {
 	w := NewDefaultWriter()
@@ -1932,6 +2011,15 @@ func NewArrayNode() *ArrayNode {
 }
 func NewArrayNodeArgs(args []Node) *ArrayNode {
 	return &ArrayNode{Args: args}
+}
+func (m *ArrayNode) Copy() Node {
+	n := *m
+	n.Args = make([]Node, len(m.Args))
+	for i, arg := range m.Args {
+		n.Args[i] = arg.Copy()
+	}
+	return &n
+
 }
 func (m *ArrayNode) NodeType() string { return "Array" }
 func (m *ArrayNode) String() string {
