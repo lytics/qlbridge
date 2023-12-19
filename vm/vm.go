@@ -213,11 +213,17 @@ func resolveInclude(ctx expr.Includer, inc *expr.IncludeNode, depth int, visited
 func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int, visitedIncludes []string) (value.Value, bool) {
 	var matches, ok bool
 	var err error
-	cacheCtx, hasCache := ctx.(expr.IncludeCacheContext)
-	if hasCache {
-		matches, ok, err = cacheCtx.GetCachedResult(inc.Identity.Text)
+	var cachedValue expr.CachedValue
+	if cacheCtx, hasCacheCtx := ctx.(expr.IncludeCacheContext); hasCacheCtx {
+		var hasCachedValue bool
+		cachedValue, hasCachedValue = cacheCtx.GetCachedValue(inc.Identity.Text)
+		if hasCachedValue {
+			cachedValue.Lock()
+			defer cachedValue.Unlock()
+			matches, ok, err = cachedValue.Get()
+		}
 	}
-	if err != nil || !hasCache {
+	if err != nil || cachedValue == nil {
 		if inc.ExprNode == nil {
 			incCtx, ok := ctx.(expr.EvalIncludeContext)
 			if !ok {
@@ -237,8 +243,8 @@ func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int, visited
 		}
 
 		matches, ok = evalBool(ctx, inc.ExprNode, depth+1, visitedIncludes)
-		if hasCache {
-			cacheCtx.SetCache(inc.Identity.Text, matches, ok)
+		if cachedValue != nil {
+			cachedValue.Set(matches, ok)
 		}
 	}
 	if !ok {
