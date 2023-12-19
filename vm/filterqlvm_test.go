@@ -2,7 +2,6 @@ package vm_test
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -322,17 +321,41 @@ func TestInclude(t *testing.T) {
 	}
 }
 
+type cachedValue struct {
+	ShouldMiss bool
+	SetCalled  bool
+	GetCalled  bool
+}
+
+func (c *cachedValue) Lock() {
+}
+
+func (c *cachedValue) Unlock() {
+}
+
+func (c *cachedValue) Get() (bool, bool, error) {
+	c.GetCalled = true
+	if c.ShouldMiss {
+		return false, false, fmt.Errorf("cache miss")
+	}
+	return false, false, nil
+}
+
+func (c *cachedValue) Set(b bool, b2 bool) {
+	if !b || !b2 {
+		panic("result should be true")
+	}
+	c.SetCalled = true
+}
+
 type contextWithCache struct {
 	expr.EvalContext
-	IncludeCalled    bool
-	CachedResultUsed bool
-	SetCacheCalled   bool
+	value           *cachedValue
+	IncludeCalled   bool
+	CachedValueUsed bool
 }
 
 func (i *contextWithCache) Include(name string) (expr.Node, error) {
-	if name != "test" {
-		return nil, fmt.Errorf("Expected name 'test' but received: %s", name)
-	}
 	i.IncludeCalled = true
 	f, err := rel.ParseFilterQL("FILTER AND (x > 5)")
 	if err != nil {
@@ -341,16 +364,12 @@ func (i *contextWithCache) Include(name string) (expr.Node, error) {
 	return f.Filter, nil
 }
 
-func (i *contextWithCache) GetCachedResult(name string) (bool, bool, error) {
+func (i *contextWithCache) GetCachedValue(name string) (expr.CachedValue, bool) {
 	if name != "cached_include" {
-		return false, false, errors.New("cache miss")
+		return nil, false
 	}
-	i.CachedResultUsed = true
-	return true, true, nil
-}
-
-func (i *contextWithCache) SetCache(string, bool, bool) {
-	i.SetCacheCalled = true
+	i.CachedValueUsed = true
+	return i.value, true
 }
 
 func TestIncludeCache(t *testing.T) {
@@ -362,22 +381,36 @@ func TestIncludeCache(t *testing.T) {
 	q2, err := rel.ParseFilterQL("FILTER INCLUDE test")
 	assert.Equal(t, nil, err)
 	{
-		ctx := &contextWithCache{EvalContext: e}
+		cachedValue := &cachedValue{}
+		ctx := &contextWithCache{EvalContext: e, value: cachedValue}
+		match, ok := vm.Matches(ctx, q1)
+		assert.False(t, ok)
+		assert.False(t, match)
+		assert.True(t, ctx.CachedValueUsed)
+		assert.True(t, cachedValue.GetCalled)
+		assert.False(t, cachedValue.SetCalled)
+		assert.False(t, ctx.IncludeCalled)
+	}
+	{
+		cachedValue := &cachedValue{ShouldMiss: true}
+		ctx := &contextWithCache{EvalContext: e, value: cachedValue}
 		match, ok := vm.Matches(ctx, q1)
 		assert.True(t, ok)
 		assert.True(t, match)
-		assert.True(t, ctx.CachedResultUsed)
-		assert.False(t, ctx.SetCacheCalled)
-		assert.False(t, ctx.IncludeCalled)
+		assert.True(t, ctx.CachedValueUsed)
+		assert.True(t, cachedValue.GetCalled)
+		assert.True(t, cachedValue.SetCalled)
+		assert.True(t, ctx.IncludeCalled)
 	}
-
 	{
-		ctx := &contextWithCache{EvalContext: e}
+		cachedValue := &cachedValue{}
+		ctx := &contextWithCache{EvalContext: e, value: cachedValue}
 		match, ok := vm.Matches(ctx, q2)
 		assert.True(t, ok)
 		assert.True(t, match)
-		assert.False(t, ctx.CachedResultUsed)
-		assert.True(t, ctx.SetCacheCalled)
+		assert.False(t, ctx.CachedValueUsed)
+		assert.False(t, cachedValue.GetCalled)
+		assert.False(t, cachedValue.SetCalled)
 		assert.True(t, ctx.IncludeCalled)
 	}
 }
