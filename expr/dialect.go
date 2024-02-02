@@ -180,7 +180,11 @@ func (w *jsonDialect) WriteLiteral(l string) {
 		w.WriteByte('*')
 		return
 	}
-	w.Buffer.WriteString(strconv.Quote(l))
+	w.Buffer.WriteString(unextraExtraEscape(strconv.Quote(l)))
+}
+
+func unextraExtraEscape(s string) string {
+	return strings.Replace(s, `\\`, `\`, -1)
 }
 
 func NewKeywordDialect(kw []string) DialectWriter {
