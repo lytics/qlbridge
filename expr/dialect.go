@@ -3,7 +3,6 @@ package expr
 import (
 	"bytes"
 	"io"
-	"strconv"
 	"strings"
 
 	u "github.com/araddon/gou"
@@ -180,7 +179,7 @@ func (w *jsonDialect) WriteLiteral(l string) {
 		w.WriteByte('*')
 		return
 	}
-	w.Buffer.WriteString(strconv.Quote(l))
+	w.Buffer.WriteString(`"` + l + `"`)
 }
 
 func NewKeywordDialect(kw []string) DialectWriter {

@@ -8,6 +8,7 @@ import (
 
 	u "github.com/araddon/gou"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/lex"
@@ -17,6 +18,7 @@ import (
 
 var FilterTests = []string{
 	`FILTER "bob@gmail.com" IN ("hello","world")`,
+	`FILTER "bob@gmail.com" IN ("hello\n","world")`,
 	`FILTER "bob@gmail.com" NOT IN ("hello","world")`,
 	`FILTER "bob@gmail.com" IN identityname`,
 	`FILTER "\"Boost\"" == identityname`,
@@ -115,10 +117,10 @@ func parseFilterQlTest(t *testing.T, ql string) {
 	assert.True(t, err == nil && req != nil, "Must parse: %s  \n\t%v", ql, err)
 	u.Debugf("after:  %s", req.String())
 	req2, err := rel.ParseFilterQL(req.String())
-	assert.True(t, err == nil, "must parse roundtrip %v for %s", err, ql)
+	require.NoError(t, err, "must parse roundtrip %v for %s", err, ql)
 	req.Raw = ""
 	req2.Raw = ""
-	assert.True(t, req.Equal(req2), "must roundtrip")
+	assert.True(t, req.Equal(req2), "must roundtrip: %s %s", req.String(), req2.String())
 
 	ast := req.Filter.Expr()
 	by, err := json.Marshal(ast)
