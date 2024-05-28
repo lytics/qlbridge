@@ -9,6 +9,7 @@ import (
 
 	u "github.com/araddon/gou"
 	"github.com/mssola/user_agent"
+	"golang.org/x/net/publicsuffix"
 
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/value"
@@ -19,9 +20,8 @@ var _ = u.EMPTY
 
 // email a string, parses email and makes sure it is valid
 //
-//     email("Bob <bob@bob.com>")  =>  bob@bob.com, true
-//     email("Bob <bob>")          =>  "", false
-//
+//	email("Bob <bob@bob.com>")  =>  bob@bob.com, true
+//	email("Bob <bob>")          =>  "", false
 type Email struct{}
 
 // Type string
@@ -61,8 +61,7 @@ func emailEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // emailname a string, parses email
 //
-//     emailname("Bob <bob@bob.com>") =>  Bob
-//
+//	emailname("Bob <bob@bob.com>") =>  Bob
 type EmailName struct{}
 
 // Type string
@@ -87,8 +86,7 @@ func emailNameEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool)
 
 // emaildomain parses email and returns domain
 //
-//     emaildomain("Bob <bob@bob.com>") =>  bob.com
-//
+//	emaildomain("Bob <bob@bob.com>") =>  bob.com
 type EmailDomain struct{}
 
 // Type string
@@ -118,8 +116,7 @@ func emailDomainEval(ctx expr.EvalContext, args []value.Value) (value.Value, boo
 
 // Domains Extract Domains from a Value, or Values (must be urlish), doesn't do much/any validation
 //
-//     domains("http://www.lytics.io/index.html") =>  []string{"lytics.io"}
-//
+//	domains("http://www.lytics.io/index.html") =>  []string{"lytics.io"}
 type Domains struct{}
 
 // Type strings
@@ -162,13 +159,11 @@ func domainsEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 			urlstr = "http://" + urlstr
 		}
 		if urlParsed, err := url.Parse(urlstr); err == nil {
-			parts := strings.Split(urlParsed.Host, ".")
-			if len(parts) > 2 {
-				parts = parts[len(parts)-2:]
+			domain, err := publicsuffix.EffectiveTLDPlusOne(urlParsed.Host)
+			if err != nil {
+				domains.Append("")
 			}
-			if len(parts) > 0 {
-				domains.Append(strings.Join(parts, "."))
-			}
+			domains.Append(domain)
 		}
 	}
 	if domains.Len() == 0 {
@@ -180,8 +175,7 @@ func domainsEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 // Extract Domain from a Value, or Values (must be urlish), doesn't do much/any validation.
 // if input is a list of strings, only first is evaluated, for plural see domains()
 //
-//     domain("http://www.lytics.io/index.html") =>  "lytics.io"
-//
+//	domain("http://www.lytics.io/index.html") =>  "lytics.io"
 type Domain struct{}
 
 // Type string
@@ -210,14 +204,11 @@ func domainEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 		urlstr = "http://" + urlstr
 	}
 	if urlParsed, err := url.Parse(urlstr); err == nil && len(urlParsed.Host) > 2 {
-		parts := strings.Split(urlParsed.Host, ".")
-		if len(parts) > 2 {
-			parts = parts[len(parts)-2:]
+		domain, err := publicsuffix.EffectiveTLDPlusOne(urlParsed.Host)
+		if err != nil {
+			return value.EmptyStringValue, false
 		}
-		if len(parts) > 0 {
-			return value.NewStringValue(strings.Join(parts, ".")), true
-		}
-
+		return value.NewStringValue(domain), true
 	}
 	return value.EmptyStringValue, false
 }
@@ -225,8 +216,7 @@ func domainEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 // Extract host from a String (must be urlish), doesn't do much/any validation
 // In the event the value contains more than one input url, will ONLY evaluate first
 //
-//     host("http://www.lytics.io/index.html") =>  www.lytics.io
-//
+//	host("http://www.lytics.io/index.html") =>  www.lytics.io
 type Host struct{}
 
 // Type string
@@ -267,8 +257,7 @@ func HostEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // Extract hosts from a Strings (must be urlish), doesn't do much/any validation
 //
-//     hosts("http://www.lytics.io", "http://www.activate.lytics.io") => www.lytics.io, www.activate.lytics.io
-//
+//	hosts("http://www.lytics.io", "http://www.activate.lytics.io") => www.lytics.io, www.activate.lytics.io
 type Hosts struct{}
 
 // Type strings
@@ -322,10 +311,9 @@ func HostsEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // url decode a string
 //
-//     urldecode("http://www.lytics.io/index.html") =>  http://www.lytics.io
+//	urldecode("http://www.lytics.io/index.html") =>  http://www.lytics.io
 //
 // In the event the value contains more than one input url, will ONLY evaluate first
-//
 type UrlDecode struct{}
 
 // Type string
@@ -358,10 +346,9 @@ func urlDecodeEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool)
 
 // UrlPath Extract url path from a String (must be urlish), doesn't do much/any validation
 //
-//     path("http://www.lytics.io/blog/index.html") =>  blog/index.html
+//	path("http://www.lytics.io/blog/index.html") =>  blog/index.html
 //
 // In the event the value contains more than one input url, will ONLY evaluate first
-//
 type UrlPath struct{}
 
 // Type string
@@ -402,8 +389,7 @@ func urlPathEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // Qs Extract qs param from a string (must be url valid)
 //
-//     qs("http://www.lytics.io/?utm_source=google","utm_source")  => "google", true
-//
+//	qs("http://www.lytics.io/?utm_source=google","utm_source")  => "google", true
 type Qs struct{}
 
 // Type string
@@ -451,8 +437,7 @@ func qsEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // Qs Extract qs param from a string (must be url valid)
 //
-//     qs("http://www.lytics.io/?utm_source=google","utm_source")  => "google", true
-//
+//	qs("http://www.lytics.io/?utm_source=google","utm_source")  => "google", true
 type QsDeprecate struct{}
 
 // Type string
@@ -501,8 +486,7 @@ func qsDeprecateEval(ctx expr.EvalContext, args []value.Value) (value.Value, boo
 
 // UrlMain remove the querystring and scheme from url
 //
-//     urlmain("http://www.lytics.io/?utm_source=google")  => "www.lytics.io/", true
-//
+//	urlmain("http://www.lytics.io/?utm_source=google")  => "www.lytics.io/", true
 type UrlMain struct{}
 
 // Type string
@@ -538,8 +522,7 @@ func urlMainEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // UrlMinusQs removes a specific query parameter and its value from a url
 //
-//     urlminusqs("http://www.lytics.io/?q1=google&q2=123", "q1") => "http://www.lytics.io/?q2=123", true
-//
+//	urlminusqs("http://www.lytics.io/?q1=google&q2=123", "q1") => "http://www.lytics.io/?q2=123", true
 type UrlMinusQs struct{}
 
 // Type string
@@ -597,8 +580,7 @@ func urlMinusQsEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool
 // UrlWithQueryFunc strips a url and retains only url parameters that match
 // the supplied regular expressions.
 //
-//     url.matchqs(url, re1, re2, ...)  => url_withoutqs
-//
+//	url.matchqs(url, re1, re2, ...)  => url_withoutqs
 type UrlWithQuery struct{}
 
 // Type string
@@ -684,8 +666,7 @@ func UrlWithQueryEval(include []*regexp.Regexp) expr.EvaluatorFunc {
 
 // UserAgent Extract user agent features
 //
-//     useragent(user_agent_field,"mobile")  => "true", true
-//
+//	useragent(user_agent_field,"mobile")  => "true", true
 type UserAgent struct{}
 
 // Type string
@@ -776,8 +757,7 @@ func userAgentEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool)
 
 // UserAgentMap Extract user agent features
 //
-//     useragent.map(user_agent_field)  => {"mobile": "false","platform":"X11"}, true
-//
+//	useragent.map(user_agent_field)  => {"mobile": "false","platform":"X11"}, true
 type UserAgentMap struct{}
 
 // Type MapString

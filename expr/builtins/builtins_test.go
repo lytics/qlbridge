@@ -504,6 +504,10 @@ var builtinTests = []testBuiltins{
 	{`domain("https://www.Google.com/search?q=golang")`, value.NewStringValue("google.com")},
 	{`domain(split("Google.com/search?q=golang,www.ign.com",","))`, value.NewStringValue("google.com")},
 	{`domain("http://")`, value.ErrValue},
+	{`domain("web.theecoexperts.co.uk")`, value.NewStringValue("theecoexperts.co.uk")},
+	{`domain("google.com")`, value.NewStringValue("google.com")},
+	{`domain("books.amazon.co.uk")`, value.NewStringValue("amazon.co.uk")},
+	{`domain("www.books.amazon.co.uk")`, value.NewStringValue("amazon.co.uk")},
 
 	{`domains(split("https://www.Google.com/,http://www.lytics.io",","))`, value.NewStringsValue([]string{"google.com", "lytics.io"})},
 	{`domains("https://www.Google.com/search?q=golang")`, value.NewStringsValue([]string{"google.com"})},
