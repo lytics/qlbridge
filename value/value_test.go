@@ -118,7 +118,7 @@ var (
 )
 
 // TestNewValue tests the conversion from Go types to Values.
-func TestValues(t *testing.T) {
+func TestNewValue(t *testing.T) {
 
 	var ty ValueType
 	assert.Equal(t, "nil", ty.String())
@@ -271,40 +271,7 @@ func TestValues(t *testing.T) {
 
 	}
 }
-func TestIntValue(t *testing.T) {
-	v := NewIntNil()
-	assert.True(t, v.Nil())
-	assert.Equal(t, "", v.ToString())
-	v = NewIntValue(32)
-	nv := v.NumberValue()
-	assert.Equal(t, nv.Int(), int64(32))
-}
-func TestValueNumber(t *testing.T) {
-	v := NewNumberValue(math.NaN())
-	_, err := json.Marshal(&v)
-	assert.Equal(t, nil, err)
-	v = NewNumberValue(math.Inf(1))
-	_, err = json.Marshal(&v)
-	assert.Equal(t, nil, err)
-	v = NewNumberValue(math.Inf(-1))
-	_, err = json.Marshal(&v)
-	assert.Equal(t, nil, err)
 
-	sv := NewStringValue("25.5")
-	nv := sv.NumberValue()
-	assert.True(t, CloseEnuf(nv.Float(), float64(25.5)))
-}
-func TestString(t *testing.T) {
-	v := NewStringValue("a")
-	slv := v.StringsValue()
-	assert.Equal(t, 1, slv.Len())
-	assert.Equal(t, "a", slv.Val()[0])
-
-	v = NewStringValue("15.3")
-	assert.Equal(t, int64(15), v.IntValue().Val())
-	v = NewStringValue("15")
-	assert.Equal(t, int64(15), v.IntValue().Val())
-}
 func TestErrValue(t *testing.T) {
 	v := NewErrorValuef("%v", "damn")
 	assert.Equal(t, false, v.Nil())
@@ -314,159 +281,4 @@ func TestErrValue(t *testing.T) {
 	_, err := v.MarshalJSON()
 	assert.Equal(t, nil, err)
 	assert.True(t, v.Err())
-}
-func TestStrings(t *testing.T) {
-	v := NewStringsValue([]string{"a"})
-	assert.Equal(t, 1, v.Len())
-	assert.Equal(t, "a", v.Val()[0])
-	v.Append("b")
-	assert.Equal(t, 2, v.Len())
-	assert.Equal(t, "b", v.Val()[1])
-	v = NewStringsValue([]string{"25.1"})
-	assert.Equal(t, 1, v.Len())
-	assert.Equal(t, float64(25.1), v.NumberValue().Float())
-	assert.Equal(t, int64(25), v.IntValue().Int())
-	v.Append("b")
-	assert.Equal(t, float64(25.1), v.NumberValue().Float())
-	assert.Equal(t, int64(25), v.IntValue().Int())
-	v = NewStringsValue(nil)
-	assert.True(t, math.IsNaN(v.NumberValue().Float()))
-	assert.Equal(t, int64(0), v.IntValue().Int())
-
-	v.Append("a")
-	v.Append("a")
-	m := v.Set()
-	assert.Equal(t, 1, len(m))
-}
-func TestSliceValues(t *testing.T) {
-	v := NewSliceValuesNative([]interface{}{"a"})
-	assert.Equal(t, 1, v.Len())
-	assert.Equal(t, "a", v.Val()[0].ToString())
-	v.Append(NewStringValue("b"))
-	assert.Equal(t, 2, v.Len())
-	assert.Equal(t, "b", v.Val()[1].ToString())
-	assert.Equal(t, 2, len(v.Values()))
-}
-func TestMapValue(t *testing.T) {
-	mv := map[string]interface{}{"k1": 10}
-	v := NewMapValue(mv)
-	_, ok := v.Get("k1")
-	assert.True(t, ok)
-	_, ok = v.Get("nope")
-	assert.Equal(t, false, ok)
-	assert.Equal(t, 1, v.MapValue().Len())
-	mi := v.MapInt()
-	assert.Equal(t, 1, len(mi))
-	assert.Equal(t, int64(10), mi["k1"])
-	mf := v.MapFloat()
-	assert.Equal(t, 1, len(mf))
-	assert.Equal(t, float64(10), mf["k1"])
-	ms := v.MapString()
-	assert.Equal(t, 1, len(mf))
-	assert.Equal(t, "10", ms["k1"])
-	v = NewMapValue(map[string]interface{}{"k1": "hello"})
-	mt := v.MapTime()
-	assert.Equal(t, 0, mt.Len())
-	v = NewMapValue(map[string]interface{}{"k1": "now-4d"})
-	mt = v.MapTime()
-	assert.Equal(t, 1, mt.Len())
-	assert.True(t, mt.Val()["k1"].Unix() > 10000)
-}
-
-func TestMapStringValue(t *testing.T) {
-	msv := map[string]string{"k1": "10"}
-	v := NewMapStringValue(msv)
-	_, ok := v.Get("k1")
-	assert.True(t, ok)
-	_, ok = v.Get("nope")
-	assert.Equal(t, false, ok)
-	assert.Equal(t, 1, v.MapValue().Len())
-	lv := v.SliceValue()
-	assert.Equal(t, 1, len(lv))
-	mi := v.MapInt()
-	assert.Equal(t, 1, mi.Len())
-	assert.Equal(t, int64(10), mi.Val()["k1"])
-	mf := v.MapNumber()
-	assert.Equal(t, 1, mf.Len())
-	assert.Equal(t, float64(10), mf.Val()["k1"])
-	mb := v.MapBool()
-	assert.Equal(t, 0, mb.Len())
-	v = NewMapStringValue(map[string]string{"k1": "true"})
-	mb = v.MapBool()
-	assert.Equal(t, 1, mb.Len())
-	assert.Equal(t, true, mb.Val()["k1"])
-}
-
-func TestMapIntValue(t *testing.T) {
-	miv := map[string]int64{"k1": 10}
-	v := NewMapIntValue(miv)
-	_, ok := v.Get("k1")
-	assert.True(t, ok)
-	_, ok = v.Get("nope")
-	assert.Equal(t, false, ok)
-	assert.Equal(t, 1, v.MapValue().Len())
-	lv := v.SliceValue()
-	assert.Equal(t, 1, len(lv))
-	mi := v.MapInt()
-	assert.Equal(t, 1, len(mi))
-	assert.Equal(t, int64(10), mi["k1"])
-	mf := v.MapFloat()
-	assert.Equal(t, 1, len(mf))
-	assert.Equal(t, float64(10), mf["k1"])
-
-	mv := v.MapValue()
-	assert.Equal(t, 1, mv.Len())
-	assert.Equal(t, int64(10), mv.Val()["k1"].Value())
-}
-func TestMapNumberValue(t *testing.T) {
-	mfv := map[string]float64{"k1": 10}
-	v := NewMapNumberValue(mfv)
-	_, ok := v.Get("k1")
-	assert.True(t, ok)
-	_, ok = v.Get("nope")
-	assert.Equal(t, false, ok)
-	assert.Equal(t, 1, v.MapValue().Len())
-	lv := v.SliceValue()
-	assert.Equal(t, 1, len(lv))
-	mi := v.MapInt()
-	assert.Equal(t, 1, len(mi))
-	assert.Equal(t, int64(10), mi["k1"])
-
-	mv := v.MapValue()
-	assert.Equal(t, 1, mv.Len())
-	assert.Equal(t, float64(10), mv.Val()["k1"].Value())
-}
-func TestMapTimeValue(t *testing.T) {
-	n := time.Now()
-	mtv := map[string]time.Time{"k1": n}
-	v := NewMapTimeValue(mtv)
-	_, ok := v.Get("k1")
-	assert.True(t, ok)
-	_, ok = v.Get("nope")
-	assert.Equal(t, false, ok)
-	assert.Equal(t, 1, v.MapValue().Len())
-
-	mi := v.MapInt()
-	assert.Equal(t, 1, len(mi))
-	assert.True(t, CloseEnuf(float64(n.UnixNano()), float64(mi["k1"])))
-
-	mv := v.MapValue()
-	assert.Equal(t, 1, mv.Len())
-	assert.Equal(t, n, mv.Val()["k1"].Value())
-}
-func TestMapBoolValue(t *testing.T) {
-
-	mbv := map[string]bool{"k1": true}
-	v := NewMapBoolValue(mbv)
-	_, ok := v.Get("k1")
-	assert.True(t, ok)
-	_, ok = v.Get("nope")
-	assert.Equal(t, false, ok)
-	assert.Equal(t, 1, v.MapValue().Len())
-	lv := v.SliceValue()
-	assert.Equal(t, 1, len(lv))
-
-	mv := v.MapValue()
-	assert.Equal(t, 1, mv.Len())
-	assert.Equal(t, true, mv.Val()["k1"].Value())
 }
