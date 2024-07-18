@@ -798,6 +798,7 @@ var builtinTests = []testBuiltins{
 	{`json.jmespath(json_field, "[?b].ct | [0]")`, value.NewNumberValue(8)},
 	{`json.jmespath(json_field, "[?b].b | [0]")`, value.NewBoolValue(true)},
 	{`json.jmespath(json_field, "[?b].tags | [0]")`, value.NewStringsValue([]string{"a", "b"})},
+	{`json.jmespath(json_field, "[*].name")`, value.NewStringsValue([]string{"n1", "n2"})},
 	{`json.jmespath(not_field, "[?b].tags | [0]")`, nil},
 	{`json.jmespath(json_field, "[?b].tags | [0 ")`, nil},
 	{`json.jmespath(json_bad, "[?b].tags | [0 ")`, value.ErrValue},
