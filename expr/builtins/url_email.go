@@ -39,6 +39,17 @@ func emailEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 	if val == nil || val.Nil() || val.Err() {
 		return nil, false
 	}
+
+	if s, ok := val.(value.Slice); ok {
+		out := make([]string, 0, s.Len())
+		for _, sv := range s.SliceValue() {
+			if v, ok := emailEval(ctx, append([]value.Value{sv}, args[1:]...)); ok {
+				out = append(out, v.ToString())
+			}
+		}
+		return value.NewStringsValue(out), len(out) > 0
+	}
+
 	emailStr := ""
 	switch v := val.(type) {
 	case value.StringValue:
