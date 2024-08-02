@@ -1027,6 +1027,7 @@ func TestBuiltins(t *testing.T) {
 			if fn, ok := exprNode.(*expr.FuncNode); ok {
 				if fn.F.Name == "email" {
 					a := val.Type() == value.StringType || val.Type() == value.SliceValueType
+					fmt.Sprintf("valType: %v", val.Type())
 					assert.True(t, a)
 					continue
 				}
