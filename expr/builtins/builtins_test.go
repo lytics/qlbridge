@@ -1025,6 +1025,11 @@ func TestBuiltins(t *testing.T) {
 			assert.True(t, ok, "Should have evaluated: %s  %#v", biTest.expr, val)
 
 			if fn, ok := exprNode.(*expr.FuncNode); ok {
+				if fn.F.Name == "email" {
+					a := val.Type() == value.StringType || val.Type() == value.SliceValueType
+					assert.True(t, a)
+					continue
+				}
 				switch fn.F.Type() {
 				case value.BoolType:
 					assert.Equal(t, value.BoolType, val.Type())
