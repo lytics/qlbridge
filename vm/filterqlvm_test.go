@@ -377,7 +377,7 @@ func TestIncludeCache(t *testing.T) {
 
 	e := datasource.NewContextSimpleNative(map[string]interface{}{"x": 6})
 
-	q1, err := rel.ParseFilterQL("FILTER INCLUDE cached_include")
+	q1, _ := rel.ParseFilterQL("FILTER INCLUDE cached_include")
 	q2, err := rel.ParseFilterQL("FILTER INCLUDE test")
 	assert.Equal(t, nil, err)
 	{
@@ -413,12 +413,6 @@ func TestIncludeCache(t *testing.T) {
 		assert.False(t, cachedValue.SetCalled)
 		assert.True(t, ctx.IncludeCalled)
 	}
-}
-
-type nilincluder struct{}
-
-func (nilincluder) Include(name string) (expr.Node, error) {
-	return nil, nil
 }
 
 // TestFilterContexts ensures we don't panic if an Includer returns nil. They

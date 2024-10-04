@@ -8,21 +8,9 @@ import (
 	"github.com/lytics/qlbridge/value"
 )
 
-var (
-	// a static nil includer whose job is to return errors
-	// for vm's that don't have an includer
-	noIncluder = &expr.IncludeContext{}
-)
-
 type filterql struct {
 	expr.EvalContext
 	expr.Includer
-}
-
-type filterqlWithCache struct {
-	expr.EvalContext
-	expr.Includer
-	expr.IncludeCacheContext
 }
 
 // EvalFilerSelect evaluates a FilterSelect statement from read, into write context
@@ -57,7 +45,7 @@ func EvalFilterSelect(sel *rel.FilterSelect, writeContext expr.ContextWriter, re
 			}
 			switch ifVal := ifColValue.(type) {
 			case value.BoolValue:
-				if ifVal.Val() == false {
+				if !ifVal.Val() {
 					continue // filter out this col
 				}
 			default:
@@ -79,25 +67,22 @@ func EvalFilterSelect(sel *rel.FilterSelect, writeContext expr.ContextWriter, re
 // Matches executes a FilterQL statement against an evaluation context
 // returning true if the context matches.
 func MatchesInc(inc expr.Includer, cr expr.EvalContext, stmt *rel.FilterStatement) (bool, bool) {
-	if cacheCtx, ok := cr.(expr.IncludeCacheContext); ok {
-		return matchesExpr(filterqlWithCache{cr, inc, cacheCtx}, stmt.Filter, 0)
-	}
-	return matchesExpr(filterql{cr, inc}, stmt.Filter, 0)
+	return matchesExpr(filterql{cr, inc}, stmt.Filter)
 }
 
 // Matches executes a FilterQL statement against an evaluation context
 // returning true if the context matches.
 func Matches(cr expr.EvalContext, stmt *rel.FilterStatement) (bool, bool) {
-	return matchesExpr(cr, stmt.Filter, 0)
+	return matchesExpr(cr, stmt.Filter)
 }
 
 // MatchesExpr executes a expr.Node expression against an evaluation context
 // returning true if the context matches.
 func MatchesExpr(cr expr.EvalContext, node expr.Node) (bool, bool) {
-	return matchesExpr(cr, node, 0)
+	return matchesExpr(cr, node)
 }
 
-func matchesExpr(cr expr.EvalContext, n expr.Node, depth int) (bool, bool) {
+func matchesExpr(cr expr.EvalContext, n expr.Node) (bool, bool) {
 	switch exp := n.(type) {
 	case *expr.IdentityNode:
 		if exp.Text == "*" || exp.Text == "match_all" {

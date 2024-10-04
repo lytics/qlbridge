@@ -3,6 +3,7 @@
 package vm
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -21,13 +22,13 @@ var (
 	// MaxDepth acts as a guard against potentially recursive queries
 	MaxDepth = 1000
 	// ErrMaxDepth If we hit max depth on recursion
-	ErrMaxDepth = fmt.Errorf("Recursive Evaluation Error")
+	ErrMaxDepth = errors.New("recursive Evaluation Error")
 	// ErrUnknownOp an unrecognized Operator in expression
-	ErrUnknownOp = fmt.Errorf("expr: unknown op type")
+	ErrUnknownOp = errors.New("expr: unknown op type")
 	// ErrUnknownNodeType Unhandled Node type for expression evaluation
-	ErrUnknownNodeType = fmt.Errorf("expr: unknown node type")
+	ErrUnknownNodeType = errors.New("expr: unknown node type")
 	// ErrExecute could not evaluate an expression
-	ErrExecute = fmt.Errorf("Could not execute")
+	ErrExecute = errors.New("could not execute")
 )
 
 // EvalBaseContext base context for expression evaluation
@@ -139,13 +140,13 @@ func evalDepth(ctx expr.EvalContext, arg expr.Node, depth int, visitedIncludes [
 	case *expr.BooleanNode:
 		return walkBoolean(ctx, argVal, depth, visitedIncludes)
 	case *expr.UnaryNode:
-		return walkUnary(ctx, argVal, depth)
+		return walkUnary(ctx, argVal)
 	case *expr.TriNode:
-		return walkTernary(ctx, argVal, depth)
+		return walkTernary(ctx, argVal)
 	case *expr.ArrayNode:
-		return walkArray(ctx, argVal, depth)
+		return walkArray(ctx, argVal)
 	case *expr.FuncNode:
-		return walkFunc(ctx, argVal, depth)
+		return walkFunc(ctx, argVal)
 	case *expr.IdentityNode:
 		return walkIdentity(ctx, argVal)
 	case *expr.StringNode:
@@ -210,10 +211,51 @@ func resolveInclude(ctx expr.Includer, inc *expr.IncludeNode, depth int, visited
 	return nil
 }
 
+var errFailedInclusion = errors.New("failed inclusion")
+
 func walkInclude(ctx expr.EvalContext, inc *expr.IncludeNode, depth int, visitedIncludes []string) (value.Value, bool) {
 	var matches, ok bool
 	var err error
 	var cachedValue expr.CachedValue
+	if cacheCtx, hasCacheCtx := ctx.(expr.IncludeCacheContextV2); hasCacheCtx {
+		matches, err := cacheCtx.GetOrSet(inc.Identity.Text, func() (bool, error) {
+			if inc.ExprNode == nil {
+				incCtx, ok := ctx.(expr.EvalIncludeContext)
+				if !ok {
+					return false, fmt.Errorf("no Includer context? %T  stack:%v", ctx, u.PrettyStack(14))
+				}
+				if err := resolveInclude(incCtx, inc, depth, visitedIncludes); err != nil {
+					return false, fmt.Errorf("could not resolve include %w", err)
+				}
+			}
+
+			switch exp := inc.ExprNode.(type) {
+			case *expr.IdentityNode:
+				if exp.Text == "*" || exp.Text == "match_all" {
+					return true, nil
+				}
+			}
+
+			matches, ok = evalBool(ctx, inc.ExprNode, depth+1, visitedIncludes)
+			if !ok {
+				return matches, errFailedInclusion
+			}
+			return matches, nil
+		})
+		if errors.Is(err, errFailedInclusion) {
+			if inc.Negated() {
+				return value.NewBoolValue(true), true
+			}
+			return nil, false
+		} else if err != nil {
+			u.Errorf("failed to get or set include in cache: %v", err)
+			return nil, false
+		}
+		if inc.Negated() {
+			return value.NewBoolValue(!matches), true
+		}
+		return value.NewBoolValue(matches), true
+	}
 	if cacheCtx, hasCacheCtx := ctx.(expr.IncludeCacheContext); hasCacheCtx {
 		var hasCachedValue bool
 		cachedValue, hasCachedValue = cacheCtx.GetCachedValue(inc.Identity.Text)
@@ -607,7 +649,7 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 
 					lht, ok := arg.(value.TimeValue)
 					if !ok {
-						return value.NewErrorValue(fmt.Errorf("All values of slice must be same type %v", at)), false
+						return value.NewErrorValue(fmt.Errorf("all values of slice must be same type %v", at)), false
 					}
 
 					if isTrue, _ := operateTime(node.Operator.T, lht.Val(), rht); isTrue.Val() {
@@ -644,7 +686,7 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 			case value.StringValue:
 				// [x,y,z] LIKE str
 				for _, val := range at.Val() {
-					if boolVal, ok := LikeCompare(val.ToString(), bv.Val()); ok && boolVal.Val() == true {
+					if boolVal, ok := LikeCompare(val.ToString(), bv.Val()); ok && boolVal.Val() {
 						return boolVal, true
 					}
 				}
@@ -704,7 +746,7 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 				// [x,y,z] LIKE str
 				for _, val := range at.Val() {
 					boolVal, ok := LikeCompare(val, bv.Val())
-					if ok && boolVal.Val() == true {
+					if ok && boolVal.Val() {
 						return boolVal, true
 					}
 				}
@@ -820,7 +862,7 @@ func walkIdentity(ctx expr.EvalContext, node *expr.IdentityNode) (value.Value, b
 	return ctx.Get(node.Text)
 }
 
-func walkUnary(ctx expr.EvalContext, node *expr.UnaryNode, depth int) (value.Value, bool) {
+func walkUnary(ctx expr.EvalContext, node *expr.UnaryNode) (value.Value, bool) {
 
 	a, ok := Eval(ctx, node.Arg)
 	if !ok {
@@ -868,7 +910,7 @@ func walkUnary(ctx expr.EvalContext, node *expr.UnaryNode, depth int) (value.Val
 // walkTernary ternary evaluator
 //
 //	A   BETWEEN   B  AND C
-func walkTernary(ctx expr.EvalContext, node *expr.TriNode, depth int) (value.Value, bool) {
+func walkTernary(ctx expr.EvalContext, node *expr.TriNode) (value.Value, bool) {
 
 	a, aok := Eval(ctx, node.Args[0])
 	b, bok := Eval(ctx, node.Args[1])
@@ -963,7 +1005,7 @@ func walkTernary(ctx expr.EvalContext, node *expr.TriNode, depth int) (value.Val
 // walkArray Array evaluator:  evaluate multiple values into an array
 //
 //	(b,c,d)
-func walkArray(ctx expr.EvalContext, node *expr.ArrayNode, depth int) (value.Value, bool) {
+func walkArray(ctx expr.EvalContext, node *expr.ArrayNode) (value.Value, bool) {
 
 	vals := make([]value.Value, len(node.Args))
 
@@ -977,7 +1019,7 @@ func walkArray(ctx expr.EvalContext, node *expr.ArrayNode, depth int) (value.Val
 }
 
 // walkFunc evaluates a function
-func walkFunc(ctx expr.EvalContext, node *expr.FuncNode, depth int) (value.Value, bool) {
+func walkFunc(ctx expr.EvalContext, node *expr.FuncNode) (value.Value, bool) {
 
 	if node.F.CustomFunc == nil {
 		return nil, false
@@ -1157,9 +1199,7 @@ func operateTime(op lex.TokenType, lht, rht time.Time) (value.BoolValue, bool) {
 // LikeCompare takes two strings and evaluates them for like equality
 func LikeCompare(a, b string) (value.BoolValue, bool) {
 	// Do we want to always do this replacement?   Or do this at parse time or config?
-	if strings.Contains(b, "%") {
-		b = strings.Replace(b, "%", "*", -1)
-	}
+	b = strings.Replace(b, "%", "*", -1)
 	match, err := glob.Match(b, a)
 	if err != nil {
 		return value.BoolValueFalse, false
@@ -1188,7 +1228,7 @@ func operateIntVals(op lex.Token, a, b int64) (value.Value, error) {
 	case lex.TokenDivide: //    /
 		//r = a / b
 		if b == 0 {
-			return nil, fmt.Errorf("Divide by Zero error")
+			return nil, errors.New("divide by Zero error")
 		}
 		return value.NewIntValue(a / b), nil
 	case lex.TokenModulus: //    %
@@ -1246,19 +1286,4 @@ func operateIntVals(op lex.Token, a, b int64) (value.Value, error) {
 		}
 	}
 	return nil, fmt.Errorf("expr: unknown operator %s", op)
-}
-func uoperate(op string, a float64) (r float64) {
-	switch op {
-	case "!":
-		if a == 0 {
-			r = 1
-		} else {
-			r = 0
-		}
-	case "-":
-		r = -a
-	default:
-		panic(fmt.Errorf("expr: unknown operator %s", op))
-	}
-	return
 }

@@ -78,7 +78,6 @@ type sqlTest struct {
 	sql     string
 	context expr.EvalContext
 	result  *datasource.ContextSimple // ?? what is this?
-	rowct   int                       // expected row count
 }
 
 func st(sql string, results map[string]interface{}) sqlTest {

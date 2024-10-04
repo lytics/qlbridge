@@ -149,6 +149,9 @@ type (
 		Get() (bool, bool, error)
 		Set(bool, bool)
 	}
+	IncludeCacheContextV2 interface {
+		GetOrSet(key string, fn func() (bool, error)) (bool, error)
+	}
 	// ContextReader is a key-value interface to read the context of message/row
 	// using a  Get("key") interface.  Used by vm to evaluate messages
 	ContextReader interface {
@@ -345,10 +348,9 @@ func (*IncludeContext) Include(name string) (Node, error) { return nil, ErrNoInc
 
 // FindFirstIdentity Recursively descend down a node looking for first Identity Field
 //
-//     min(year)                 == year
-//     eq(min(item), max(month)) == item
-//     eq(min(user.last_name), max(month)) == user.last_name
-//
+//	min(year)                 == year
+//	eq(min(item), max(month)) == item
+//	eq(min(user.last_name), max(month)) == user.last_name
 func FindFirstIdentity(node Node) string {
 	l := findIdentities(node, nil).Strings()
 	if len(l) == 0 {
@@ -359,9 +361,8 @@ func FindFirstIdentity(node Node) string {
 
 // FindAllIdentityField Recursively descend down a node looking for all Identity Fields
 //
-//     min(year)                 == {year}
-//     eq(min(user.name), max(month)) == {user.name, month}
-//
+//	min(year)                 == {year}
+//	eq(min(user.name), max(month)) == {user.name, month}
 func FindAllIdentityField(node Node) []string {
 	return findIdentities(node, nil).Strings()
 }
@@ -369,9 +370,8 @@ func FindAllIdentityField(node Node) []string {
 // FindAllLeftIdentityFields Recursively descend down a node looking for all
 // LEFT Identity Fields
 //
-//     min(year)                 == {year}
-//     eq(min(user.name), max(month)) == {user, month}
-//
+//	min(year)                 == {year}
+//	eq(min(user.name), max(month)) == {user, month}
 func FindAllLeftIdentityFields(node Node) []string {
 	return findIdentities(node, nil).LeftStrings()
 }
@@ -452,9 +452,9 @@ func (m IdentityNodes) LeftStrings() []string {
 // FindIdentityName Recursively walk a node looking for first Identity Field
 // and combine with outermost expression to create an alias
 //
-//     min(year)                 => "min_year"
-//     eq(min(year), max(month)) =>  "eq_year
-//     EXISTS url                =>  "exists_url"
+//	min(year)                 => "min_year"
+//	eq(min(year), max(month)) =>  "eq_year
+//	EXISTS url                =>  "exists_url"
 func FindIdentityName(depth int, node Node, prefix string) string {
 
 	switch n := node.(type) {
@@ -1256,9 +1256,10 @@ unary_op   = "+" | "-" | "!" | "^" | "*" | "&" | "<-" .
 */
 
 // Create a Binary node
-//   @operator = * + - %/ / && || = ==
-//   @operator =  and, or, "is not"
-//  @lhArg, rhArg the left, right side of binary
+//
+//	 @operator = * + - %/ / && || = ==
+//	 @operator =  and, or, "is not"
+//	@lhArg, rhArg the left, right side of binary
 func NewBinaryNode(operator lex.Token, lhArg, rhArg Node) *BinaryNode {
 	//u.Debugf("NewBinaryNode: %v %v %v", lhArg, operator, rhArg)
 	return &BinaryNode{Args: []Node{lhArg, rhArg}, Operator: operator}
@@ -1331,48 +1332,51 @@ AST that is necessary for other evaluation run-times.
 
 logically `NOT (X > y)` is NOT THE SAME AS  `(X <= y)   due to lack of existence of X
 
-func (m *BinaryNode) ReverseNegation() bool {
-	switch m.Operator.T {
-	case lex.TokenEqualEqual:
-		m.Operator.T = lex.TokenNE
-		m.Operator.V = m.Operator.T.String()
-	case lex.TokenNE:
-		m.Operator.T = lex.TokenEqualEqual
-		m.Operator.V = m.Operator.T.String()
-	case lex.TokenLT:
-		m.Operator.T = lex.TokenGE
-		m.Operator.V = m.Operator.T.String()
-	case lex.TokenLE:
-		m.Operator.T = lex.TokenGT
-		m.Operator.V = m.Operator.T.String()
-	case lex.TokenGT:
-		m.Operator.T = lex.TokenLE
-		m.Operator.V = m.Operator.T.String()
-	case lex.TokenGE:
-		m.Operator.T = lex.TokenLT
-		m.Operator.V = m.Operator.T.String()
-	default:
-		//u.Warnf("What, what is this?   %s", m)
-		m.negated = !m.negated
+	func (m *BinaryNode) ReverseNegation() bool {
+		switch m.Operator.T {
+		case lex.TokenEqualEqual:
+			m.Operator.T = lex.TokenNE
+			m.Operator.V = m.Operator.T.String()
+		case lex.TokenNE:
+			m.Operator.T = lex.TokenEqualEqual
+			m.Operator.V = m.Operator.T.String()
+		case lex.TokenLT:
+			m.Operator.T = lex.TokenGE
+			m.Operator.V = m.Operator.T.String()
+		case lex.TokenLE:
+			m.Operator.T = lex.TokenGT
+			m.Operator.V = m.Operator.T.String()
+		case lex.TokenGT:
+			m.Operator.T = lex.TokenLE
+			m.Operator.V = m.Operator.T.String()
+		case lex.TokenGE:
+			m.Operator.T = lex.TokenLT
+			m.Operator.V = m.Operator.T.String()
+		default:
+			//u.Warnf("What, what is this?   %s", m)
+			m.negated = !m.negated
+			return true
+		}
 		return true
 	}
-	return true
-}
+
 func (m *BinaryNode) Collapse() Node { return m }
 func (m *BinaryNode) Negated() bool { return m.negated }
-func (m *BinaryNode) StringNegate() string {
-	w := NewDefaultWriter()
-	m.WriteNegate(w)
-	return w.String()
-}
-func (m *BinaryNode) WriteNegate(w DialectWriter) {
-	switch m.Operator.T {
-	case lex.TokenIN, lex.TokenIntersects, lex.TokenLike, lex.TokenContains:
-		m.writeToString(w, "NOT ")
-	default:
-		m.writeToString(w, "")
+
+	func (m *BinaryNode) StringNegate() string {
+		w := NewDefaultWriter()
+		m.WriteNegate(w)
+		return w.String()
 	}
-}
+
+	func (m *BinaryNode) WriteNegate(w DialectWriter) {
+		switch m.Operator.T {
+		case lex.TokenIN, lex.TokenIntersects, lex.TokenLike, lex.TokenContains:
+			m.writeToString(w, "NOT ")
+		default:
+			m.writeToString(w, "")
+		}
+	}
 */
 func (m *BinaryNode) Validate() error {
 	if len(m.Args) != 2 {
@@ -1463,8 +1467,9 @@ func (m *BinaryNode) Equal(n Node) bool {
 }
 
 // NewBooleanNode Create a boolean node
-//   @operator = AND, OR
-//  @args = nodes
+//
+//	 @operator = AND, OR
+//	@args = nodes
 func NewBooleanNode(operator lex.Token, args ...Node) *BooleanNode {
 	//u.Debugf("NewBinaryNode: %v %v %v", lhArg, operator, rhArg)
 	return &BooleanNode{Args: args, Operator: operator}
@@ -1620,8 +1625,7 @@ func (m *BooleanNode) Equal(n Node) bool {
 
 // Create a Tri node
 //
-//  @arg1 [NOT] BETWEEN @arg2 AND @arg3
-//
+//	@arg1 [NOT] BETWEEN @arg2 AND @arg3
 func NewTriNode(operator lex.Token, arg1, arg2, arg3 Node) *TriNode {
 	return &TriNode{Args: []Node{arg1, arg2, arg3}, Operator: operator}
 }
@@ -1756,11 +1760,10 @@ func (m *TriNode) Equal(n Node) bool {
 
 // Unary nodes
 //
-//    NOT <expression>
-//    ! <expression>
-//    EXISTS <identity>
-//    <identity> IS NOT NULL
-//
+//	NOT <expression>
+//	! <expression>
+//	EXISTS <identity>
+//	<identity> IS NOT NULL
 func NewUnary(operator lex.Token, arg Node) Node {
 	nn, ok := arg.(NegateableNode)
 	switch operator.T {
@@ -1889,10 +1892,9 @@ func (m *UnaryNode) Equal(n Node) bool {
 
 // Include nodes
 //
-//    NOT INCLUDE <identity>
-//    ! INCLUDE <identity>
-//    INCLUDE <identity>
-//
+//	NOT INCLUDE <identity>
+//	! INCLUDE <identity>
+//	INCLUDE <identity>
 func NewInclude(operator lex.Token, id *IdentityNode) *IncludeNode {
 	return &IncludeNode{Identity: id, Operator: operator}
 }

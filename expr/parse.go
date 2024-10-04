@@ -712,14 +712,16 @@ func (t *tree) Func(depth int, funcTok lex.Token) (fn *FuncNode) {
 			switch firstToken := t.Cur(); firstToken.T {
 			case lex.TokenRightParenthesis:
 				t.Next()
-				if node != nil {
-					fn.append(node)
-				}
+				// Impossible condition?
+				// if node != nil {
+				// 	fn.append(node)
+				// }
 				return
 			case lex.TokenEOF, lex.TokenEOS, lex.TokenFrom:
-				if node != nil {
-					fn.append(node)
-				}
+				// Impossible condition?
+				// if node != nil {
+				// 	fn.append(node)
+				// }
 				return
 			case lex.TokenComma:
 				if len(fn.Args) == 0 || t.Peek().T == lex.TokenComma || lastComma {
