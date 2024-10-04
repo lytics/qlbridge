@@ -25,7 +25,7 @@ func EvalSql(sel *rel.SqlSelect, writeContext expr.ContextWriter, readContext ex
 		}
 		switch whereVal := whereValue.(type) {
 		case value.BoolValue:
-			if whereVal.Val() == false {
+			if !whereVal.Val() {
 				return false, nil
 			}
 			// ok, continue
@@ -43,7 +43,7 @@ func EvalSql(sel *rel.SqlSelect, writeContext expr.ContextWriter, readContext ex
 			}
 			switch ifVal := ifColValue.(type) {
 			case value.BoolValue:
-				if ifVal.Val() == false {
+				if !ifVal.Val() {
 					continue // filter out this col
 				}
 			default:

@@ -358,6 +358,3 @@ func vmt(qltext string, result interface{}, ok bool) vmTest {
 func vmtall(qltext string, result interface{}, parseOk, evalOk bool) vmTest {
 	return vmTest{qlText: qltext, parseok: parseOk, evalok: evalOk, result: result, context: &includer{msgContext}}
 }
-func vmtctx(qltext string, result interface{}, c expr.ContextReader, ok bool) vmTest {
-	return vmTest{qlText: qltext, context: &includer{c}, result: result, parseok: ok, evalok: ok}
-}
