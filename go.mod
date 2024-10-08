@@ -9,8 +9,6 @@ require (
 	github.com/araddon/gou v0.0.0-20190110011759-c797efecbb61
 	github.com/dchest/siphash v1.2.1
 	github.com/go-sql-driver/mysql v1.4.1
-	github.com/gogo/protobuf v1.3.1
-	github.com/golang/protobuf v1.5.0
 	github.com/google/btree v1.0.0
 	github.com/hashicorp/go-memdb v1.0.4
 	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
@@ -31,6 +29,7 @@ require (
 require (
 	cloud.google.com/go v0.38.0 // indirect
 	github.com/davecgh/go-spew v1.1.0 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/uuid v1.0.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/hashicorp/go-immutable-radix v1.1.0 // indirect

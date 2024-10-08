@@ -20,13 +20,4 @@ func TestContext(t *testing.T) {
 	c2 := NewContext(selQuery)
 	// Should NOT be equal because the id is not the same
 	assert.Equal(t, false, c1.Equal(c2))
-
-	c1pb := c1.ToPB()
-	c1FromPb := NewContextFromPb(c1pb)
-	// Should be equal
-	assert.Equal(t, true, c1.Equal(c1FromPb))
-	c1FromPb.SchemaName = "what"
-	assert.Equal(t, false, c1.Equal(c1FromPb))
-	c1FromPb.fingerprint = 88 //
-	assert.Equal(t, false, c1.Equal(c1FromPb))
 }

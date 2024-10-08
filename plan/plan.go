@@ -5,12 +5,10 @@ package plan
 
 import (
 	"database/sql/driver"
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	u "github.com/araddon/gou"
-	"github.com/golang/protobuf/proto"
 
 	"github.com/lytics/qlbridge/rel"
 	"github.com/lytics/qlbridge/schema"
@@ -42,10 +40,6 @@ var (
 	_ Task = (*Order)(nil)
 	_ Task = (*JoinMerge)(nil)
 	_ Task = (*JoinKey)(nil)
-
-	// Force any plan that participates in a Select to implement Proto
-	//  which allows us to serialize and distribute to multiple nodes.
-	_ Proto = (*Select)(nil)
 )
 
 type (
@@ -54,11 +48,6 @@ type (
 	// SelectTask interface to check equality
 	SelectTask interface {
 		Equal(Task) bool
-	}
-	// Proto interface to ensure implements protobuf marshalling.
-	Proto interface {
-		proto.Marshaler
-		proto.Unmarshaler
 	}
 
 	// Task interface allows different portions of distributed
@@ -82,7 +71,6 @@ type (
 		IsParallel() bool
 		SetParallel()
 		Equal(Task) bool
-		ToPb() (*PlanPb, error)
 	}
 
 	// Planner interface for planners.  Planners take a statement
@@ -141,7 +129,6 @@ type (
 		From     []*Source
 		Stmt     *rel.SqlSelect
 		ChildDag bool
-		pbplan   *PlanPb
 	}
 	// Insert plan
 	Insert struct {
@@ -185,14 +172,15 @@ type (
 	// sources such as sub-select, join, etc this is the plan for a each source
 	Source struct {
 		*PlanBase
-		pbplan *PlanPb
 
 		// Request Information, if cross-node distributed query must be serialized
-		*SourcePb
-		Stmt     *rel.SqlSource  // The sub-query statement (may have been rewritten)
-		Proj     *rel.Projection // projection for this sub-query
-		ExecPlan Proto           // If SourceExec has a plan?
-		Custom   u.JsonHelper    // Source specific context info
+		Stmt   *rel.SqlSource  // The sub-query statement (may have been rewritten)
+		Proj   *rel.Projection // projection for this sub-query
+		Custom u.JsonHelper    // Source specific context info
+
+		Final      bool
+		Complete   bool
+		SourceExec bool
 
 		// Schema and underlying Source provider info, not serialized or transported
 		ctx        *Context       // query context, shared across all parts of this request
@@ -313,44 +301,6 @@ func WalkStmt(ctx *Context, stmt rel.SqlStatement, planner Planner) (Task, error
 	return p, p.Walk(planner)
 }
 
-// SelectPlanFromPbBytes Create a sql plan from pb.
-func SelectPlanFromPbBytes(pb []byte, loader SchemaLoader) (*Select, error) {
-	p := &PlanPb{}
-	if err := proto.Unmarshal(pb, p); err != nil {
-		u.Errorf("error reading protobuf select: %v  \n%s", err, pb)
-		return nil, err
-	}
-	switch {
-	case p.Select != nil:
-		return SelectFromPB(p, loader)
-	}
-	return nil, ErrNotImplemented
-}
-
-// SelectTaskFromTaskPb create plan task for SqlSelect from pb.
-func SelectTaskFromTaskPb(pb *PlanPb, ctx *Context, sel *rel.SqlSelect) (Task, error) {
-	switch {
-	case pb.Source != nil:
-		return SourceFromPB(pb, ctx)
-	case pb.Where != nil:
-		return WhereFromPB(pb), nil
-	case pb.Having != nil:
-		return HavingFromPB(pb), nil
-	case pb.GroupBy != nil:
-		return GroupByFromPB(pb), nil
-	case pb.Order != nil:
-		return OrderFromPB(pb), nil
-	case pb.Projection != nil:
-		return ProjectionFromPB(pb, sel), nil
-	case pb.JoinMerge != nil:
-		u.Warnf("JoinMerge not implemented: %T", pb)
-	case pb.JoinKey != nil:
-		u.Warnf("JoinKey not implemented: %T", pb)
-	default:
-		u.Warnf("not implemented: %#v", pb)
-	}
-	return nil, ErrNotImplemented
-}
 func NewPlanBase(isParallel bool) *PlanBase {
 	return &PlanBase{tasks: make([]Task, 0), parallel: isParallel}
 }
@@ -365,22 +315,7 @@ func (m *PlanBase) IsParallel() bool   { return m.parallel }
 func (m *PlanBase) IsSequential() bool { return !m.parallel }
 func (m *PlanBase) SetParallel()       { m.parallel = true }
 func (m *PlanBase) SetSequential()     { m.parallel = false }
-func (m *PlanBase) ToPb() (*PlanPb, error) {
-	pbp := &PlanPb{}
-	if len(m.tasks) > 0 {
-		pbp.Children = make([]*PlanPb, len(m.tasks))
-		for i, t := range m.tasks {
-			childPlan, err := t.ToPb()
-			if err != nil {
-				u.Errorf("%T not implemented? %v", t, err)
-				return nil, err
-			}
-			pbp.Children[i] = childPlan
-		}
-	}
-	return pbp, nil
-}
-func (m *PlanBase) Equal(t Task) bool { return false }
+func (m *PlanBase) Equal(t Task) bool  { return false }
 func (m *PlanBase) EqualBase(p *PlanBase) bool {
 	if m == nil && p == nil {
 		return true
@@ -429,46 +364,6 @@ func NewAlter(ctx *Context, stmt *rel.SqlAlter) *Alter {
 	return &Alter{Stmt: stmt, PlanBase: NewPlanBase(false), Ctx: ctx}
 }
 
-func (m *Select) Marshal() ([]byte, error) {
-	err := m.serializeToPb()
-	if err != nil {
-		return nil, err
-	}
-	return m.pbplan.Marshal()
-}
-func (m *Select) MarshalTo(data []byte) (int, error) {
-	err := m.serializeToPb()
-	if err != nil {
-		return 0, err
-	}
-	return m.pbplan.MarshalTo(data)
-}
-func (m *Select) Size() (n int) {
-	m.serializeToPb()
-	return m.pbplan.Size()
-}
-func (m *Select) Unmarshal(data []byte) error {
-	if m.pbplan == nil {
-		m.pbplan = &PlanPb{Select: &SelectPb{}}
-	}
-	return m.pbplan.Unmarshal(data)
-}
-func (m *Select) serializeToPb() error {
-	if m.pbplan == nil {
-		pbp, err := m.PlanBase.ToPb()
-		if err != nil {
-			return err
-		}
-		m.pbplan = pbp
-	}
-	if m.pbplan.Select == nil && m.Stmt != nil {
-		stmtPb := m.Stmt.ToPB()
-		ctxpb := m.Ctx.ToPB()
-		m.pbplan.Select = &SelectPb{Select: stmtPb, Context: ctxpb}
-		//u.Infof("ctx %+v", m.pbplan.Select.Context)
-	}
-	return nil
-}
 func (m *Select) Equal(t Task) bool {
 	if m == nil && t == nil {
 		return true
@@ -521,109 +416,9 @@ func (m *Select) IsSchemaQuery() bool {
 	return false
 }
 
-func SelectFromPB(pb *PlanPb, loader SchemaLoader) (*Select, error) {
-	m := Select{
-		pbplan:   pb,
-		ChildDag: true,
-	}
-	m.PlanBase = NewPlanBase(pb.Parallel)
-	if pb.Select != nil {
-		m.Stmt = rel.SqlSelectFromPb(pb.Select.Select)
-		if pb.Select.Context != nil {
-			//u.Infof("got context pb %+v", pb.Select.Context)
-			m.Ctx = NewContextFromPb(pb.Select.Context)
-			m.Ctx.Stmt = m.Stmt
-			m.Ctx.Raw = m.Stmt.Raw
-			sch, err := loader(m.Ctx.SchemaName)
-			if err != nil {
-				u.Errorf("could not load schema: %q  err=%v", m.Ctx.SchemaName, err)
-				return nil, err
-			}
-			m.Ctx.Schema = sch
-		}
-	}
-	if len(pb.Children) > 0 {
-		m.tasks = make([]Task, len(pb.Children))
-		for i, pbt := range pb.Children {
-			//u.Infof("%+v", pbt)
-			childPlan, err := SelectTaskFromTaskPb(pbt, m.Ctx, m.Stmt)
-			if err != nil {
-				u.Errorf("%+v not implemented? %v  %#v", pbt, err, pbt)
-				return nil, err
-			}
-			switch cpt := childPlan.(type) {
-			case *Source:
-				m.From = append(m.From, cpt)
-			}
-			m.tasks[i] = childPlan
-		}
-	}
-	return &m, nil
-}
-
-func SourceFromPB(pb *PlanPb, ctx *Context) (*Source, error) {
-	m := Source{
-		SourcePb: pb.Source,
-		ctx:      ctx,
-	}
-	if len(pb.Source.Custom) > 0 {
-		m.Custom = make(u.JsonHelper)
-		if err := json.Unmarshal(pb.Source.Custom, &m.Custom); err != nil {
-			u.Errorf("Could not unmarshall custom data %v", err)
-		}
-		//u.Debugf("custom %v", m.Custom)
-	}
-	if pb.Source.Projection != nil {
-		m.Proj = rel.ProjectionFromPb(pb.Source.Projection)
-	}
-	if pb.Source.SqlSource != nil {
-		m.Stmt = rel.SqlSourceFromPb(pb.Source.SqlSource)
-	}
-	m.PlanBase = NewPlanBase(pb.Parallel)
-	if len(pb.Children) > 0 {
-		m.tasks = make([]Task, len(pb.Children))
-		for i, pbt := range pb.Children {
-			childPlan, err := SelectTaskFromTaskPb(pbt, ctx, m.Stmt.Source)
-			if err != nil {
-				u.Errorf("%T not implemented? %v", pbt, err)
-				return nil, err
-			}
-			m.tasks[i] = childPlan
-		}
-	}
-
-	err := m.load()
-	if err != nil {
-		u.Errorf("could not load? %v", err)
-		return nil, err
-	}
-	if m.Conn == nil {
-		err = m.LoadConn()
-		if err != nil {
-			u.Errorf("conn error? %v", err)
-			return nil, err
-		}
-		if m.Conn == nil {
-			if m.Stmt != nil {
-				if m.Stmt.IsLiteral() {
-					// this is fine
-				} else {
-					u.Warnf("no data source and not literal query? %s", m.Stmt.String())
-					return nil, ErrNoDataSource
-				}
-			} else {
-				//u.Warnf("hm  no conn, no stmt?....")
-				//return nil, ErrNoDataSource
-			}
-		}
-	}
-
-	return &m, nil
-}
-
 // NewSource create a new plan Task for data source
 func NewSource(ctx *Context, stmt *rel.SqlSource, isFinal bool) (*Source, error) {
-	s := &Source{Stmt: stmt, ctx: ctx, SourcePb: &SourcePb{Final: isFinal}, PlanBase: NewPlanBase(false)}
+	s := &Source{Stmt: stmt, Final: isFinal, ctx: ctx, PlanBase: NewPlanBase(false)}
 	err := s.load()
 	if err != nil {
 		return nil, err
@@ -631,7 +426,7 @@ func NewSource(ctx *Context, stmt *rel.SqlSource, isFinal bool) (*Source, error)
 	return s, nil
 }
 func NewSourceStaticPlan(ctx *Context) *Source {
-	return &Source{ctx: ctx, SourcePb: &SourcePb{Final: true}, PlanBase: NewPlanBase(false)}
+	return &Source{ctx: ctx, PlanBase: NewPlanBase(false)}
 }
 func (m *Source) Context() *Context {
 	return m.ctx
@@ -679,10 +474,6 @@ func (m *Source) IsSchemaQuery() bool {
 	}
 	return false
 }
-func (m *Source) ToPb() (*PlanPb, error) {
-	m.serializeToPb()
-	return m.pbplan, nil
-}
 func (m *Source) Equal(t Task) bool {
 	if m == nil && t == nil {
 		return true
@@ -703,50 +494,6 @@ func (m *Source) Equal(t Task) bool {
 		return false
 	}
 	return true
-}
-func (m *Source) Marshal() ([]byte, error) {
-	m.serializeToPb()
-	return m.SourcePb.Marshal()
-}
-func (m *Source) MarshalTo(data []byte) (n int, err error) {
-	m.serializeToPb()
-	return m.SourcePb.MarshalTo(data)
-}
-func (m *Source) Size() (n int) {
-	m.serializeToPb()
-	return m.SourcePb.Size()
-}
-func (m *Source) Unmarshal(data []byte) error {
-	if m.SourcePb == nil {
-		m.SourcePb = &SourcePb{}
-	}
-	return m.SourcePb.Unmarshal(data)
-}
-func (m *Source) serializeToPb() error {
-	if m.pbplan == nil {
-		pbp, err := m.PlanBase.ToPb()
-		if err != nil {
-			return err
-		}
-		m.pbplan = pbp
-	}
-	if m.SourcePb.Projection == nil && m.Proj != nil {
-		m.SourcePb.Projection = m.Proj.ToPB()
-	}
-	if m.SourcePb.SqlSource == nil && m.Stmt != nil {
-		m.SourcePb.SqlSource = m.Stmt.ToPB()
-	}
-	if len(m.Custom) > 0 {
-		by, err := json.Marshal(m.Custom)
-		if err != nil {
-			u.Errorf("Could not marshall custom source plan json %v", m.Custom)
-		} else {
-			m.SourcePb.Custom = by
-		}
-	}
-
-	m.pbplan.Source = m.SourcePb
-	return nil
 }
 func (m *Source) load() error {
 	// u.Debugf("source load schema=%s from=%s  %#v", m.ctx.Schema.Name, m.Stmt.SourceName(), m.Stmt)
@@ -815,39 +562,14 @@ func (m *Projection) Equal(t Task) bool {
 	return true
 }
 
-// ToPb to protobuf.
-func (m *Projection) ToPb() (*PlanPb, error) {
-	pbp, err := m.PlanBase.ToPb()
-	if err != nil {
-		return nil, err
-	}
-	ppbptr := m.Proj.ToPB()
-	ppcpy := *ppbptr
-	ppcpy.Final = m.Final
-	pbp.Projection = &ppcpy
-	return pbp, nil
-}
-
-// ProjectionFromPB create Projection from Protobuf.
-func ProjectionFromPB(pb *PlanPb, sel *rel.SqlSelect) *Projection {
-	m := Projection{
-		Proj: rel.ProjectionFromPb(pb.Projection),
-	}
-	m.Final = pb.Projection.Final
-	m.PlanBase = NewPlanBase(pb.Parallel)
-	m.Stmt = sel
-	return &m
-}
-
 // NewJoinMerge A parallel join merge, uses Key() as value to merge
 // two different input task/channels.
 //
-//   left source  ->
-//                  \
-//                    --  join  -->
-//                  /
-//   right source ->
-//
+//	left source  ->
+//	               \
+//	                 --  join  -->
+//	               /
+//	right source ->
 func NewJoinMerge(l, r Task, lf, rf *rel.SqlSource) *JoinMerge {
 
 	m := &JoinMerge{
@@ -927,14 +649,6 @@ func (m *Into) Equal(t Task) bool {
 	}
 	return true
 }
-func (m *Where) ToPb() (*PlanPb, error) {
-	pbp, err := m.PlanBase.ToPb()
-	if err != nil {
-		return nil, err
-	}
-	pbp.Where = &WherePb{Select: m.Stmt.ToPB()}
-	return pbp, nil
-}
 func (m *Where) Equal(t Task) bool {
 	if m == nil && t == nil {
 		return true
@@ -954,23 +668,6 @@ func (m *Where) Equal(t Task) bool {
 		return false
 	}
 	return true
-}
-func WhereFromPB(pb *PlanPb) *Where {
-	m := Where{
-		Final: pb.Where.Final,
-		Stmt:  rel.SqlSelectFromPb(pb.Where.Select),
-	}
-	m.PlanBase = NewPlanBase(pb.Parallel)
-	return &m
-}
-
-func (m *Having) ToPb() (*PlanPb, error) {
-	pbp, err := m.PlanBase.ToPb()
-	if err != nil {
-		return nil, err
-	}
-	pbp.Having = &HavingPb{Select: m.Stmt.ToPB()}
-	return pbp, nil
 }
 func (m *Having) Equal(t Task) bool {
 	if m == nil && t == nil {
@@ -992,22 +689,6 @@ func (m *Having) Equal(t Task) bool {
 	}
 	return true
 }
-func HavingFromPB(pb *PlanPb) *Having {
-	m := Having{
-		Stmt: rel.SqlSelectFromPb(pb.Having.Select),
-	}
-	m.PlanBase = NewPlanBase(pb.Parallel)
-	return &m
-}
-
-func (m *GroupBy) ToPb() (*PlanPb, error) {
-	pbp, err := m.PlanBase.ToPb()
-	if err != nil {
-		return nil, err
-	}
-	pbp.GroupBy = &GroupByPb{Select: m.Stmt.ToPB()}
-	return pbp, nil
-}
 func (m *GroupBy) Equal(t Task) bool {
 	if m == nil && t == nil {
 		return true
@@ -1027,22 +708,6 @@ func (m *GroupBy) Equal(t Task) bool {
 		return false
 	}
 	return true
-}
-func GroupByFromPB(pb *PlanPb) *GroupBy {
-	m := GroupBy{
-		Stmt: rel.SqlSelectFromPb(pb.GroupBy.Select),
-	}
-	m.PlanBase = NewPlanBase(pb.Parallel)
-	return &m
-}
-
-func (m *Order) ToPb() (*PlanPb, error) {
-	pbp, err := m.PlanBase.ToPb()
-	if err != nil {
-		return nil, err
-	}
-	pbp.Order = &OrderPb{Select: m.Stmt.ToPB()}
-	return pbp, nil
 }
 func (m *Order) Equal(t Task) bool {
 	if m == nil && t == nil {
@@ -1064,14 +729,6 @@ func (m *Order) Equal(t Task) bool {
 	}
 	return true
 }
-func OrderFromPB(pb *PlanPb) *Order {
-	m := Order{
-		Stmt: rel.SqlSelectFromPb(pb.Order.Select),
-	}
-	m.PlanBase = NewPlanBase(pb.Parallel)
-	return &m
-}
-
 func (m *JoinMerge) Equal(t Task) bool {
 	if m == nil && t == nil {
 		return true

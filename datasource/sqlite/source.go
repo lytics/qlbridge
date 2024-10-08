@@ -38,12 +38,10 @@ var (
 // - Support full predicate push down to SqlLite.
 // - Support Thread-Safe wrapper around sqlite file.
 type Source struct {
-	exit      <-chan bool
 	schema    *schema.Schema
 	file      string // Local file path to sqlite db
 	db        *sql.DB
 	mu        sync.Mutex
-	source    *Source
 	qryconns  map[string]*qryconn
 	tables    map[string]*schema.Table
 	tblmu     sync.Mutex
