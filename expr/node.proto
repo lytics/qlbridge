@@ -1,118 +1,109 @@
 syntax = "proto2";
 package expr;
-
-
-//  protoc --proto_path=$GOPATH/src:$GOPATH/src/github.com/gogo/protobuf/protobuf:. --gofast_out=. node.proto
-
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-
-option (gogoproto.marshaler_all) = true;
-option (gogoproto.sizer_all) = true;
-option (gogoproto.unmarshaler_all) = true;
-option (gogoproto.goproto_getters_all) = false;
+option go_package = "github.com/lytics/qlbridge/expr";
 
 // The generic Expr
 message ExprPb {
-  optional int32 op = 1 [(gogoproto.nullable) = true];
-  repeated ExprPb args = 2 [(gogoproto.nullable) = true];
-  
-  optional string ident = 4 [(gogoproto.nullable) = true];
-  optional string val = 5 [(gogoproto.nullable) = true];
-  optional int64 ival = 6 [(gogoproto.nullable) = true];
-  optional bool bval = 7 [(gogoproto.nullable) = true];
-  optional double fval = 8 [(gogoproto.nullable) = true];
+  optional int32 op = 1;
+  repeated ExprPb args = 2;
+
+  optional string ident = 4;
+  optional string val = 5;
+  optional int64 ival = 6;
+  optional bool bval = 7;
+  optional double fval = 8;
 }
 
 // The generic Node, must be exactly one of these types
 message NodePb {
-  optional BinaryNodePb bn = 1 [(gogoproto.nullable) = true];
-  optional BooleanNodePb booln = 2 [(gogoproto.nullable) = true];
-  optional UnaryNodePb un = 3 [(gogoproto.nullable) = true];
-  optional FuncNodePb fn = 4 [(gogoproto.nullable) = true];
-  optional TriNodePb tn = 5 [(gogoproto.nullable) = true];
-  optional ArrayNodePb an = 6 [(gogoproto.nullable) = true];
-  optional NumberNodePb nn = 10 [(gogoproto.nullable) = true];
-  optional ValueNodePb vn = 11 [(gogoproto.nullable) = true];
-  optional IdentityNodePb in = 12 [(gogoproto.nullable) = true];
-  optional StringNodePb sn = 13 [(gogoproto.nullable) = true];
-  optional IncludeNodePb incn = 14 [(gogoproto.nullable) = true];
-  optional NullNodePb niln = 15 [(gogoproto.nullable) = true];
+  optional BinaryNodePb bn = 1;
+  optional BooleanNodePb booln = 2;
+  optional UnaryNodePb un = 3;
+  optional FuncNodePb fn = 4;
+  optional TriNodePb tn = 5;
+  optional ArrayNodePb an = 6;
+  optional NumberNodePb nn = 10;
+  optional ValueNodePb vn = 11;
+  optional IdentityNodePb in = 12;
+  optional StringNodePb sn = 13;
+  optional IncludeNodePb incn = 14;
+  optional NullNodePb niln = 15;
 }
 
 // Binary Node, two child args
 message BinaryNodePb {
-	required int32 op = 1 [(gogoproto.nullable) = false];
-	optional bool paren = 2 [(gogoproto.nullable) = false];
-	repeated NodePb args = 3 [(gogoproto.nullable) = false];
+	required int32 op = 1;
+	optional bool paren = 2;
+	repeated NodePb args = 3;
 }
 
 // Boolean Node, n child args
 message BooleanNodePb {
-	required int32 op = 1 [(gogoproto.nullable) = false];
-	repeated NodePb args = 2 [(gogoproto.nullable) = false];
+	required int32 op = 1;
+	repeated NodePb args = 2;
 }
 
 // Include Node, two child args
 message IncludeNodePb {
-	required int32 op = 1 [(gogoproto.nullable) = false];
-	required bool negated = 2 [(gogoproto.nullable) = false];
-	required IdentityNodePb identity = 3 [(gogoproto.nullable) = false];
+	required int32 op = 1;
+	required bool negated = 2;
+	required IdentityNodePb identity = 3;
 }
 
 // Unary Node, one child
 message UnaryNodePb {
-	required int32 op = 1 [(gogoproto.nullable) = false];
-	optional bool paren = 2 [(gogoproto.nullable) = false];
-	required NodePb arg = 3 [(gogoproto.nullable) = false];
+	required int32 op = 1;
+	optional bool paren = 2;
+	required NodePb arg = 3;
 }
 
 // Func Node, args are children
 message FuncNodePb {
-	required string name = 1 [(gogoproto.nullable) = false];
-	repeated NodePb args = 2 [(gogoproto.nullable) = false];
+	required string name = 1;
+	repeated NodePb args = 2;
 }
 
 // Tri Node, may hve children
 message TriNodePb {
-	required int32 op = 1 [(gogoproto.nullable) = false];
-	repeated NodePb args = 2 [(gogoproto.nullable) = false];
+	required int32 op = 1;
+	repeated NodePb args = 2;
 }
 
 // Array Node
 message ArrayNodePb {
-	required int32 wrap = 1 [(gogoproto.nullable) = true];
-	repeated NodePb args = 3 [(gogoproto.nullable) = false];
+	required int32 wrap = 1;
+	repeated NodePb args = 3;
 }
 
 // String literal, no children
 message StringNodePb {
-	optional bool noquote = 1 [(gogoproto.nullable) = true];
-	optional int32 quote = 2 [(gogoproto.nullable) = true];
-	optional string text = 3 [(gogoproto.nullable) = false];
+	optional bool noquote = 1;
+	optional int32 quote = 2;
+	optional string text = 3;
 }
 
 // Identity
 message IdentityNodePb {
-	optional int32 quote = 1 [(gogoproto.nullable) = true];
-	optional string text = 3 [(gogoproto.nullable) = false];
+	optional int32 quote = 1;
+	optional string text = 3;
 }
 
 // Number Node
 message NumberNodePb {
-	optional bool isint = 1 [(gogoproto.nullable) = false];
-	optional bool isfloat = 2 [(gogoproto.nullable) = false];
-	required int64 iv = 3 [(gogoproto.nullable) = false];
-	required double fv = 4 [(gogoproto.nullable) = false];
-	required string text = 5 [(gogoproto.nullable) = false];
+	optional bool isint = 1;
+	optional bool isfloat = 2;
+	required int64 iv = 3;
+	required double fv = 4;
+	required string text = 5;
 }
 
 // Value Node
 message ValueNodePb {
-	required int32 valuetype = 1 [(gogoproto.nullable) = false];
+	required int32 valuetype = 1;
 	required bytes value = 2;
 }
 
 // NullNode
 message NullNodePb {
-	optional int32 niltype = 1 [(gogoproto.nullable) = false];
+	optional int32 niltype = 1;
 }
