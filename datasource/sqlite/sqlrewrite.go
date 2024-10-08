@@ -9,14 +9,11 @@ import (
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/lex"
 	"github.com/lytics/qlbridge/rel"
-	"github.com/lytics/qlbridge/value"
-	"github.com/lytics/qlbridge/vm"
 )
 
 type rewrite struct {
-	sel           *rel.SqlSelect
-	result        *rel.SqlSelect
-	needsPolyFill bool // do we request that features be polyfilled?
+	sel    *rel.SqlSelect
+	result *rel.SqlSelect
 }
 
 func newRewriter(stmt *rel.SqlSelect) *rewrite {
@@ -65,28 +62,9 @@ func (m *rewrite) rewrite() (string, error) {
 	return m.result.String(), nil
 }
 
-// eval() returns ( value, isOk, isIdentity )
-func (m *rewrite) eval(arg expr.Node) (value.Value, bool, bool) {
-	switch arg := arg.(type) {
-	case *expr.NumberNode, *expr.StringNode:
-		val, ok := vm.Eval(nil, arg)
-		return val, ok, false
-	case *expr.IdentityNode:
-		if arg.IsBooleanIdentity() {
-			return value.NewBoolValue(arg.Bool()), true, false
-		}
-		return value.NewStringValue(arg.Text), true, true
-	case *expr.ArrayNode:
-		val, ok := vm.Eval(nil, arg)
-		return val, ok, false
-	}
-	return nil, false, false
-}
-
 // Aggregations from the <select_list>
 //
-//    SELECT <select_list> FROM ... WHERE
-//
+//	SELECT <select_list> FROM ... WHERE
 func (m *rewrite) walkSelectList() error {
 
 	m.result.Columns = m.sel.Columns
@@ -109,7 +87,7 @@ func (m *rewrite) walkSelectList() error {
 				newNode, err := m.selectFunc(curNode)
 				if err == nil {
 					col.Expr = newNode
-				} else if err != nil {
+				} else {
 					u.Error(err)
 					return err
 				}
@@ -136,10 +114,9 @@ func (m *rewrite) walkSelectList() error {
 // Group By Clause:  Mongo is a little weird where they move the
 // group by expressions INTO the aggregation clause:
 //
-//    operation(field) FROM x GROUP BY x,y,z
+//	operation(field) FROM x GROUP BY x,y,z
 //
-//    db.article.aggregate([{"$group":{_id: "$author", count: {"$sum":1}}}]);
-//
+//	db.article.aggregate([{"$group":{_id: "$author", count: {"$sum":1}}}]);
 func (m *rewrite) walkGroupBy() error {
 
 	for _, col := range m.sel.GroupBy {
@@ -193,7 +170,6 @@ func (m *rewrite) selectFunc(cur expr.Node) (expr.Node, error) {
 // nested bson document for mongo queries if possible.
 //
 // - if can't express logic we need to allow qlbridge to poly-fill
-//
 func (m *rewrite) walkNode(cur expr.Node) (expr.Node, error) {
 	//u.Debugf("WalkNode: %#v", cur)
 	switch curNode := cur.(type) {
@@ -206,7 +182,7 @@ func (m *rewrite) walkNode(cur expr.Node) (expr.Node, error) {
 	case *expr.UnaryNode:
 		//return m.walkUnary(curNode)
 		u.Warnf("not implemented: %#v", curNode)
-		return nil, fmt.Errorf("Not implemented urnary function: %v", curNode.String())
+		return nil, fmt.Errorf("not implemented urnary function: %v", curNode.String())
 	case *expr.FuncNode:
 		return m.walkFilterFunc(curNode)
 	case *expr.IdentityNode:
@@ -223,8 +199,7 @@ func (m *rewrite) walkNode(cur expr.Node) (expr.Node, error) {
 
 // Tri Nodes expressions:
 //
-//     <expression> [NOT] BETWEEN <expression> AND <expression>
-//
+//	<expression> [NOT] BETWEEN <expression> AND <expression>
 func (m *rewrite) walkFilterTri(node *expr.TriNode) (expr.Node, error) {
 
 	/*
@@ -248,8 +223,7 @@ func (m *rewrite) walkFilterTri(node *expr.TriNode) (expr.Node, error) {
 
 // Array Nodes expressions:
 //
-//    year IN (1990,1992)  =>
-//
+//	year IN (1990,1992)  =>
 func (m *rewrite) walkArrayNode(node *expr.ArrayNode) (expr.Node, error) {
 
 	return node, nil
@@ -257,13 +231,12 @@ func (m *rewrite) walkArrayNode(node *expr.ArrayNode) (expr.Node, error) {
 
 // Binary Node:   operations for >, >=, <, <=, =, !=, AND, OR, Like, IN
 //
-//    x = y             =>   db.users.find({field: {"$eq": value}})
-//    x != y            =>   db.inventory.find( { qty: { $ne: 20 } } )
+//	x = y             =>   db.users.find({field: {"$eq": value}})
+//	x != y            =>   db.inventory.find( { qty: { $ne: 20 } } )
 //
-//    x like "list%"    =>   db.users.find( { user_id: /^list/ } )
-//    x like "%list%"   =>   db.users.find( { user_id: /bc/ } )
-//    x IN [a,b,c]      =>   db.users.find( { user_id: {"$in":[a,b,c] } } )
-//
+//	x like "list%"    =>   db.users.find( { user_id: /^list/ } )
+//	x like "%list%"   =>   db.users.find( { user_id: /bc/ } )
+//	x IN [a,b,c]      =>   db.users.find( { user_id: {"$in":[a,b,c] } } )
 func (m *rewrite) walkFilterBinary(node *expr.BinaryNode) (expr.Node, error) {
 
 	// If we have to recurse deeper for AND, OR operators
@@ -329,9 +302,8 @@ func (m *rewrite) walkFilterBinary(node *expr.BinaryNode) (expr.Node, error) {
 // Take an expression func, ensure we don't do runtime-checking (as the function)
 // doesn't really exist, then map that function to a mongo operation
 //
-//    exists(fieldname)
-//    regex(fieldname,value)
-//
+//	exists(fieldname)
+//	regex(fieldname,value)
 func (m *rewrite) walkFilterFunc(node *expr.FuncNode) (expr.Node, error) {
 	switch funcName := strings.ToLower(node.Name); funcName {
 	case "exists", "missing":
@@ -346,14 +318,15 @@ func (m *rewrite) walkFilterFunc(node *expr.FuncNode) (expr.Node, error) {
 // Take an expression func, ensure we don't do runtime-checking (as the function)
 // doesn't really exist, then map that function to an Mongo Aggregation/MapReduce function
 //
-//    min, max, avg, sum, cardinality, terms
+//	min, max, avg, sum, cardinality, terms
 //
 // Single Value Aggregates:
-//       min, max, avg, sum, cardinality, count
+//
+//	min, max, avg, sum, cardinality, count
 //
 // MultiValue aggregates:
-//      terms, ??
 //
+//	terms, ??
 func (m *rewrite) walkProjectionFunc(node *expr.FuncNode) (expr.Node, error) {
 	switch funcName := strings.ToLower(node.Name); funcName {
 	case "count":
@@ -362,19 +335,4 @@ func (m *rewrite) walkProjectionFunc(node *expr.FuncNode) (expr.Node, error) {
 		u.Warnf("not implemented %v", funcName)
 	}
 	return node, nil
-}
-
-func eval(cur expr.Node) (value.Value, bool) {
-	switch curNode := cur.(type) {
-	case *expr.IdentityNode:
-		if curNode.IsBooleanIdentity() {
-			return value.NewBoolValue(curNode.Bool()), true
-		}
-		return value.NewStringValue(curNode.Text), true
-	case *expr.StringNode:
-		return value.NewStringValue(curNode.Text), true
-	default:
-		//u.Errorf("unrecognized T:%T  %v", cur, cur)
-	}
-	return value.NilValueVal, false
 }

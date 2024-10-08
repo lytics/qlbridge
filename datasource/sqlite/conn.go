@@ -53,7 +53,6 @@ type (
 		colidx    map[string]int
 		err       error
 		sqlInsert string
-		sqlUpdate string
 	}
 )
 
@@ -109,7 +108,7 @@ func (m *qryconn) CreateMutator(pc interface{}) (schema.ConnMutator, error) {
 		m.stmt = ctx.Stmt
 		return m, nil
 	}
-	return nil, fmt.Errorf("Expected *plan.Context but got %T", pc)
+	return nil, fmt.Errorf("expected *plan.Context but got %T", pc)
 }
 
 func (m *qryconn) Next() schema.Message {
@@ -122,43 +121,41 @@ func (m *qryconn) Next() schema.Message {
 	case <-m.exit:
 		return nil
 	default:
-		for {
-			if !m.rows.Next() {
-				return nil
-			}
-			//vals := make([]driver.Value, len(m.cols))
-			//u.Infof("expecting %d cols", len(m.cols))
-			readCols := make([]interface{}, len(m.cols))
-			writeCols := make([]driver.Value, len(m.cols))
-			for i := range writeCols {
-				readCols[i] = &writeCols[i]
-			}
-			//cols, _ := m.rows.Columns()
-			//u.Debugf("sqlite result cols provides %v but expecting %d", cols, len(m.cols))
-
-			m.err = m.rows.Scan(readCols...)
-			if m.err != nil {
-				u.Warnf("err=%v", m.err)
-				return nil
-			}
-			//u.Debugf("read vals: %#v", writeCols)
-
-			// This seems pretty gross, isn't there a better way to do this?
-			for i, col := range writeCols {
-				//u.Debugf("%d %s  %T %v", i, m.cols[i], col, col)
-				switch val := col.(type) {
-				case []uint8:
-					writeCols[i] = driver.Value(string(val))
-				}
-			}
-			msg := datasource.NewSqlDriverMessageMap(m.ct, writeCols, m.colidx)
-
-			m.ct++
-
-			//u.Infof("return item btreeP:%p itemP:%p cursorP:%p  %v %v", m, item, m.cursor, msg.Id(), msg.Values())
-			//u.Debugf("return? %T  %v", item, item.(*DriverItem).SqlDriverMessageMap)
-			return msg
+		if !m.rows.Next() {
+			return nil
 		}
+		//vals := make([]driver.Value, len(m.cols))
+		//u.Infof("expecting %d cols", len(m.cols))
+		readCols := make([]interface{}, len(m.cols))
+		writeCols := make([]driver.Value, len(m.cols))
+		for i := range writeCols {
+			readCols[i] = &writeCols[i]
+		}
+		//cols, _ := m.rows.Columns()
+		//u.Debugf("sqlite result cols provides %v but expecting %d", cols, len(m.cols))
+
+		m.err = m.rows.Scan(readCols...)
+		if m.err != nil {
+			u.Warnf("err=%v", m.err)
+			return nil
+		}
+		//u.Debugf("read vals: %#v", writeCols)
+
+		// This seems pretty gross, isn't there a better way to do this?
+		for i, col := range writeCols {
+			//u.Debugf("%d %s  %T %v", i, m.cols[i], col, col)
+			switch val := col.(type) {
+			case []uint8:
+				writeCols[i] = driver.Value(string(val))
+			}
+		}
+		msg := datasource.NewSqlDriverMessageMap(m.ct, writeCols, m.colidx)
+
+		m.ct++
+
+		//u.Infof("return item btreeP:%p itemP:%p cursorP:%p  %v %v", m, item, m.cursor, msg.Id(), msg.Values())
+		//u.Debugf("return? %T  %v", item, item.(*DriverItem).SqlDriverMessageMap)
+		return msg
 	}
 }
 
@@ -170,7 +167,7 @@ func (m *qryconn) Put(ctx context.Context, key schema.Key, row interface{}) (sch
 	case []driver.Value:
 		if len(rowVals) != len(m.Columns()) {
 			u.Warnf("wrong column ct")
-			return nil, fmt.Errorf("Wrong number of columns, got %v expected %v", len(rowVals), len(m.Columns()))
+			return nil, fmt.Errorf("wrong number of columns, got %v expected %v", len(rowVals), len(m.Columns()))
 		}
 
 		id := MakeId(rowVals[m.indexCol])
@@ -205,7 +202,7 @@ func (m *qryconn) Put(ctx context.Context, key schema.Key, row interface{}) (sch
 		return NewKey(id), nil
 	default:
 		u.Warnf("not implemented %T", row)
-		return nil, fmt.Errorf("Expected []driver.Value but got %T", row)
+		return nil, fmt.Errorf("expected []driver.Value but got %T", row)
 	}
 }
 

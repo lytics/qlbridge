@@ -13,7 +13,7 @@ import (
 	"time"
 
 	u "github.com/araddon/gou"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/value"
@@ -47,10 +47,6 @@ var (
 
 	// Schema In Mem must implement applyer
 	_ Applyer = (*InMemApplyer)(nil)
-
-	// Enforce proto marshalling
-	_ proto.Marshaler = (*Table)(nil)
-	//_ proto.Unmarshaler = (*Table)(nil)
 
 	_ = u.EMPTY
 )
@@ -233,7 +229,7 @@ func (m *Schema) Table(tableIn string) (*Table, error) {
 	if m.SchemaRef != nil {
 		return m.SchemaRef.Table(tableIn)
 	}
-	return nil, fmt.Errorf("Could not find that table: %v", tableIn)
+	return nil, fmt.Errorf("could not find that table: %v", tableIn)
 }
 
 // OpenConn get a connection from this schema by table name.
@@ -243,7 +239,7 @@ func (m *Schema) OpenConn(tableName string) (Conn, error) {
 	defer m.mu.RUnlock()
 	sch, ok := m.tableSchemas[tableName]
 	if !ok || sch == nil || sch.DS == nil {
-		return nil, fmt.Errorf("Could not find a DataSource for that table %q", tableName)
+		return nil, fmt.Errorf("could not find a DataSource for that table %q", tableName)
 	}
 
 	conn, err := sch.DS.Open(tableName)
@@ -251,7 +247,7 @@ func (m *Schema) OpenConn(tableName string) (Conn, error) {
 		return nil, err
 	}
 	if conn == nil {
-		return nil, fmt.Errorf("Could not establish a connection for %v", tableName)
+		return nil, fmt.Errorf("could not establish a connection for %v", tableName)
 	}
 	return conn, nil
 }
@@ -266,7 +262,7 @@ func (m *Schema) Schema(schemaName string) (*Schema, error) {
 	if ok && child != nil && child.DS != nil {
 		return child, nil
 	}
-	return nil, fmt.Errorf("Could not find a Schema by that name %q", schemaName)
+	return nil, fmt.Errorf("could not find a Schema by that name %q", schemaName)
 }
 
 // SchemaForTable Find a Schema for given Table
@@ -309,11 +305,12 @@ func (m *Schema) addChildSchema(child *Schema) {
 
 /*
 // AddSchemaForTable add table.
-func (m *Schema) addSchemaForTable(tableName string, ss *Schema) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.addschemaForTableUnlocked(tableName, ss)
-}
+
+	func (m *Schema) addSchemaForTable(tableName string, ss *Schema) {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		m.addschemaForTableUnlocked(tableName, ss)
+	}
 */
 func (m *Schema) refreshSchemaUnlocked() {
 

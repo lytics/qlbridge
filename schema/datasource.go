@@ -2,7 +2,7 @@ package schema
 
 import (
 	"database/sql/driver"
-	"fmt"
+	"errors"
 
 	"golang.org/x/net/context"
 
@@ -12,9 +12,9 @@ import (
 
 var (
 	// ErrNotFound is error expressing sought item was not found.
-	ErrNotFound = fmt.Errorf("Not Found")
+	ErrNotFound = errors.New("not Found")
 	// ErrNotImplemented this feature is not implemented for this source.
-	ErrNotImplemented = fmt.Errorf("Not Implemented")
+	ErrNotImplemented = errors.New("not Implemented")
 )
 
 type (

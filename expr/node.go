@@ -12,7 +12,6 @@ import (
 	"time"
 
 	u "github.com/araddon/gou"
-	"github.com/gogo/protobuf/proto"
 
 	"github.com/lytics/qlbridge/lex"
 	"github.com/lytics/qlbridge/value"
@@ -77,11 +76,6 @@ type (
 
 		// Validate Syntax validation of this expression node
 		Validate() error
-
-		// NodePb Convert this node to a Protobuf copy of it
-		NodePb() *NodePb
-		// FromPB Convert a protobuf presentation of node to Node.
-		FromPB(*NodePb) Node
 
 		// Expr Convert node into a simple expression syntax
 		// which can be used for json respresentation
@@ -586,36 +580,6 @@ func (m *FuncNode) ChildrenArgs() []Node {
 	return m.Args
 }
 
-func (m *FuncNode) NodePb() *NodePb {
-	n := &FuncNodePb{}
-	n.Name = m.Name
-	n.Args = make([]NodePb, len(m.Args))
-	for i, a := range m.Args {
-		n.Args[i] = *a.NodePb()
-	}
-	return &NodePb{Fn: n}
-}
-func (m *FuncNode) FromPB(n *NodePb) Node {
-
-	fn, ok := funcReg.FuncGet(strings.ToLower(n.Fn.Name))
-	if !ok {
-		u.Debugf("Not Found Func %q", n.Fn.Name)
-		// Panic?
-	}
-
-	f := FuncNode{
-		Name: n.Fn.Name,
-		Args: NodesFromNodesPb(n.Fn.Args),
-		F:    fn,
-	}
-
-	if err := f.Validate(); err != nil {
-		u.Warnf("could not validate %v", err)
-	}
-
-	return &f
-}
-
 // Expr convert the FuncNode to Expr
 func (m *FuncNode) Expr() *Expr {
 	fe := &Expr{Op: lex.TokenUdfExpr.String()}
@@ -752,22 +716,6 @@ func (m *NumberNode) Copy() Node {
 	n := *m
 	return &n
 }
-func (m *NumberNode) NodePb() *NodePb {
-	n := &NumberNodePb{}
-	n.Text = m.Text
-	n.Fv = m.Float64
-	n.Iv = m.Int64
-	return &NodePb{Nn: n}
-}
-func (m *NumberNode) FromPB(n *NodePb) Node {
-	nn := &NumberNode{
-		Text:    n.Nn.Text,
-		Float64: n.Nn.Fv,
-		Int64:   n.Nn.Iv,
-	}
-	nn.load()
-	return nn
-}
 func (m *NumberNode) Expr() *Expr {
 	return &Expr{Value: m.Text}
 }
@@ -834,32 +782,6 @@ func (m *StringNode) WriteDialect(w DialectWriter) {
 	w.WriteLiteral(m.Text)
 }
 func (m *StringNode) Validate() error { return nil }
-func (m *StringNode) NodePb() *NodePb {
-	n := &StringNodePb{}
-	n.Text = m.Text
-	if m.noQuote {
-		n.Noquote = proto.Bool(true)
-	}
-	if m.Quote > 0 {
-		n.Quote = proto.Int32(int32(m.Quote))
-	}
-	return &NodePb{Sn: n}
-}
-func (m *StringNode) FromPB(n *NodePb) Node {
-	noQuote := false
-	quote := 0
-	if n.Sn.Noquote != nil {
-		noQuote = *n.Sn.Noquote
-	}
-	if n.Sn.Quote != nil {
-		quote = int(*n.Sn.Quote)
-	}
-	return &StringNode{
-		noQuote: noQuote,
-		Text:    n.Sn.Text,
-		Quote:   byte(quote),
-	}
-}
 func (m *StringNode) Expr() *Expr {
 	return &Expr{Value: m.Text}
 }
@@ -956,14 +878,6 @@ func (m *ValueNode) WriteDialect(w DialectWriter) {
 	}
 }
 func (m *ValueNode) Validate() error { return nil }
-func (m *ValueNode) NodePb() *NodePb {
-	u.Errorf("Not implemented %#v", m)
-	return nil
-}
-func (m *ValueNode) FromPB(n *NodePb) Node {
-	u.Errorf("Not implemented %#v", n)
-	return &ValueNode{}
-}
 func (m *ValueNode) Expr() *Expr {
 	return &Expr{Value: m.Value.ToString()}
 }
@@ -1085,20 +999,6 @@ func (m *IdentityNode) OriginalText() string {
 	return m.Text
 }
 func (m *IdentityNode) Validate() error { return nil }
-func (m *IdentityNode) IdentityPb() *IdentityNodePb {
-	n := &IdentityNodePb{}
-	n.Text = m.Text
-	q := int32(m.Quote)
-	n.Quote = &q
-	return n
-}
-func (m *IdentityNode) NodePb() *NodePb {
-	return &NodePb{In: m.IdentityPb()}
-}
-func (m *IdentityNode) FromPB(n *NodePb) Node {
-	q := n.In.Quote
-	return &IdentityNode{Text: n.In.Text, Quote: byte(*q)}
-}
 func (m *IdentityNode) Expr() *Expr {
 	if m.IsBooleanIdentity() {
 		return &Expr{Value: m.Text}
@@ -1208,12 +1108,6 @@ func (m *NullNode) WriteDialect(w DialectWriter) {
 	io.WriteString(w, "NULL")
 }
 func (m *NullNode) Validate() error { return nil }
-func (m *NullNode) NodePb() *NodePb {
-	return &NodePb{Niln: &NullNodePb{}}
-}
-func (m *NullNode) FromPB(n *NodePb) Node {
-	return &NullNode{}
-}
 func (m *NullNode) Expr() *Expr {
 	return &Expr{Value: "NULL"}
 }
@@ -1392,20 +1286,6 @@ func (m *BinaryNode) Validate() error {
 func (m *BinaryNode) ChildrenArgs() []Node {
 	return m.Args
 }
-func (m *BinaryNode) NodePb() *NodePb {
-	n := &BinaryNodePb{}
-	n.Paren = m.Paren
-	n.Op = int32(m.Operator.T)
-	n.Args = []NodePb{*m.Args[0].NodePb(), *m.Args[1].NodePb()}
-	return &NodePb{Bn: n}
-}
-func (m *BinaryNode) FromPB(n *NodePb) Node {
-	return &BinaryNode{
-		Operator: tokenFromInt(n.Bn.Op),
-		Paren:    n.Bn.Paren,
-		Args:     NodesFromNodesPb(n.Bn.Args),
-	}
-}
 func (m *BinaryNode) Expr() *Expr {
 	fe := &Expr{Op: strings.ToLower(m.Operator.V)}
 	if len(m.Args) > 0 {
@@ -1549,20 +1429,6 @@ func (m *BooleanNode) Validate() error {
 func (m *BooleanNode) ChildrenArgs() []Node {
 	return m.Args
 }
-func (m *BooleanNode) NodePb() *NodePb {
-	n := &BooleanNodePb{}
-	n.Op = int32(m.Operator.T)
-	for _, arg := range m.Args {
-		n.Args = append(n.Args, *arg.NodePb())
-	}
-	return &NodePb{Booln: n}
-}
-func (m *BooleanNode) FromPB(n *NodePb) Node {
-	return &BooleanNode{
-		Operator: tokenFromInt(n.Booln.Op),
-		Args:     NodesFromNodesPb(n.Booln.Args),
-	}
-}
 func (m *BooleanNode) Expr() *Expr {
 	fe := &Expr{Op: strings.ToLower(m.Operator.V)}
 	if len(m.Args) > 0 {
@@ -1684,21 +1550,6 @@ func (m *TriNode) Validate() error {
 }
 func (m *TriNode) ChildrenArgs() []Node {
 	return m.Args
-}
-func (m *TriNode) NodePb() *NodePb {
-	n := &TriNodePb{Args: make([]NodePb, len(m.Args))}
-	n.Op = int32(m.Operator.T)
-	for i, arg := range m.Args {
-		n.Args[i] = *arg.NodePb()
-		//u.Debugf("TriNode NodePb: %T", arg)
-	}
-	return &NodePb{Tn: n}
-}
-func (m *TriNode) FromPB(n *NodePb) Node {
-	return &TriNode{
-		Operator: tokenFromInt(n.Tn.Op),
-		Args:     NodesFromNodesPb(n.Tn.Args),
-	}
 }
 func (m *TriNode) Expr() *Expr {
 	fe := &Expr{Op: strings.ToLower(m.Operator.V)}
@@ -1827,18 +1678,6 @@ func (m *UnaryNode) ChildrenArgs() []Node {
 	return []Node{m.Arg}
 }
 func (m *UnaryNode) Collapse() Node { return m }
-func (m *UnaryNode) NodePb() *NodePb {
-	n := &UnaryNodePb{}
-	n.Arg = *m.Arg.NodePb()
-	n.Op = int32(m.Operator.T)
-	return &NodePb{Un: n}
-}
-func (m *UnaryNode) FromPB(n *NodePb) Node {
-	return &UnaryNode{
-		Operator: tokenFromInt(n.Un.Op),
-		Arg:      NodeFromNodePb(&n.Un.Arg),
-	}
-}
 func (m *UnaryNode) Expr() *Expr {
 	fe := &Expr{Op: strings.ToLower(m.Operator.V)}
 	fe.Args = []*Expr{m.Arg.Expr()}
@@ -1937,22 +1776,6 @@ func (m *IncludeNode) WriteNegate(w DialectWriter) {
 func (m *IncludeNode) Validate() error { return nil }
 func (m *IncludeNode) Negated() bool   { return m.negated }
 func (m *IncludeNode) Collapse() Node  { return m }
-func (m *IncludeNode) NodePb() *NodePb {
-	n := &IncludeNodePb{}
-	n.Identity = *m.Identity.IdentityPb()
-	n.Op = int32(m.Operator.T)
-	n.Negated = m.negated
-	return &NodePb{Incn: n}
-}
-func (m *IncludeNode) FromPB(n *NodePb) Node {
-	inid := n.Incn.Identity
-	q := n.Incn.Identity.Quote
-	return &IncludeNode{
-		negated:  n.Incn.Negated,
-		Operator: tokenFromInt(n.Incn.Op),
-		Identity: &IdentityNode{Text: inid.Text, Quote: byte(*q)},
-	}
-}
 func (m *IncludeNode) Expr() *Expr {
 	fe := &Expr{Op: lex.TokenInclude.String()}
 	fe.Args = []*Expr{m.Identity.Expr()}
@@ -2061,23 +1884,6 @@ func (m *ArrayNode) ChildrenArgs() []Node {
 	return m.Args
 }
 func (m *ArrayNode) Append(n Node) { m.Args = append(m.Args, n) }
-func (m *ArrayNode) NodePb() *NodePb {
-	n := &ArrayNodePb{Args: make([]NodePb, len(m.Args))}
-	iv := int32(0)
-	if m.wraptype != "" && len(m.wraptype) == 1 {
-		iv = int32(m.wraptype[0])
-	}
-	n.Wrap = &iv
-	for i, arg := range m.Args {
-		n.Args[i] = *arg.NodePb()
-	}
-	return &NodePb{An: n}
-}
-func (m *ArrayNode) FromPB(n *NodePb) Node {
-	return &ArrayNode{
-		Args: NodesFromNodesPb(n.An.Args),
-	}
-}
 func (m *ArrayNode) Expr() *Expr {
 	fe := &Expr{}
 	if len(m.Args) > 0 {
@@ -2132,82 +1938,6 @@ func tokenFromInt(iv int32) lex.Token {
 	return lex.Token{}
 }
 
-// NodeFromPb Create a node from pb
-func NodeFromPb(pb []byte) (Node, error) {
-	n := &NodePb{}
-	if err := proto.Unmarshal(pb, n); err != nil {
-		return nil, err
-	}
-	return NodeFromNodePb(n), nil
-}
-
-// NodeFromNodePb Create a node from pb
-func NodeFromNodePb(n *NodePb) Node {
-	if n == nil {
-		return nil
-	}
-	switch {
-	case n.Bn != nil:
-		var bn *BinaryNode
-		return bn.FromPB(n)
-	case n.Booln != nil:
-		var bn *BooleanNode
-		return bn.FromPB(n)
-	case n.Un != nil:
-		var un *UnaryNode
-		return un.FromPB(n)
-	case n.Fn != nil:
-		var fn *FuncNode
-		return fn.FromPB(n)
-	case n.Tn != nil:
-		var tn *TriNode
-		return tn.FromPB(n)
-	case n.An != nil:
-		var an *ArrayNode
-		return an.FromPB(n)
-	case n.Nn != nil:
-		var nn *NumberNode
-		return nn.FromPB(n)
-	case n.Vn != nil:
-		var vn *ValueNode
-		return vn.FromPB(n)
-	case n.In != nil:
-		var in *IdentityNode
-		return in.FromPB(n)
-	case n.Sn != nil:
-		var sn *StringNode
-		return sn.FromPB(n)
-	case n.Incn != nil:
-		var in *IncludeNode
-		return in.FromPB(n)
-	case n.Niln != nil:
-		return &NullNode{}
-	}
-	return nil
-}
-func NodesFromNodesPbPtr(pb []*NodePb) []Node {
-	nodes := make([]Node, len(pb))
-	for i, pbn := range pb {
-		nodes[i] = NodeFromNodePb(pbn)
-	}
-	return nodes
-}
-
-func NodesFromNodesPb(pb []NodePb) []Node {
-	nodes := make([]Node, len(pb))
-	for i, pbn := range pb {
-		nodes[i] = NodeFromNodePb(&pbn)
-	}
-	return nodes
-}
-
-func NodesPbFromNodes(nodes []Node) []*NodePb {
-	pbs := make([]*NodePb, len(nodes))
-	for i, n := range nodes {
-		pbs[i] = n.NodePb()
-	}
-	return pbs
-}
 func NodesEqual(n1, n2 Node) bool {
 	switch n1t := n1.(type) {
 	case *BinaryNode:

@@ -98,7 +98,7 @@ func (m *InMemApplyer) AddOrUpdateOnSchema(s *Schema, v interface{}) error {
 		}
 	default:
 		u.Errorf("invalid type %T", v)
-		return fmt.Errorf("Could not find %T", v)
+		return fmt.Errorf("could not find %T", v)
 	}
 
 	return nil
@@ -141,7 +141,7 @@ func (m *InMemApplyer) Drop(s *Schema, v interface{}) error {
 
 	default:
 		u.Errorf("invalid type %T", v)
-		return fmt.Errorf("Could not find %T", v)
+		return fmt.Errorf("could not find %T", v)
 	}
 
 	return nil

@@ -63,9 +63,6 @@ type Context struct {
 func NewContext(query string) *Context {
 	return &Context{Raw: query}
 }
-func NewContextFromPb(pb *ContextPb) *Context {
-	return &Context{id: pb.Id, fingerprint: pb.Fingerprint, SchemaName: pb.Schema}
-}
 
 // called by go routines/tasks to ensure any recovery panics are captured
 func (m *Context) Recover() {
@@ -83,16 +80,6 @@ func (m *Context) init() {
 		}
 		m.id = NextId()
 	}
-}
-
-// called by go routines/tasks to ensure any recovery panics are captured
-func (m *Context) ToPB() *ContextPb {
-	m.init()
-	pb := &ContextPb{}
-	pb.Schema = m.SchemaName
-	pb.Fingerprint = m.fingerprint
-	pb.Id = m.id
-	return pb
 }
 
 func (m *Context) Equal(c *Context) bool {
