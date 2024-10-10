@@ -131,12 +131,13 @@ func findDateMathFn(fns BoundaryFns, node expr.Node) BoundaryFns {
 				val := strings.ToLower(narg.Text)
 
 				if nowRegex.MatchString(val) {
+					argIdx := i
 					fns = append(fns, func(d *DateConverter, ctx expr.EvalIncludeContext) {
 						// If left side is datemath   "now-3d" < ident then re-write to have ident on left
 						var lhv value.Value
 						op := n.Operator.T
 						var ok bool
-						if i == 0 {
+						if argIdx == 0 {
 							lhv, ok = Eval(ctx, n.Args[1])
 							if !ok {
 								return
@@ -157,17 +158,14 @@ func findDateMathFn(fns BoundaryFns, node expr.Node) BoundaryFns {
 								// none of these are supported operators for finding boundary
 								return
 							}
-						} else if i == 1 {
+						} else if argIdx == 1 {
 							lhv, ok = Eval(ctx, n.Args[0])
 							if !ok {
 								return
 							}
 						}
-
-						bt, err := evalBoundary(d.at, d.bt, lhv, op, val)
-						d.bt = bt
-						if err != nil {
-							d.err = err
+						d.bt, d.err = evalBoundary(d.at, d.bt, lhv, op, val)
+						if d.err != nil {
 							return
 						}
 					})

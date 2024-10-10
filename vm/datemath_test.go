@@ -19,7 +19,6 @@ var _ = u.EMPTY
 type dateTestCase struct {
 	filter string
 	match  bool
-	ts     []string
 	tm     time.Time
 }
 
@@ -39,13 +38,11 @@ func TestDateBoundaries(t *testing.T) {
 		{ // false, will turn true in 12 hours
 			filter: `FILTER last_event < "now-1d"`,
 			match:  false,
-			ts:     []string{"now-1d"},
 			tm:     t1.Add(time.Hour * 12),
 		},
 		{ // same as previous, but swap left/right
 			filter: `FILTER "now-1d" > last_event`,
 			match:  false,
-			ts:     []string{"now-1d"},
 			tm:     t1.Add(time.Hour * 12),
 		},
 		{ // false, will turn true in 12 hours
@@ -55,67 +52,56 @@ func TestDateBoundaries(t *testing.T) {
 				last_event < "now-1d"
 			)`,
 			match: false,
-			ts:    []string{"now-6d", "now-1d"},
 			tm:    t1.Add(time.Hour * 12),
 		},
 		{ // This statement is true, but will turn false in 12 hours
 			filter: `FILTER last_event > "now-1d"`,
 			match:  true,
-			ts:     []string{"now-1d"},
 			tm:     t1.Add(time.Hour * 12),
 		},
 		{ // same as previous but swap left/right
 			filter: `FILTER  "now-1d" < last_event`,
 			match:  true,
-			ts:     []string{"now-1d"},
 			tm:     t1.Add(time.Hour * 12),
 		},
 		{ // false, true in 36 hours
 			filter: `FILTER last_event < "now-2d"`,
 			match:  false,
-			ts:     []string{"now-2d"},
 			tm:     t1.Add(time.Hour * 36),
 		},
 		{ // same as above, but swap left/right
 			filter: `FILTER  "now-2d" > last_event`,
 			match:  false,
-			ts:     []string{"now-2d"},
 			tm:     t1.Add(time.Hour * 36),
 		},
 		{ // same as above, but ge
 			filter: `FILTER  "now-2d" >= last_event`,
 			match:  false,
-			ts:     []string{"now-2d"},
 			tm:     t1.Add(time.Hour * 36),
 		},
 		{ // False, will always be false
 			filter: `FILTER "now+1d" < last_event`,
 			match:  false,
-			ts:     []string{"now+1d"},
 			tm:     time.Time{},
 		},
 		{ // Same as above but swap left/right
 			filter: `FILTER last_event > "now+1d"`,
 			match:  false,
-			ts:     []string{"now+1d"},
 			tm:     time.Time{},
 		},
 		{ // False, will always be false, le
 			filter: `FILTER "now+1d" <= last_event`,
 			match:  false,
-			ts:     []string{"now+1d"},
 			tm:     time.Time{},
 		},
 		{ // true, always true
 			filter: `FILTER last_event < "now+1h"`,
 			match:  true,
-			ts:     []string{"now+1h"},
 			tm:     time.Time{},
 		},
 		{
 			filter: `FILTER "now+1h" > last_event`,
 			match:  true,
-			ts:     []string{"now+1h"},
 			tm:     time.Time{},
 		},
 		{
@@ -125,7 +111,6 @@ func TestDateBoundaries(t *testing.T) {
 				exists(not_a_field)
 			)`,
 			match: true,
-			ts:    []string{"now+1h"},
 			tm:    time.Time{},
 		},
 		{
@@ -134,7 +119,6 @@ func TestDateBoundaries(t *testing.T) {
 				last_event IN ("a", "b")
 			)`,
 			match: true,
-			ts:    []string{"now+1h"},
 			tm:    time.Time{},
 		},
 	}
@@ -159,8 +143,7 @@ func TestDateBoundaries(t *testing.T) {
 
 		// now look at boundary
 		// on go 1.9 timezones being different on these two.
-		bt := dc.Boundary()
-		assert.Equal(t, tc.tm.Unix(), bt.Unix(), tc.filter)
+		require.Equal(t, tc.tm.Unix(), dc.Boundary().Unix(), tc.filter)
 	}
 }
 
@@ -190,12 +173,10 @@ func TestDateMath(t *testing.T) {
 	tests := []dateTestCase{
 		{
 			filter: `FILTER last_event < "now-1d"`,
-			ts:     []string{"now-1d"},
 			tm:     t1.Add(time.Hour * 72),
 		},
 		{
 			filter: `FILTER AND (EXISTS event, last_event < "now-1d", INCLUDE signedup_onedayago)`,
-			ts:     []string{"now-1d", "now-2d"},
 			tm:     t1.Add(time.Hour * 72),
 		},
 	}
