@@ -1,11 +1,11 @@
 package vm
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
-	u "github.com/araddon/gou"
 	"github.com/lytics/datemath"
 
 	"github.com/lytics/qlbridge/expr"
@@ -21,52 +21,56 @@ import (
 // - Only calculates POSSIBLE boundary, given complex logic (ors etc) may NOT change.
 type DateConverter struct {
 	HasDateMath bool      // Does this have date math in it all?
-	Node        expr.Node // The expression we are extracting datemath from
-	TimeStrings []string  // List of each extracted timestring
 	bt          time.Time // The possible boundary time when expression flips true/false
 	at          time.Time // The Time to use as "now" or reference point
-	ctx         expr.EvalIncludeContext
 	err         error
+}
+
+func FindBoundary(anchorTime time.Time, ctx expr.EvalIncludeContext, fns BoundaryFns) (time.Time, error) {
+	dc := &DateConverter{
+		at: anchorTime,
+	}
+	for _, fn := range fns {
+		fn(dc, ctx)
+	}
+	return dc.bt, dc.err
+}
+
+type BoundaryFns []func(*DateConverter, expr.EvalIncludeContext)
+
+func CalcBoundaryFns(n expr.Node) BoundaryFns {
+	return findDateMathFn(nil, n)
 }
 
 // NewDateConverter takes a node expression
 func NewDateConverter(ctx expr.EvalIncludeContext, n expr.Node) (*DateConverter, error) {
 	dc := &DateConverter{
-		Node: n,
-		at:   time.Now(),
-		ctx:  ctx,
+		at: time.Now(),
 	}
-	dc.findDateMath(n)
-	if dc.err == nil && len(dc.TimeStrings) > 0 {
+	fns := findDateMathFn(nil, n)
+	dc.bt, dc.err = FindBoundary(dc.at, ctx, fns)
+	if dc.err == nil && len(fns) > 0 {
 		dc.HasDateMath = true
 	}
-	if dc.err != nil {
-		return nil, dc.err
-	}
-	return dc, nil
+	return dc, dc.err
 }
-func (d *DateConverter) addBoundary(bt time.Time) {
-	if d.bt.IsZero() {
-		d.bt = bt
-		return
+func compareBoundaries(currBoundary, newBoundary time.Time) time.Time {
+	// Should we check for is zero on the newBoundary?
+	if currBoundary.IsZero() || newBoundary.Before(currBoundary) {
+		return newBoundary
 	}
-	if bt.Before(d.bt) {
-		d.bt = bt
-	}
+	return currBoundary
 }
-func (d *DateConverter) addValue(lhv value.Value, op lex.TokenType, val string) {
-
+func evalBoundary(anchorTime, currBoundary time.Time, lhv value.Value, op lex.TokenType, val string) (time.Time, error) {
 	ct, ok := value.ValueToTime(lhv)
 	if !ok {
-		u.Debugf("Could not convert %T: %v to time.Time", lhv, lhv)
-		return
+		return currBoundary, fmt.Errorf("Could not convert %T: %v to time.Time", lhv, lhv)
 	}
 
 	// Given Anchor Time At calculate Relative Time Rt
-	rt, err := datemath.EvalAnchor(d.at, val)
+	rt, err := datemath.EvalAnchor(anchorTime, val)
 	if err != nil {
-		d.err = err
-		return
+		return currBoundary, err
 	}
 
 	// Ct = Comparison time, left hand side of expression
@@ -76,7 +80,7 @@ func (d *DateConverter) addValue(lhv value.Value, op lex.TokenType, val string) 
 	switch op {
 	case lex.TokenEqual, lex.TokenEqualEqual, lex.TokenNE:
 		// none of these are supported operators for finding boundary
-		return
+		return currBoundary, nil
 	case lex.TokenGT, lex.TokenGE:
 		// 1) ----------- Ct --------------     Rt < Ct
 		//        Rt                            Ct > "now+-1d" = true but will be true when at + (ct - rt)
@@ -86,8 +90,7 @@ func (d *DateConverter) addValue(lhv value.Value, op lex.TokenType, val string) 
 		//                        Rt            Ct > "now+-1d" = false, and will always be false
 		//
 		if rt.Before(ct) {
-			bt := d.at.Add(ct.Sub(rt))
-			d.addBoundary(bt)
+			return compareBoundaries(currBoundary, anchorTime.Add(ct.Sub(rt))), nil
 		} else {
 			// Is false, and always will be false no candidates
 		}
@@ -102,10 +105,10 @@ func (d *DateConverter) addValue(lhv value.Value, op lex.TokenType, val string) 
 		if ct.Before(rt) {
 			// Is true, and always will be true no candidates
 		} else {
-			bt := d.at.Add(ct.Sub(rt))
-			d.addBoundary(bt)
+			return compareBoundaries(currBoundary, anchorTime.Add(ct.Sub(rt))), nil
 		}
 	}
+	return currBoundary, nil
 }
 
 // Boundary given all the date-maths in this node find the boundary time where
@@ -118,87 +121,98 @@ func (d *DateConverter) Boundary() time.Time {
 var nowRegex = regexp.MustCompile(`^now([+-]+.*)*$`)
 
 // Determine if this expression node uses datemath (ie, "now-4h")
-func (d *DateConverter) findDateMath(node expr.Node) {
+func findDateMathFn(fns BoundaryFns, node expr.Node) BoundaryFns {
 
 	switch n := node.(type) {
 	case *expr.BinaryNode:
-
 		for i, arg := range n.Args {
 			switch narg := arg.(type) {
 			case *expr.StringNode:
 				val := strings.ToLower(narg.Text)
 
 				if nowRegex.MatchString(val) {
-					d.TimeStrings = append(d.TimeStrings, val)
+					fns = append(fns, func(d *DateConverter, ctx expr.EvalIncludeContext) {
+						// If left side is datemath   "now-3d" < ident then re-write to have ident on left
+						var lhv value.Value
+						op := n.Operator.T
+						var ok bool
+						if i == 0 {
+							lhv, ok = Eval(ctx, n.Args[1])
+							if !ok {
+								return
+							}
+							// Reverse equation to put identity on left side
+							// "now-1d" < last_visit    =>   "last_visit" > "now-1d"
+							switch n.Operator.T {
+							case lex.TokenGT:
+								op = lex.TokenLT
+							case lex.TokenGE:
+								op = lex.TokenLE
+							case lex.TokenLT:
+								op = lex.TokenGT
+							case lex.TokenLE:
+								op = lex.TokenGE
+							default:
+								// lex.TokenEqual, lex.TokenEqualEqual, lex.TokenNE:
+								// none of these are supported operators for finding boundary
+								return
+							}
+						} else if i == 1 {
+							lhv, ok = Eval(ctx, n.Args[0])
+							if !ok {
+								return
+							}
+						}
 
-					// If left side is datemath   "now-3d" < ident then re-write to have ident on left
-					var lhv value.Value
-					op := n.Operator.T
-					var ok bool
-					if i == 0 {
-						lhv, ok = Eval(d.ctx, n.Args[1])
-						if !ok {
-							continue
+						bt, err := evalBoundary(d.at, d.bt, lhv, op, val)
+						d.bt = bt
+						if err != nil {
+							d.err = err
+							return
 						}
-						// Reverse equation to put identity on left side
-						// "now-1d" < last_visit    =>   "last_visit" > "now-1d"
-						switch n.Operator.T {
-						case lex.TokenGT:
-							op = lex.TokenLT
-						case lex.TokenGE:
-							op = lex.TokenLE
-						case lex.TokenLT:
-							op = lex.TokenGT
-						case lex.TokenLE:
-							op = lex.TokenGE
-						default:
-							// lex.TokenEqual, lex.TokenEqualEqual, lex.TokenNE:
-							// none of these are supported operators for finding boundary
-							continue
-						}
-					} else if i == 1 {
-						lhv, ok = Eval(d.ctx, n.Args[0])
-						if !ok {
-							continue
-						}
-					}
-
-					d.addValue(lhv, op, val)
+					})
 					continue
 				}
 			default:
-				d.findDateMath(arg)
+				if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
+					fns = append(fns, moreFns...)
+				}
 			}
 		}
 
 	case *expr.BooleanNode:
 		for _, arg := range n.Args {
-			d.findDateMath(arg)
+			if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
+				fns = append(fns, moreFns...)
+			}
 		}
 	case *expr.UnaryNode:
-		d.findDateMath(n.Arg)
+		return findDateMathFn(fns, n.Arg)
 	case *expr.TriNode:
 		for _, arg := range n.Args {
-			d.findDateMath(arg)
+			if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
+				fns = append(fns, moreFns...)
+			}
 		}
 	case *expr.FuncNode:
 		for _, arg := range n.Args {
-			d.findDateMath(arg)
+			if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
+				fns = append(fns, moreFns...)
+			}
 		}
 	case *expr.ArrayNode:
 		for _, arg := range n.Args {
-			d.findDateMath(arg)
+			if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
+				fns = append(fns, moreFns...)
+			}
 		}
 	case *expr.IncludeNode:
-
-		if err := resolveInclude(d.ctx, n, 0, make([]string, 0)); err != nil {
-			d.err = err
-			return
-		}
+		// Assumes all includes are resolved
 		if n.ExprNode != nil {
-			d.findDateMath(n.ExprNode)
+			return findDateMathFn(fns, n.ExprNode)
 		}
 	case *expr.NumberNode, *expr.ValueNode, *expr.IdentityNode, *expr.StringNode:
-		// Scalar/Literal values cannot be datemath, must be binary-expression
+		// Scalar/	Literal values cannot be datemath, must be binary-expression
 	}
+	return fns
 }

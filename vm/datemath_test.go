@@ -6,6 +6,7 @@ import (
 
 	u "github.com/araddon/gou"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/lytics/qlbridge/datasource"
 	"github.com/lytics/qlbridge/expr"
@@ -118,7 +119,7 @@ func TestDateBoundaries(t *testing.T) {
 			tm:     time.Time{},
 		},
 		{
-			filter: `FILTER OR ( 
+			filter: `FILTER OR (
 				"now+1h" > last_event
 				x BETWEEN a AND b
 				exists(not_a_field)
@@ -148,19 +149,15 @@ func TestDateBoundaries(t *testing.T) {
 
 		// Converter to find/calculate date operations
 		dc, err := vm.NewDateConverter(includeCtx, fs.Filter)
-		assert.Equal(t, nil, err)
-		assert.True(t, dc.HasDateMath)
+		require.Equal(t, nil, err)
+		require.True(t, dc.HasDateMath)
 
 		// initially we should not match
 		matched, evalOk := vm.Matches(includeCtx, fs)
 		assert.True(t, evalOk, tc.filter)
 		assert.Equal(t, tc.match, matched)
 
-		// Ensure the expected time-strings are found
-		assert.Equal(t, tc.ts, dc.TimeStrings)
-
 		// now look at boundary
-		// TODO:  I would like to compare time, but was getting some errors
 		// on go 1.9 timezones being different on these two.
 		bt := dc.Boundary()
 		assert.Equal(t, tc.tm.Unix(), bt.Unix(), tc.filter)
@@ -214,8 +211,8 @@ func TestDateMath(t *testing.T) {
 
 		// Converter to find/calculate date operations
 		dc, err := vm.NewDateConverter(evalCtx, fs.Filter)
-		assert.Equal(t, nil, err)
-		assert.True(t, dc.HasDateMath)
+		require.NoError(t, err)
+		require.True(t, dc.HasDateMath, tc.filter)
 
 		// Ensure we inline/include all of the expressions
 		node, err := expr.InlineIncludes(evalCtx, fs.Filter)
@@ -230,10 +227,6 @@ func TestDateMath(t *testing.T) {
 		matched, evalOk := vm.Matches(evalCtx, fs)
 		assert.True(t, evalOk)
 		assert.Equal(t, false, matched)
-
-		// Ensure the expected time-strings are found
-		assert.Equal(t, tc.ts, dc.TimeStrings)
-
 		/*
 			// TODO:  I was trying to calculate the date in the future that
 			// this filter statement would no longer be true.  BUT, need to change
@@ -252,11 +245,12 @@ func TestDateMath(t *testing.T) {
 
 	fs := rel.MustParseFilter(`FILTER AND (INCLUDE not_valid_lookup)`)
 	_, err := vm.NewDateConverter(evalCtx, fs.Filter)
-	assert.NotEqual(t, nil, err)
+	// We assume that the inclusions are preresolved
+	assert.Nil(t, err)
 
 	fs = rel.MustParseFilter(`FILTER AND ( last_event > "now-3x")`)
 	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
-	assert.NotEqual(t, nil, err)
+	assert.NotNil(t, err)
 
 	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now-")`)
 	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
