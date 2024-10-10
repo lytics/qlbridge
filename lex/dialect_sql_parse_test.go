@@ -14,15 +14,9 @@ func parseSqlTest(t *testing.T, sql string) {
 	sqlRequest, err := rel.ParseSql(sql)
 	assert.Equal(t, nil, err)
 	assert.NotEqual(t, nil, sqlRequest, "Must parse: %s  \n\t%v", sql, err)
-	if ss, ok := sqlRequest.(*rel.SqlSelect); ok {
+	if _, ok := sqlRequest.(*rel.SqlSelect); ok {
 		_, err2 := rel.ParseSqlSelect(sql)
 		assert.Equal(t, nil, err2)
-		pb := ss.ToPbStatement()
-		pbb, err := pb.Marshal()
-		assert.Equal(t, nil, err)
-		ss2, err := rel.SqlFromPb(pbb)
-		assert.Equal(t, nil, err)
-		assert.True(t, ss.Equal(ss2))
 	}
 }
 func parseSqlError(t *testing.T, sql string) {

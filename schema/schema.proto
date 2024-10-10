@@ -1,9 +1,7 @@
 syntax = "proto3";
 
 package schema;
-
-// protoc --go_out=. *.proto
-
+option go_package = "github.com/lytics/qlbridge/schema";
 
 //import "github.com/lytics/qlbridge/rel/sql.proto";
 //import "github.com/lytics/qlbridge/expr/node.proto";

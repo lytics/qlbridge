@@ -1,6 +1,7 @@
 package schema_test
 
 import (
+	"context"
 	"database/sql/driver"
 	"sort"
 	"testing"
@@ -35,7 +36,7 @@ func TestRegistry(t *testing.T) {
 	dc, ok := c.(schema.ConnAll)
 	assert.True(t, ok)
 
-	_, err = dc.Put(nil, &datasource.KeyInt{Id: 123}, []driver.Value{123, "aaron", "email@email.com", created.In(time.UTC), []string{"admin"}})
+	_, err = dc.Put(context.Background(), &datasource.KeyInt{Id: 123}, []driver.Value{123, "aaron", "email@email.com", created.In(time.UTC), []string{"admin"}})
 	assert.Equal(t, nil, err)
 
 	// We need to register our DataSource provider here

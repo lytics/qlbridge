@@ -150,7 +150,7 @@ func (m *Registry) SchemaDrop(schema, name string, objectType lex.TokenType) err
 		}
 		return m.applyer.Drop(s, t)
 	}
-	return fmt.Errorf("Object type %s not recognized to DROP", objectType)
+	return fmt.Errorf("object type %s not recognized to DROP", objectType)
 }
 
 // SchemaRefresh means reload the schema from underlying store.  Possibly
@@ -229,7 +229,7 @@ func (m *Registry) SchemaAdd(s *Schema) error {
 		if s.Name != "server_schema" {
 			u.Warnf("Can't add duplicate schema %q", s.Name)
 		}
-		return fmt.Errorf("Cannot add duplicate schema %q", s.Name)
+		return fmt.Errorf("cannot add duplicate schema %q", s.Name)
 	}
 
 	if s.InfoSchema == nil {
@@ -246,7 +246,7 @@ func (m *Registry) SchemaAddChild(name string, child *Schema) error {
 	parent, ok := m.schemas[name]
 	m.mu.RUnlock()
 	if !ok {
-		return fmt.Errorf("Cannot find schema %q to add child", name)
+		return fmt.Errorf("cannot find schema %q to add child", name)
 	}
 	m.applyer.AddOrUpdateOnSchema(parent, child)
 	return nil
@@ -296,10 +296,10 @@ func (m *Registry) String() string {
 func discoverSchemaFromSource(s *Schema, applyer Applyer) error {
 
 	if s.DS == nil {
-		return fmt.Errorf("Missing datasource for schema %q", s.Name)
+		return fmt.Errorf("missing datasource for schema %q", s.Name)
 	}
 	if s.InfoSchema == nil {
-		return fmt.Errorf("Missing InfoSchema for schema %q", s.Name)
+		return fmt.Errorf("missing InfoSchema for schema %q", s.Name)
 	}
 
 	if err := s.DS.Setup(s); err != nil {

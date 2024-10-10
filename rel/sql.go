@@ -4,7 +4,6 @@ package rel
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -12,7 +11,6 @@ import (
 	"strings"
 
 	u "github.com/araddon/gou"
-	"github.com/gogo/protobuf/proto"
 
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/lex"
@@ -103,8 +101,6 @@ type (
 		finalized bool         // have we already finalized, ie formalized left/right aliases
 		schemaqry bool         // is this a schema qry?  ie select @@max_packet etc
 
-		// Memoized sql, we assume this is an immuteable struct so if this is populated use it
-		pb            *SqlStatementPb
 		fingerprintid int64
 	}
 	// SqlSource is a table name, sub-query, or join as used in
@@ -131,8 +127,6 @@ type (
 
 		// Plan Hints, move to a dedicated planner
 		Seekable bool
-		// Memoized sql, we assume this is an immuteable struct so if this is populated use it
-		pb *SqlSourcePb
 	}
 	// SqlWhere WHERE is select stmt, or set of expressions
 	// - WHERE x in (select name from q)
@@ -300,8 +294,6 @@ type (
 		Final    bool // Is this a Final Projection? or intermiediate?
 		colNames map[string]struct{}
 		Columns  ResultColumns
-		// Memoized pb, we assume this is an immuteable struct so if this is populated use it
-		pb *ProjectionPb
 	}
 	// CommandColumns SQL commands such as:
 	//     set autocommit
@@ -439,37 +431,6 @@ func (m *ResultColumn) Equal(s *ResultColumn) bool {
 	}
 	return true
 }
-func resultColumnFromPb(pb *ResultColumnPb) *ResultColumn {
-	s := ResultColumn{}
-	s.Final = pb.GetFinal()
-	s.Name = pb.GetName()
-	s.ColPos = int(pb.GetColPos())
-	if pb.Column != nil {
-		s.Col = columnFromPb(pb.Column)
-	}
-	s.Star = pb.GetStar()
-	s.As = pb.GetAs()
-	s.Type = value.ValueType(pb.GetValueType())
-	return &s
-}
-func resultColumnToPb(m *ResultColumn) *ResultColumnPb {
-	s := &ResultColumnPb{}
-	if m.Col != nil {
-		s.Column = m.Col.ToPB()
-	}
-	if m.Final {
-		s.Final = &m.Final
-	}
-	if m.Star {
-		s.Star = &m.Star
-	}
-	s.Name = m.Name
-	s.ColPos = int32(m.ColPos)
-	s.As = m.As
-	s.ValueType = int32(m.Type)
-	return s
-}
-
 func (m *Projection) AddColumnShort(colName string, vt value.ValueType) {
 	//colName = strings.ToLower(colName)
 	// if _, exists := m.colNames[colName]; exists {
@@ -521,46 +482,6 @@ func (m *Projection) Equal(s *Projection) bool {
 	}
 	return true
 }
-func (m *Projection) FromPB(pb *ProjectionPb) *Projection {
-	return ProjectionFromPb(pb)
-}
-func (m *Projection) ToPB() *ProjectionPb {
-	if m.pb == nil {
-		m.pb = projectionToPb(m)
-	}
-	return m.pb
-}
-func ProjectionFromPb(pb *ProjectionPb) *Projection {
-	s := Projection{}
-	s.Distinct = pb.GetDistinct()
-	s.colNames = make(map[string]struct{}, len(pb.ColNames))
-	for _, name := range pb.ColNames {
-		s.colNames[name] = struct{}{}
-	}
-	s.Columns = make(ResultColumns, len(pb.Columns))
-	for i, pbc := range pb.Columns {
-		s.Columns[i] = resultColumnFromPb(pbc)
-	}
-	return &s
-}
-func projectionToPb(m *Projection) *ProjectionPb {
-	s := &ProjectionPb{}
-	s.Distinct = m.Distinct
-	if len(m.colNames) > 0 {
-		s.ColNames = make([]string, 0, len(m.colNames))
-		for name := range m.colNames {
-			s.ColNames = append(s.ColNames, name)
-		}
-	}
-	if len(m.Columns) > 0 {
-		s.Columns = make([]*ResultColumnPb, len(m.Columns))
-		for i, c := range m.Columns {
-			s.Columns[i] = resultColumnToPb(c)
-		}
-	}
-	return s
-}
-
 func (m *Columns) WriteDialect(w expr.DialectWriter) {
 	colCt := len(*m)
 	if colCt == 1 {
@@ -843,61 +764,6 @@ func (m *Column) Copy() *Column {
 		Guard:           m.Guard,
 	}
 }
-func (m *Column) ToPB() *ColumnPb {
-	n := ColumnPb{}
-	n.SourceQuote = []byte{m.sourceQuoteByte}
-	n.AsQuoteByte = []byte{m.asQuoteByte}
-	if len(m.originalAs) > 0 {
-		n.OriginalAs = &m.originalAs
-	}
-	if len(m.left) > 0 {
-		n.Left = &m.left
-	}
-	if len(m.right) > 0 {
-		n.Right = &m.right
-	}
-	n.ParentIndex = int32(m.ParentIndex)
-	n.Index = int32(m.Index)
-	n.SourceIndex = int32(m.SourceIndex)
-	if len(m.SourceField) > 0 {
-		n.SourceField = &m.SourceField
-	}
-	n.As = m.As
-	if len(m.Comment) > 0 {
-		n.Comment = &m.Comment
-	}
-	if len(m.Order) > 0 {
-		n.Order = &m.Order
-	}
-	if m.Star {
-		n.Star = &m.Star
-	}
-	if m.Expr != nil {
-		n.Expr = m.Expr.NodePb()
-	}
-	if m.Guard != nil {
-		n.Guard = m.Guard.NodePb()
-	}
-	return &n
-}
-func columnFromPb(c *ColumnPb) *Column {
-	return &Column{
-		sourceQuoteByte: optionalByte(c.GetSourceQuote()),
-		asQuoteByte:     optionalByte(c.GetAsQuoteByte()),
-		originalAs:      c.GetOriginalAs(),
-		left:            c.GetLeft(),
-		right:           c.GetRight(),
-		ParentIndex:     int(c.GetParentIndex()),
-		Index:           int(c.GetIndex()),
-		SourceIndex:     int(c.GetSourceIndex()),
-		SourceField:     c.GetSourceField(),
-		As:              c.GetAs(),
-		Order:           c.GetOrder(),
-		Star:            c.GetStar(),
-		Expr:            expr.NodeFromNodePb(c.GetExpr()),
-		Guard:           expr.NodeFromNodePb(c.GetGuard()),
-	}
-}
 
 // Return left, right values if is of form   `table.column` and
 // also return true/false for if it even has left/right
@@ -925,80 +791,6 @@ func (m *SqlSelect) Keyword() lex.TokenType { return lex.TokenSelect }
 func (m *SqlSelect) SystemQry() bool        { return len(m.From) == 0 && m.schemaqry }
 func (m *SqlSelect) SetSystemQry()          { m.schemaqry = true }
 func (m *SqlSelect) IsLiteral() bool        { return len(m.From) == 0 }
-func (m *SqlSelect) FromPB(spb *SqlSelectPb) *SqlSelect {
-	return SqlSelectFromPb(spb)
-}
-func (m *SqlSelect) ToPbStatement() *SqlStatementPb {
-	if m.pb == nil {
-		m.pb = &SqlStatementPb{Select: SqlSelectToPb(m)}
-	}
-	return m.pb
-}
-func (m *SqlSelect) ToPB() *SqlSelectPb {
-	return m.ToPbStatement().Select
-}
-func (m *SqlSelect) Copy() *SqlSelect {
-	pb := m.ToPB()
-	selCopy := SqlSelectFromPb(pb)
-	return selCopy
-}
-
-// SqlSelectToPb Given a select statement lets convert it into a PB statement
-func SqlSelectToPb(m *SqlSelect) *SqlSelectPb {
-	return sqlSelectToPbDepth(m, 0)
-}
-func sqlSelectToPbDepth(m *SqlSelect, depth int) *SqlSelectPb {
-	//u.Debugf("SqlSelectToPb %d? %p", depth, m)
-	s := SqlSelectPb{}
-	s.Db = m.Db
-	s.Raw = m.Raw
-	s.Star = m.Star
-	s.Distinct = m.Distinct
-	s.Limit = int32(m.Limit)
-	s.Offset = int32(m.Offset)
-	s.IsAgg = m.isAgg
-	s.Finalized = m.finalized
-	s.Schemaqry = m.schemaqry
-	if len(m.Alias) > 0 {
-		s.Alias = &m.Alias
-	}
-	if m.Where != nil {
-		s.Where = SqlWhereToPb(m.Where)
-	}
-	if m.proj != nil {
-		s.Projection = projectionToPb(m.proj)
-	}
-	if m.Having != nil {
-		s.Having = m.Having.NodePb()
-	}
-	if len(m.Columns) > 0 {
-		s.Columns = ColumnsToPb(m.Columns)
-	}
-	if len(m.GroupBy) > 0 {
-		s.GroupBy = ColumnsToPb(m.GroupBy)
-	}
-	if len(m.OrderBy) > 0 {
-		s.OrderBy = ColumnsToPb(m.OrderBy)
-	}
-	if len(m.From) > 0 && depth == 0 {
-		s.From = make([]*SqlSourcePb, len(m.From))
-		for i, from := range m.From {
-			s.From[i] = from.ToPB()
-		}
-	}
-	if len(m.With) > 0 {
-		by, err := json.Marshal(m.With)
-		if err != nil {
-			u.Errorf("unhandled error json with? %v", err)
-		} else {
-			s.With = by
-		}
-	}
-	if m.Into != nil {
-		s.Into = &m.Into.Table
-	}
-	return &s
-}
 func (m *SqlSelect) Equal(ss SqlStatement) bool {
 	s, ok := ss.(*SqlSelect)
 	if !ok {
@@ -1092,52 +884,6 @@ func (m *SqlSelect) Equal(ss SqlStatement) bool {
 }
 
 // SqlSelectFromPb take a protobuf select struct and conver to SqlSelect
-func SqlSelectFromPb(pb *SqlSelectPb) *SqlSelect {
-	ss := SqlSelect{
-		Db:        pb.GetDb(),
-		Raw:       pb.GetRaw(),
-		Star:      pb.GetStar(),
-		Distinct:  pb.GetDistinct(),
-		Alias:     pb.GetAlias(),
-		Limit:     int(pb.GetLimit()),
-		Offset:    int(pb.GetOffset()),
-		isAgg:     pb.GetIsAgg(),
-		finalized: pb.GetFinalized(),
-		schemaqry: pb.GetSchemaqry(),
-	}
-	if pb.Into != nil {
-		ss.Into = &SqlInto{pb.GetInto()}
-	}
-	if pb.Where != nil {
-		ss.Where = SqlWhereFromPb(pb.GetWhere())
-	}
-	if pb.Having != nil {
-		ss.Having = expr.NodeFromNodePb(pb.GetHaving())
-	}
-	if pb.Projection != nil {
-		ss.proj = ProjectionFromPb(pb.GetProjection())
-	}
-	if len(pb.Columns) > 0 {
-		ss.Columns = ColumnsFromPb(pb.GetColumns())
-	}
-	if len(pb.GroupBy) > 0 {
-		ss.GroupBy = ColumnsFromPb(pb.GetGroupBy())
-	}
-	if len(pb.OrderBy) > 0 {
-		ss.OrderBy = ColumnsFromPb(pb.GetOrderBy())
-	}
-	if len(pb.From) > 0 {
-		ss.From = make([]*SqlSource, len(pb.From))
-		for i, fpb := range pb.From {
-			ss.From[i] = SqlSourceFromPb(fpb)
-		}
-	}
-	if len(pb.With) > 0 {
-		ss.With = make(u.JsonHelper)
-		json.Unmarshal(pb.With, &ss.With)
-	}
-	return &ss
-}
 func (m *SqlSelect) IsAggQuery() bool {
 	if m.isAgg || len(m.GroupBy) > 0 {
 		return true
@@ -1215,8 +961,9 @@ func (m *SqlSelect) WriteDialect(w expr.DialectWriter) {
 }
 
 // Finalize this Query plan by preparing sub-sources
-//  ie we need to rewrite some things into sub-statements
-//  - we need to share the join expression across sources
+//
+//	ie we need to rewrite some things into sub-statements
+//	- we need to share the join expression across sources
 func (m *SqlSelect) Finalize() error {
 	if m.finalized {
 		return nil
@@ -1454,7 +1201,8 @@ func (m *SqlSource) findFromAliases() (string, string) {
 }
 
 // Get a list of Un-Aliased Columns, ie columns with column
-//  names that have NOT yet been aliased
+//
+//	names that have NOT yet been aliased
 func (m *SqlSource) UnAliasedColumns() map[string]*Column {
 	//u.Warnf("un-aliased %d", len(m.Source.Columns))
 	if len(m.cols) > 0 || m.Source != nil && len(m.Source.Columns) == 0 {
@@ -1498,23 +1246,22 @@ func (m *SqlSource) ColumnPositions() map[string]int {
 
 // We need to be able to rewrite statements to convert a stmt such as:
 //
-//     FROM users AS u
-//         INNER JOIN orders AS o
-//         ON u.user_id = o.user_id
+//	FROM users AS u
+//	    INNER JOIN orders AS o
+//	    ON u.user_id = o.user_id
 //
 // So that we can evaluate the Join Key on left/right
 // in this case, it is simple, just
 //
-//    =>   user_id
+//	=>   user_id
 //
 // or this one:
 //
-//		FROM users AS u
-//			INNER JOIN orders AS o
-//			ON LOWER(u.email) = LOWER(o.email)
+//			FROM users AS u
+//				INNER JOIN orders AS o
+//				ON LOWER(u.email) = LOWER(o.email)
 //
-//    =>  LOWER(user_id)
-//
+//	   =>  LOWER(user_id)
 func (m *SqlSource) JoinNodes() []expr.Node {
 	return m.joinNodes
 }
@@ -1529,15 +1276,6 @@ func (m *SqlSource) Finalize() error {
 	//u.Warnf("finalize sqlsource: %v", len(m.Columns))
 	m.final = true
 	return nil
-}
-func (m *SqlSource) FromPB(n *SqlSourcePb) *SqlSource {
-	return SqlSourceFromPb(n)
-}
-func (m *SqlSource) ToPB() *SqlSourcePb {
-	if m.pb == nil {
-		m.pb = sqlSourceToPb(m)
-	}
-	return m.pb
 }
 func (m *SqlSource) Equal(s *SqlSource) bool {
 	if m == nil && s == nil {
@@ -1617,80 +1355,6 @@ func (m *SqlSource) Equal(s *SqlSource) bool {
 	}
 	return true
 }
-func sqlSourceToPb(m *SqlSource) *SqlSourcePb {
-	s := SqlSourcePb{}
-	cols := make([]*ColumnPb, 0, len(m.cols))
-	for k, col := range m.cols {
-		col.As = k
-		cols = append(cols, col.ToPB())
-	}
-	s.Columns = cols
-	s.Final = m.final
-	s.Seekable = m.Seekable
-	s.Raw = m.Raw
-	s.Name = m.Name
-	s.Alias = m.Alias
-	s.Op = int32(m.Op)
-	s.LeftOrRight = int32(m.LeftOrRight)
-	s.JoinType = int32(m.JoinType)
-	if len(m.alias) > 0 {
-		s.AliasInner = &m.alias
-	}
-	kvs := make([]KvInt, 0, len(m.colIndex))
-	for k, v := range m.colIndex {
-		kvs = append(kvs, KvInt{K: k, V: int32(v)})
-	}
-	s.ColIndex = kvs
-	if len(m.joinNodes) > 0 {
-		s.JoinNodes = expr.NodesPbFromNodes(m.joinNodes)
-	}
-	// We get into recursive hell if we don't bail
-	// but need to go stich in source?
-	if m.Source != nil {
-		//u.Warnf("about to descend? %p", m.Source)
-		s.Source = sqlSelectToPbDepth(m.Source, 1)
-	}
-	if m.SubQuery != nil {
-		s.SubQuery = SqlSelectToPb(m.SubQuery)
-	}
-	if m.JoinExpr != nil {
-		s.JoinExpr = m.JoinExpr.NodePb()
-	}
-
-	return &s
-}
-func SqlSourceFromPb(pb *SqlSourcePb) *SqlSource {
-	s := SqlSource{
-		final:       pb.GetFinal(),
-		alias:       pb.GetAliasInner(),
-		colIndex:    MapIntFromPb(pb.GetColIndex()),
-		joinNodes:   expr.NodesFromNodesPbPtr(pb.GetJoinNodes()),
-		Raw:         pb.GetRaw(),
-		Name:        pb.GetName(),
-		Alias:       pb.GetAlias(),
-		Op:          lex.TokenType(pb.GetOp()),
-		LeftOrRight: lex.TokenType(pb.GetLeftOrRight()),
-		JoinType:    lex.TokenType(pb.GetJoinType()),
-		JoinExpr:    expr.NodeFromNodePb(pb.GetJoinExpr()),
-		Seekable:    pb.GetSeekable(),
-	}
-	if pb.Source != nil {
-		s.Source = SqlSelectFromPb(pb.Source)
-	} else {
-		//u.Debugf("no source for SqlSource? %+v", pb)
-	}
-	if pb.SubQuery != nil {
-		s.SubQuery = SqlSelectFromPb(pb.SubQuery)
-	}
-	if len(pb.Columns) > 0 {
-		s.cols = make(map[string]*Column, len(pb.Columns))
-		for _, pbc := range pb.Columns {
-			col := columnFromPb(pbc)
-			s.cols[col.As] = col
-		}
-	}
-	return &s
-}
 
 func (m *SqlWhere) Keyword() lex.TokenType { return m.Op }
 func (m *SqlWhere) writeDialectDepth(depth int, w expr.DialectWriter) {
@@ -1739,29 +1403,6 @@ func (m *SqlWhere) Equal(s *SqlWhere) bool {
 	}
 
 	return true
-}
-func SqlWhereToPb(m *SqlWhere) *SqlWherePb {
-	s := SqlWherePb{}
-	s.Op = int32(m.Op)
-	if m.Source != nil {
-		s.Source = SqlSelectToPb(m.Source)
-	}
-	if m.Expr != nil {
-		s.Expr = m.Expr.NodePb()
-	}
-	return &s
-}
-func SqlWhereFromPb(pb *SqlWherePb) *SqlWhere {
-	w := SqlWhere{
-		Op: lex.TokenType(pb.GetOp()),
-	}
-	if pb.Source != nil {
-		w.Source = SqlSelectFromPb(pb.Source)
-	}
-	if pb.Expr != nil {
-		w.Expr = expr.NodeFromNodePb(pb.GetExpr())
-	}
-	return &w
 }
 
 func (m *SqlInto) Keyword() lex.TokenType            { return lex.TokenInto }
@@ -1823,8 +1464,9 @@ func (m *SqlInsert) String() string {
 }
 
 // RewriteAsPrepareable rewite the insert as a ? substituteable query
-//     INSERT INTO user (name) VALUES ("wonder-woman") ->
-//        INSERT INTO user (name) VALUES (?)
+//
+//	INSERT INTO user (name) VALUES ("wonder-woman") ->
+//	   INSERT INTO user (name) VALUES (?)
 func (m *SqlInsert) RewriteAsPrepareable(maxRows int, mark byte) string {
 	buf := bytes.Buffer{}
 	buf.WriteString(fmt.Sprintf("INSERT INTO %s (", m.Table))
@@ -1979,48 +1621,6 @@ func tokenFromInt(iv int32) lex.Token {
 		return lex.Token{T: t.T, V: t.Description}
 	}
 	return lex.Token{}
-}
-
-// SqlFromPb Create a sql statement from pb
-func SqlFromPb(pb []byte) (SqlStatement, error) {
-	s := &SqlStatementPb{}
-	if err := proto.Unmarshal(pb, s); err != nil {
-		return nil, err
-	}
-	return statementFromPb(s), nil
-}
-func statementFromPb(s *SqlStatementPb) SqlStatement {
-	switch {
-	case s.Select != nil:
-		var ss *SqlSelect
-		return ss.FromPB(s.Select)
-	case s.Source != nil:
-		var ss *SqlSource
-		return ss.FromPB(s.Source)
-	}
-	return nil
-}
-func MapIntFromPb(kv []KvInt) map[string]int {
-	m := make(map[string]int, len(kv))
-	for _, kv := range kv {
-		m[kv.K] = int(kv.V)
-	}
-	return m
-}
-
-func ColumnsFromPb(c []*ColumnPb) Columns {
-	cols := make(Columns, len(c))
-	for i, col := range c {
-		cols[i] = columnFromPb(col)
-	}
-	return cols
-}
-func ColumnsToPb(c Columns) []*ColumnPb {
-	cols := make([]*ColumnPb, len(c))
-	for i, col := range c {
-		cols[i] = col.ToPB()
-	}
-	return cols
 }
 
 func optionalByte(b []byte) byte {
