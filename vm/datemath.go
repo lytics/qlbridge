@@ -39,7 +39,7 @@ func FindBoundary(anchorTime time.Time, ctx expr.EvalIncludeContext, fns Boundar
 type BoundaryFns []func(*DateConverter, expr.EvalIncludeContext)
 
 func CalcBoundaryFns(n expr.Node) BoundaryFns {
-	return findDateMathFn(nil, n)
+	return findDateMathFn(n)
 }
 
 // NewDateConverter takes a node expression
@@ -47,7 +47,7 @@ func NewDateConverter(ctx expr.EvalIncludeContext, n expr.Node) (*DateConverter,
 	dc := &DateConverter{
 		at: time.Now(),
 	}
-	fns := findDateMathFn(nil, n)
+	fns := findDateMathFn(n)
 	dc.bt, dc.err = FindBoundary(dc.at, ctx, fns)
 	if dc.err == nil && len(fns) > 0 {
 		dc.HasDateMath = true
@@ -121,8 +121,8 @@ func (d *DateConverter) Boundary() time.Time {
 var nowRegex = regexp.MustCompile(`^now([+-]+.*)*$`)
 
 // Determine if this expression node uses datemath (ie, "now-4h")
-func findDateMathFn(fns BoundaryFns, node expr.Node) BoundaryFns {
-
+func findDateMathFn(node expr.Node) BoundaryFns {
+	fns := BoundaryFns{}
 	switch n := node.(type) {
 	case *expr.BinaryNode:
 		for i, arg := range n.Args {
@@ -172,42 +172,32 @@ func findDateMathFn(fns BoundaryFns, node expr.Node) BoundaryFns {
 					continue
 				}
 			default:
-				if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
-					fns = append(fns, moreFns...)
-				}
+				fns = append(fns, findDateMathFn(arg)...)
 			}
 		}
 
 	case *expr.BooleanNode:
 		for _, arg := range n.Args {
-			if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
-				fns = append(fns, moreFns...)
-			}
+			fns = append(fns, findDateMathFn(arg)...)
 		}
 	case *expr.UnaryNode:
-		return findDateMathFn(fns, n.Arg)
+		return findDateMathFn(n.Arg)
 	case *expr.TriNode:
 		for _, arg := range n.Args {
-			if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
-				fns = append(fns, moreFns...)
-			}
+			fns = append(fns, findDateMathFn(arg)...)
 		}
 	case *expr.FuncNode:
 		for _, arg := range n.Args {
-			if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
-				fns = append(fns, moreFns...)
-			}
+			fns = append(fns, findDateMathFn(arg)...)
 		}
 	case *expr.ArrayNode:
 		for _, arg := range n.Args {
-			if moreFns := findDateMathFn(fns, arg); len(moreFns) > 0 {
-				fns = append(fns, moreFns...)
-			}
+			fns = append(fns, findDateMathFn(arg)...)
 		}
 	case *expr.IncludeNode:
 		// Assumes all includes are resolved
 		if n.ExprNode != nil {
-			return findDateMathFn(fns, n.ExprNode)
+			return findDateMathFn(n.ExprNode)
 		}
 	case *expr.NumberNode, *expr.ValueNode, *expr.IdentityNode, *expr.StringNode:
 		// Scalar/	Literal values cannot be datemath, must be binary-expression
