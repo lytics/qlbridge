@@ -619,8 +619,8 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 			n := operateNumbers(node.Operator, at.NumberValue(), bt)
 			return n, true
 		case value.TimeValue:
-			lht, ok := value.ValueToTime(at)
-			if !ok {
+			lht, err := value.ValueToTime(at)
+			if err != nil {
 				return value.BoolValueFalse, false
 			}
 			return operateTime(node.Operator.T, lht, bt.Val())
