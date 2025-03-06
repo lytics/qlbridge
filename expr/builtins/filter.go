@@ -12,8 +12,7 @@ import (
 
 // OneOf choose the first non-nil, non-zero, non-false fields
 //
-//    oneof(nil, 0, "hello") => 'hello'
-//
+//	oneof(nil, 0, "hello") => 'hello'
 type OneOf struct{}
 
 // Type unknown
@@ -65,16 +64,15 @@ func FiltersFromArgs(filterVals []value.Value) []string {
 //
 // Filter a map of values by key to remove certain keys
 //
-//    filter(match("topic_"),key_to_filter, key2_to_filter)  => {"goodkey": 22}, true
+//	filter(match("topic_"),key_to_filter, key2_to_filter)  => {"goodkey": 22}, true
 //
 // Filter out VALUES (not keys) from a list of []string{} for a specific value
 //
-//    filter(split("apples,oranges",","),"ora*")  => ["apples"], true
+//	filter(split("apples,oranges",","),"ora*")  => ["apples"], true
 //
 // Filter out values for single strings
 //
-//    filter("apples","app*")      => []string{}, true
-//
+//	filter("apples","app*")      => []string{}, true
 type Filter struct{}
 
 // Type unknown
@@ -187,16 +185,15 @@ func FilterEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 //
 // Filter a map of values by key to only keep certain keys
 //
-//    filtermatch(match("topic_"),key_to_filter, key2_to_filter)  => {"goodkey": 22}, true
+//	filtermatch(match("topic_"),key_to_filter, key2_to_filter)  => {"goodkey": 22}, true
 //
 // Filter in VALUES (not keys) from a list of []string{} for a specific value
 //
-//    filtermatch(split("apples,oranges",","),"ora*")  => ["oranges"], true
+//	filtermatch(split("apples,oranges",","),"ora*")  => ["oranges"], true
 //
 // Filter in values for single strings
 //
-//    filtermatch("apples","app*")      => []string{"apple"}, true
-//
+//	filtermatch("apples","app*")      => []string{"apple"}, true
 type FilterMatch struct{}
 
 // Type Unknown
@@ -272,6 +269,9 @@ func FilterMatchEval(ctx expr.EvalContext, vals []value.Value) (value.Value, boo
 		lv := make([]string, 0, val.Len())
 
 		for _, slv := range val.SliceValue() {
+			switch slv.Type() {
+			case value.StringType:
+			}
 			sv := slv.ToString()
 			filteredIn := false
 			for _, filter := range filters {

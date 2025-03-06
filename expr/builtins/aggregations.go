@@ -11,9 +11,8 @@ import (
 // Avg average of values.  Note, this function DOES NOT persist state doesn't aggregate
 // across multiple calls.  That would be responsibility of write context.
 //
-//    avg(1,2,3) => 2.0, true
-//    avg("hello") => math.NaN, false
-//
+//	avg(1,2,3) => 2.0, true
+//	avg("hello") => math.NaN, false
 type Avg struct{}
 
 // Type is NumberType
@@ -68,9 +67,8 @@ func avgEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 // Sum function to add values. Note, this function DOES NOT persist state doesn't aggregate
 // across multiple calls.  That would be responsibility of write context.
 //
-//   sum(1, 2, 3) => 6
-//   sum(1, "horse", 3) => nan, false
-//
+//	sum(1, 2, 3) => 6
+//	sum(1, "horse", 3) => nan, false
 type Sum struct{}
 
 // Type is number
@@ -133,9 +131,8 @@ func sumEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 // and in general is a horrible, horrible function that needs to be replaced
 // with occurrences of value, ignores the value and ensures it is non null
 //
-//    count(anyvalue)     =>  1, true
-//    count(not_number)   =>  -- 0, false
-//
+//	count(anyvalue)     =>  1, true
+//	count(not_number)   =>  -- 0, false
 type Count struct{}
 
 // Type is Integer
