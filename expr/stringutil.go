@@ -32,17 +32,26 @@ func LeftRight(val string) (string, string, bool) {
 		if i == -1 {
 			return "", IdentityTrim(val), false
 		}
+		if i+3 >= len(val) {
+			return IdentityTrim(val[0:i]), "", false
+		}
 		return IdentityTrim(val[0:i]), IdentityTrim(val[i+3:]), true
 	case '[':
 		i := strings.Index(val, "].[")
 		if i == -1 {
 			return "", IdentityTrim(val), false
 		}
+		if i+3 >= len(val) {
+			return IdentityTrim(val[0:i]), "", false
+		}
 		return IdentityTrim(val[0:i]), IdentityTrim(val[i+3:]), true
 	default:
 		i := strings.Index(val, ".")
 		if i == -1 {
 			return "", val, false
+		}
+		if i+1 >= len(val) {
+			return IdentityTrim(val[0:i]), "", false
 		}
 		return IdentityTrim(val[0:i]), IdentityTrim(val[i+1:]), true
 	}
