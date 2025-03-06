@@ -28,33 +28,24 @@ func LeftRight(val string) (string, string, bool) {
 	}
 	switch by := val[0]; by {
 	case '`':
-		vals := strings.Split(val, "`.`")
-		if len(vals) == 1 {
+		i := strings.Index(val, "`.`")
+		if i == -1 {
 			return "", IdentityTrim(val), false
-		} else if len(vals) == 2 {
-			return IdentityTrim(vals[0]), IdentityTrim(vals[1]), true
 		}
-		// wat, no idea what this is
-		return "", val, false
+		return IdentityTrim(val[0:i]), IdentityTrim(val[i+3:]), true
 	case '[':
-		vals := strings.Split(val, "].[")
-		if len(vals) == 1 {
+		i := strings.Index(val, "].[")
+		if i == -1 {
 			return "", IdentityTrim(val), false
-		} else if len(vals) == 2 {
-			return IdentityTrim(vals[0]), IdentityTrim(vals[1]), true
 		}
-		// wat, no idea what this is
-		return "", val, false
+		return IdentityTrim(val[0:i]), IdentityTrim(val[i+3:]), true
 	default:
-		vals := strings.SplitN(val, ".", 2)
-		if len(vals) == 1 {
+		i := strings.Index(val, ".")
+		if i == -1 {
 			return "", val, false
-		} else if len(vals) == 2 {
-			return IdentityTrim(vals[0]), IdentityTrim(vals[1]), true
 		}
+		return IdentityTrim(val[0:i]), IdentityTrim(val[i+1:]), true
 	}
-
-	return "", val, false
 }
 
 // IdentityTrim trims the leading/trailing identity quote marks  ` or []
@@ -86,7 +77,8 @@ func IdentityMaybeEscapeBuf(buf *bytes.Buffer, quote byte, ident string) {
 }
 
 // IdentityMaybeQuoteStrict Quote an identity if need be (has illegal characters or spaces)
-//  First character MUST be alpha (not numeric or any other character)
+//
+//	First character MUST be alpha (not numeric or any other character)
 func IdentityMaybeQuoteStrictBuf(buf *bytes.Buffer, quote byte, ident string) {
 
 	if len(ident) == 0 {
@@ -158,10 +150,9 @@ func escapeQuote(buf *bytes.Buffer, quote rune, val string) {
 
 // LiteralQuoteEscape escape string that may need characters escaped
 //
-//  LiteralQuoteEscape("'","item's") => 'item''s'
-//  LiteralQuoteEscape(`"`,"item's") => "item's"
-//  LiteralQuoteEscape(`"`,`item"s`) => "item""s"
-//
+//	LiteralQuoteEscape("'","item's") => 'item''s'
+//	LiteralQuoteEscape(`"`,"item's") => "item's"
+//	LiteralQuoteEscape(`"`,`item"s`) => "item""s"
 func LiteralQuoteEscape(quote rune, literal string) string {
 	if len(literal) > 1 {
 		quoteb := byte(quote)
@@ -177,10 +168,9 @@ func LiteralQuoteEscape(quote rune, literal string) string {
 
 // LiteralQuoteEscapeBuf escape string that may need characters escaped
 //
-//  LiteralQuoteEscapeBuf("'","item's") => 'item''s'
-//  LiteralQuoteEscapeBuf(`"`,"item's") => "item's"
-//  LiteralQuoteEscapeBuf(`"`,`item"s`) => "item""s"
-//
+//	LiteralQuoteEscapeBuf("'","item's") => 'item''s'
+//	LiteralQuoteEscapeBuf(`"`,"item's") => "item's"
+//	LiteralQuoteEscapeBuf(`"`,`item"s`) => "item""s"
 func LiteralQuoteEscapeBuf(buf *bytes.Buffer, quote rune, literal string) {
 	if len(literal) > 1 {
 		quoteb := byte(quote)
@@ -201,8 +191,7 @@ func LiteralQuoteEscapeBuf(buf *bytes.Buffer, quote rune, literal string) {
 
 // StringEscape escape string that may need characters escaped
 //
-//  StringEscape("'","item's") => "item''s"
-//
+//	StringEscape("'","item's") => "item''s"
 func StringEscape(quote rune, literal string) string {
 	var buf bytes.Buffer
 	escapeQuote(&buf, quote, literal)
@@ -211,8 +200,7 @@ func StringEscape(quote rune, literal string) string {
 
 // StringUnEscape remove escaping on string that may need characters escaped
 //
-//  StringUnEscape(`"`,`item"s`) => "item""s", true
-//
+//	StringUnEscape(`"`,`item"s`) => "item""s", true
 func StringUnEscape(quote rune, val string) (string, bool) {
 	var buf bytes.Buffer
 	prevEscape, hasEscape := false, false
