@@ -23,7 +23,7 @@ func NewOptimizedVM() *OptimizedVM {
 
 // CompileFilter compiles a FilterQL statement
 func (vm *OptimizedVM) CompileFilter(filter *rel.FilterStatement) (*compiler.CompiledExpr, error) {
-	return vm.compiler.Compile(filter.Filter)
+	return vm.compiler.CompileFilter(filter)
 }
 
 // CompileNode compiles any expression node

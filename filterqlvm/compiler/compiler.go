@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"hash/fnv"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/lex"
+	"github.com/lytics/qlbridge/rel"
 	"github.com/lytics/qlbridge/value"
 	"github.com/lytics/qlbridge/vm"
 )
@@ -33,6 +35,32 @@ func NewDirectCompiler() *DirectCompiler {
 	return &DirectCompiler{
 		cache: make(map[uint64]*CompiledExpr),
 	}
+}
+
+func (c *DirectCompiler) CompileFilter(node *rel.FilterStatement) (*CompiledExpr, error) {
+	// Generate a hash for the node to use as cache key
+	hash := hashFilter(node)
+
+	// Check cache first
+	c.cacheLock.RLock()
+	if compiled, ok := c.cache[hash]; ok {
+		c.cacheLock.RUnlock()
+		return compiled, nil
+	}
+	c.cacheLock.RUnlock()
+
+	// Create the compiled expression
+	compiled, err := c.compileToFunc(node.Filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cache the result
+	c.cacheLock.Lock()
+	c.cache[hash] = compiled
+	c.cacheLock.Unlock()
+
+	return compiled, nil
 }
 
 // Compile compiles an expression node into a direct evaluation function
@@ -116,27 +144,67 @@ func (c *DirectCompiler) compileBinary(node *expr.BinaryNode) (*CompiledExpr, er
 	evalFunc := func(ctx expr.EvalContext) (value.Value, bool) {
 		// Get left and right values
 		left, leftOk := leftExpr.EvalFunc(ctx)
-		if !leftOk {
-			return nil, false
-		}
 
 		// Short-circuit for logical operators
 		switch node.Operator.T {
 		case lex.TokenLogicAnd, lex.TokenAnd:
+			if !leftOk {
+				return nil, false
+			}
 			// If left is false, no need to evaluate right
 			if leftBool, ok := left.(value.BoolValue); ok && !leftBool.Val() {
 				return value.NewBoolValue(false), true
 			}
 		case lex.TokenLogicOr, lex.TokenOr:
-			// If left is true, no need to evaluate right
-			if leftBool, ok := left.(value.BoolValue); ok && leftBool.Val() {
-				return value.NewBoolValue(true), true
+			if leftOk {
+				// If left is true, no need to evaluate right
+				if leftBool, ok := left.(value.BoolValue); ok && leftBool.Val() {
+					return value.NewBoolValue(true), true
+				}
 			}
 		}
 
 		right, rightOk := rightExpr.EvalFunc(ctx)
-		if !rightOk {
+		// If we could not evaluate either we can shortcut
+		if !leftOk && !rightOk {
+			switch node.Operator.T {
+			case lex.TokenLogicOr, lex.TokenOr:
+				return value.NewBoolValue(false), true
+			case lex.TokenEqualEqual, lex.TokenEqual:
+				// We don't alllow nil == nil here bc we have a NilValue type
+				// that we would use for that
+				return value.NewBoolValue(false), true
+			case lex.TokenNE:
+				return value.NewBoolValue(false), true
+			case lex.TokenGT, lex.TokenGE, lex.TokenLT, lex.TokenLE, lex.TokenLike:
+				return value.NewBoolValue(false), true
+			}
 			return nil, false
+		}
+
+		// Else if we can only evaluate right
+		if !leftOk {
+			switch node.Operator.T {
+			case lex.TokenIntersects, lex.TokenIN, lex.TokenContains, lex.TokenLike:
+				return value.NewBoolValue(false), true
+			}
+		}
+
+		// Else if we can only evaluate one, we can short circuit as well
+		if !leftOk || !rightOk {
+			switch node.Operator.T {
+			case lex.TokenAnd, lex.TokenLogicAnd:
+				return value.NewBoolValue(false), true
+			case lex.TokenEqualEqual, lex.TokenEqual:
+				return value.NewBoolValue(false), true
+			case lex.TokenNE:
+				// they are technically not equal?
+				return value.NewBoolValue(true), true
+			case lex.TokenIN, lex.TokenIntersects:
+				return value.NewBoolValue(false), true
+			case lex.TokenGT, lex.TokenGE, lex.TokenLT, lex.TokenLE, lex.TokenLike:
+				return value.NewBoolValue(false), true
+			}
 		}
 
 		// Handle different operators
@@ -163,6 +231,10 @@ func (c *DirectCompiler) compileBinary(node *expr.BinaryNode) (*CompiledExpr, er
 					return value.NewBoolValue(lv.Val() > rv.Val()), true
 				} else if rv, ok := right.(value.IntValue); ok {
 					return value.NewBoolValue(lv.Val() > float64(rv.Val())), true
+				} else if rv, ok := right.(value.StringValue); ok {
+					if rf, err := strconv.ParseFloat(rv.Val(), 64); err == nil {
+						return value.NewBoolValue(lv.Val() > rf), true
+					}
 				}
 			case value.IntValue:
 				if rv, ok := right.(value.NumberValue); ok {
@@ -171,13 +243,22 @@ func (c *DirectCompiler) compileBinary(node *expr.BinaryNode) (*CompiledExpr, er
 					return value.NewBoolValue(lv.Val() > rv.Val()), true
 				}
 			case value.StringValue:
+				if rv, ok := right.(value.TimeValue); ok {
+					leftTime, ok := value.ValueToTime(left)
+					if !ok {
+						return value.BoolValueFalse, false
+					}
+					return value.NewBoolValue(rv.Val().Unix() > leftTime.Unix()), true
+				}
 				if rv, ok := right.(value.StringValue); ok {
 					return value.NewBoolValue(lv.Val() > rv.Val()), true
 				}
 			case value.TimeValue:
-				if rv, ok := right.(value.TimeValue); ok {
-					return value.NewBoolValue(lv.Val().Unix() > rv.Val().Unix()), true
+				rightTime, ok := value.ValueToTime(right)
+				if !ok {
+					return value.BoolValueFalse, false
 				}
+				return value.NewBoolValue(lv.Val().Unix() > rightTime.Unix()), true
 			}
 			// Try converting to strings
 			return value.NewBoolValue(left.ToString() > right.ToString()), true
@@ -190,6 +271,10 @@ func (c *DirectCompiler) compileBinary(node *expr.BinaryNode) (*CompiledExpr, er
 					return value.NewBoolValue(lv.Val() >= rv.Val()), true
 				} else if rv, ok := right.(value.IntValue); ok {
 					return value.NewBoolValue(lv.Val() >= float64(rv.Val())), true
+				} else if rv, ok := right.(value.StringValue); ok {
+					if rf, err := strconv.ParseFloat(rv.Val(), 64); err == nil {
+						return value.NewBoolValue(lv.Val() >= rf), true
+					}
 				}
 			case value.IntValue:
 				if rv, ok := right.(value.NumberValue); ok {
@@ -198,13 +283,23 @@ func (c *DirectCompiler) compileBinary(node *expr.BinaryNode) (*CompiledExpr, er
 					return value.NewBoolValue(lv.Val() >= rv.Val()), true
 				}
 			case value.StringValue:
+				// TODO (need this to work for all the operators)
+				if rv, ok := right.(value.TimeValue); ok {
+					leftTime, ok := value.ValueToTime(left)
+					if !ok {
+						return value.BoolValueFalse, false
+					}
+					return value.NewBoolValue(rv.Val().Unix() >= leftTime.Unix()), true
+				}
 				if rv, ok := right.(value.StringValue); ok {
 					return value.NewBoolValue(lv.Val() >= rv.Val()), true
 				}
 			case value.TimeValue:
-				if rv, ok := right.(value.TimeValue); ok {
-					return value.NewBoolValue(lv.Val().Unix() >= rv.Val().Unix()), true
+				rightTime, ok := value.ValueToTime(right)
+				if !ok {
+					return value.BoolValueFalse, false
 				}
+				return value.NewBoolValue(lv.Val().Unix() >= rightTime.Unix()), true
 			}
 			return value.NewBoolValue(left.ToString() >= right.ToString()), true
 
@@ -216,6 +311,10 @@ func (c *DirectCompiler) compileBinary(node *expr.BinaryNode) (*CompiledExpr, er
 					return value.NewBoolValue(lv.Val() < rv.Val()), true
 				} else if rv, ok := right.(value.IntValue); ok {
 					return value.NewBoolValue(lv.Val() < float64(rv.Val())), true
+				} else if rv, ok := right.(value.StringValue); ok {
+					if rf, err := strconv.ParseFloat(rv.Val(), 64); err == nil {
+						return value.NewBoolValue(lv.Val() < rf), true
+					}
 				}
 			case value.IntValue:
 				if rv, ok := right.(value.NumberValue); ok {
@@ -224,13 +323,22 @@ func (c *DirectCompiler) compileBinary(node *expr.BinaryNode) (*CompiledExpr, er
 					return value.NewBoolValue(lv.Val() < rv.Val()), true
 				}
 			case value.StringValue:
+				if rv, ok := right.(value.TimeValue); ok {
+					leftTime, ok := value.ValueToTime(left)
+					if !ok {
+						return value.BoolValueFalse, false
+					}
+					return value.NewBoolValue(rv.Val().Unix() < leftTime.Unix()), true
+				}
 				if rv, ok := right.(value.StringValue); ok {
 					return value.NewBoolValue(lv.Val() < rv.Val()), true
 				}
 			case value.TimeValue:
-				if rv, ok := right.(value.TimeValue); ok {
-					return value.NewBoolValue(lv.Val().Unix() < rv.Val().Unix()), true
+				rightTime, ok := value.ValueToTime(right)
+				if !ok {
+					return value.BoolValueFalse, false
 				}
+				return value.NewBoolValue(lv.Val().Unix() < rightTime.Unix()), true
 			}
 			return value.NewBoolValue(left.ToString() < right.ToString()), true
 
@@ -242,21 +350,36 @@ func (c *DirectCompiler) compileBinary(node *expr.BinaryNode) (*CompiledExpr, er
 					return value.NewBoolValue(lv.Val() <= rv.Val()), true
 				} else if rv, ok := right.(value.IntValue); ok {
 					return value.NewBoolValue(lv.Val() <= float64(rv.Val())), true
+				} else if rv, ok := right.(value.StringValue); ok {
+					if rf, err := strconv.ParseFloat(rv.Val(), 64); err == nil {
+						return value.NewBoolValue(lv.Val() <= rf), true
+					}
 				}
 			case value.IntValue:
+				//  TODO (Add parsing of strings to ints)
+				//  TODO (How to handle string floats?)
 				if rv, ok := right.(value.NumberValue); ok {
 					return value.NewBoolValue(float64(lv.Val()) <= rv.Val()), true
 				} else if rv, ok := right.(value.IntValue); ok {
 					return value.NewBoolValue(lv.Val() <= rv.Val()), true
 				}
 			case value.StringValue:
+				if rv, ok := right.(value.TimeValue); ok {
+					leftTime, ok := value.ValueToTime(left)
+					if !ok {
+						return value.BoolValueFalse, false
+					}
+					return value.NewBoolValue(rv.Val().Unix() <= leftTime.Unix()), true
+				}
 				if rv, ok := right.(value.StringValue); ok {
 					return value.NewBoolValue(lv.Val() <= rv.Val()), true
 				}
 			case value.TimeValue:
-				if rv, ok := right.(value.TimeValue); ok {
-					return value.NewBoolValue(lv.Val().Unix() <= rv.Val().Unix()), true
+				rightTime, ok := value.ValueToTime(right)
+				if !ok {
+					return value.BoolValueFalse, false
 				}
+				return value.NewBoolValue(lv.Val().Unix() <= rightTime.Unix()), true
 			}
 			return value.NewBoolValue(left.ToString() <= right.ToString()), true
 
@@ -445,6 +568,26 @@ func (c *DirectCompiler) compileBinary(node *expr.BinaryNode) (*CompiledExpr, er
 			// IN or INTERSECTS operation
 			switch rv := right.(type) {
 			case value.Slice:
+				if lv, ok := left.(value.Slice); ok {
+					// Check if any left item is in right slice
+					for _, item := range lv.SliceValue() {
+						for _, rightItem := range rv.SliceValue() {
+							if eq, err := value.Equal(item, rightItem); err == nil && eq {
+								return value.NewBoolValue(true), true
+							}
+						}
+					}
+					return value.NewBoolValue(false), true
+				}
+				if lv, ok := left.(value.Map); ok {
+					// Check if any left item is in right slice
+					for _, item := range rv.SliceValue() {
+						if _, exists := lv.Get(item.ToString()); exists {
+							return value.NewBoolValue(exists), true
+						}
+					}
+					return value.NewBoolValue(false), true
+				}
 				// Check if left side is in right slice
 				for _, item := range rv.SliceValue() {
 					if eq, err := value.Equal(left, item); err == nil && eq {
@@ -961,5 +1104,11 @@ func (c *DirectCompiler) compileValue(node *expr.ValueNode) (*CompiledExpr, erro
 func hashNode(node expr.Node) uint64 {
 	h := fnv.New64()
 	h.Write([]byte(node.String()))
+	return h.Sum64()
+}
+
+func hashFilter(filter *rel.FilterStatement) uint64 {
+	h := fnv.New64()
+	h.Write([]byte(filter.String()))
 	return h.Sum64()
 }

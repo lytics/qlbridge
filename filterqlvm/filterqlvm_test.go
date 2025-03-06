@@ -20,7 +20,6 @@ func (tc *testContext) Get(key string) (value.Value, bool) {
 	v, ok := tc.data[key]
 	left, right, hasNamespacing := expr.LeftRight(key)
 
-	//u.Debugf("left:%q right:%q    key=%v", left, right, key)
 	if hasNamespacing {
 		f, ok := tc.data[left]
 		if !ok {
@@ -175,12 +174,11 @@ func BenchmarkOptimizedVM(b *testing.B) {
 	optimizedVM := NewOptimizedVM()
 
 	for _, pattern := range benchmarkPatterns {
+		filter, err := rel.ParseFilterQL("FILTER " + pattern.filter)
+		if err != nil {
+			b.Fatalf("Failed to parse filter: %v", err)
+		}
 		b.Run(pattern.name, func(b *testing.B) {
-			filter, err := rel.ParseFilterQL("FILTER " + pattern.filter)
-			if err != nil {
-				b.Fatalf("Failed to parse filter: %v", err)
-			}
-
 			var ctx *testContext
 			if pattern.complex {
 				ctx = newComplexContext()
@@ -193,7 +191,6 @@ func BenchmarkOptimizedVM(b *testing.B) {
 			if err != nil {
 				b.Fatalf("Failed to compile filter: %v", err)
 			}
-
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				optimizedVM.Matches(ctx, filter)
