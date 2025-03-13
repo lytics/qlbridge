@@ -340,6 +340,19 @@ func NewIncludeContext(cr ContextReader) *IncludeContext {
 // Include interface not implemented.
 func (*IncludeContext) Include(name string) (Node, error) { return nil, ErrNoIncluder }
 
+// copyNodes helper function to copy a slice of Nodes
+func copyNodes(nodes []Node) []Node {
+	if nodes == nil {
+		return nil
+	}
+	newNodes := make([]Node, len(nodes))
+	for i, n := range nodes {
+		newNodes[i] = n.Copy()
+	}
+	return newNodes
+}
+
+
 // FindFirstIdentity Recursively descend down a node looking for first Identity Field
 //
 //	min(year)                 == year
@@ -531,10 +544,7 @@ func (m *FuncNode) append(arg Node) {
 }
 func (m *FuncNode) Copy() Node {
 	n := *m
-	n.Args = make([]Node, len(m.Args))
-	for i, arg := range m.Args {
-		n.Args[i] = arg.Copy()
-	}
+	n.Args = copyNodes(m.Args)
 	return &n
 }
 func (m *FuncNode) NodeType() string { return "Func" }
@@ -1160,10 +1170,7 @@ func NewBinaryNode(operator lex.Token, lhArg, rhArg Node) *BinaryNode {
 }
 func (m *BinaryNode) Copy() Node {
 	n := *m
-	n.Args = make([]Node, len(m.Args))
-	for i, arg := range m.Args {
-		n.Args[i] = arg.Copy()
-	}
+	n.Args = copyNodes(m.Args)
 	return &n
 }
 func (m *BinaryNode) NodeType() string { return "Binary" }
@@ -1356,10 +1363,7 @@ func NewBooleanNode(operator lex.Token, args ...Node) *BooleanNode {
 }
 func (m *BooleanNode) Copy() Node {
 	n := *m
-	n.Args = make([]Node, len(m.Args))
-	for i, arg := range m.Args {
-		n.Args[i] = arg.Copy()
-	}
+	n.Args = copyNodes(m.Args)
 	return &n
 }
 func (m *BooleanNode) NodeType() string { return "Boolean" }
@@ -1497,10 +1501,7 @@ func NewTriNode(operator lex.Token, arg1, arg2, arg3 Node) *TriNode {
 }
 func (m *TriNode) Copy() Node {
 	n := *m
-	n.Args = make([]Node, len(m.Args))
-	for i, arg := range m.Args {
-		n.Args[i] = arg.Copy()
-	}
+	n.Args = copyNodes(m.Args)
 	return &n
 }
 func (m *TriNode) NodeType() string { return "Ternary" }
@@ -1819,8 +1820,7 @@ func (m *IncludeNode) Equal(n Node) bool {
 	if m != nil && n == nil {
 		return false
 	}
-	nt, ok := n.(*IncludeNode)
-	if !ok {
+	nt, ok := n.(*IncludeNode); ok {
 		return false
 	}
 	if m.Negated() != nt.Negated() {
@@ -1841,10 +1841,7 @@ func NewArrayNodeArgs(args []Node) *ArrayNode {
 }
 func (m *ArrayNode) Copy() Node {
 	n := *m
-	n.Args = make([]Node, len(m.Args))
-	for i, arg := range m.Args {
-		n.Args[i] = arg.Copy()
-	}
+	n.Args = copyNodes(m.Args)
 	return &n
 
 }
