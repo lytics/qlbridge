@@ -1820,7 +1820,8 @@ func (m *IncludeNode) Equal(n Node) bool {
 	if m != nil && n == nil {
 		return false
 	}
-	nt, ok := n.(*IncludeNode); ok {
+	nt, ok := n.(*IncludeNode)
+	if !ok {
 		return false
 	}
 	if m.Negated() != nt.Negated() {
