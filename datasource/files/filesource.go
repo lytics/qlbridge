@@ -54,12 +54,11 @@ func SipPartitioner(partitionCt uint64, fi *FileInfo) int {
 // the contents to be treated as a database, like doing a full
 // table scan in mysql.  But, you can partition across files.
 //
-// - readers:      gcs, local-fs
-// - tablesource:  translate lists of files into tables.  Normally we would have
-//                 multiple files per table (ie partitioned, per-day, etc)
-// - scanners:     responsible for file-specific
-// - files table:  a "table" of all the files from this cloud source
-//
+//   - readers:      gcs, local-fs
+//   - tablesource:  translate lists of files into tables.  Normally we would have
+//     multiple files per table (ie partitioned, per-day, etc)
+//   - scanners:     responsible for file-specific
+//   - files table:  a "table" of all the files from this cloud source
 type FileSource struct {
 	ss             *schema.Schema
 	lastLoad       time.Time

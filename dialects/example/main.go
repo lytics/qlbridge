@@ -8,10 +8,9 @@ import (
 )
 
 /*
-	This example is meant to show how to create a new
-	Dialect Language with a keyword"SUBSCRIBETO"
-	then Lex an example of this syntax
-
+This example is meant to show how to create a new
+Dialect Language with a keyword"SUBSCRIBETO"
+then Lex an example of this syntax
 */
 var (
 	// We need a token to recognize our "SUBSCRIBETO" keyword
@@ -54,11 +53,10 @@ func verifyLexerTokens(l *lex.Lexer, tokens []lex.Token) {
 
 // Custom lexer for our maybe hash function
 //
-//  SUBSCRIBE
-//       valuect(item) AS stuff
-//  FROM maybe(stuff)
-//  WHERE x = y
-//
+//	SUBSCRIBE
+//	     valuect(item) AS stuff
+//	FROM maybe(stuff)
+//	WHERE x = y
 func LexMaybe(l *lex.Lexer) lex.StateFn {
 
 	l.SkipWhiteSpaces()

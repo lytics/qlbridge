@@ -274,8 +274,7 @@ func (n *NestedContextReader) Delete(delRow map[string]value.Value) error {
 // all keys with a name space.  This is useful if you have overlapping
 // field names between ContextReaders within a NestedContextReader.
 //
-//      msg.Get("foo.key")
-//
+//	msg.Get("foo.key")
 func NewNamespacedContextReader(basereader expr.ContextReader, namespace string) expr.ContextReader {
 	if namespace == "" {
 		return basereader

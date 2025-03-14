@@ -20,8 +20,7 @@ var _ = u.EMPTY
 
 // hash.sip() hash a value to a 64 bit int
 //
-//     hash.sip("/blog/index.html")  =>  1234
-//
+//	hash.sip("/blog/index.html")  =>  1234
 type HashSip struct{}
 
 // Type int
@@ -56,8 +55,7 @@ func hashSipEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // HashMd5Func Hash a value to MD5 string
 //
-//     hash.md5("/blog/index.html")  =>  abc345xyz
-//
+//	hash.md5("/blog/index.html")  =>  abc345xyz
 type HashMd5 struct{}
 
 // Type string
@@ -79,8 +77,7 @@ func hashMd5Eval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // HashSha1Func Hash a value to SHA256 string
 //
-//     hash.sha1("/blog/index.html")  =>  abc345xyz
-//
+//	hash.sha1("/blog/index.html")  =>  abc345xyz
 type HashSha1 struct{}
 
 // Type string
@@ -102,8 +99,7 @@ func hashSha1Eval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) 
 
 // HashSha256Func Hash a value to SHA256 string
 //
-//     hash.sha256("/blog/index.html")  =>  abc345xyz
-//
+//	hash.sha256("/blog/index.html")  =>  abc345xyz
 type HashSha256 struct{}
 
 // Type string
@@ -125,8 +121,7 @@ func hashSha256Eval(ctx expr.EvalContext, args []value.Value) (value.Value, bool
 
 // HashSha512Func Hash a value to SHA512 string
 //
-//     hash.sha512("/blog/index.html")  =>  abc345xyz
-//
+//	hash.sha512("/blog/index.html")  =>  abc345xyz
 type HashSha512 struct{}
 
 // Type string
@@ -148,8 +143,7 @@ func hashSha512Eval(ctx expr.EvalContext, args []value.Value) (value.Value, bool
 
 // Base 64 encoding function
 //
-//     encoding.b64encode("hello world=")  =>  aGVsbG8gd29ybGQ=
-//
+//	encoding.b64encode("hello world=")  =>  aGVsbG8gd29ybGQ=
 type EncodeB64Encode struct{}
 
 // Type string
@@ -170,8 +164,7 @@ func encodeB64EncodeEval(ctx expr.EvalContext, args []value.Value) (value.Value,
 
 // Base 64 encoding function
 //
-//     encoding.b64decode("aGVsbG8gd29ybGQ=")  =>  "hello world"
-//
+//	encoding.b64decode("aGVsbG8gd29ybGQ=")  =>  "hello world"
 type EncodeB64Decode struct{}
 
 // Type string

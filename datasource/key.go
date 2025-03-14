@@ -42,8 +42,8 @@ func NewKeyCol(name string, val driver.Value) KeyCol { return KeyCol{name, val} 
 func (m KeyCol) Key() driver.Value                   { return m.Val }
 
 // Given a Where expression, lets try to create a key which
-//  requires form    `idenity = "value"`
 //
+//	requires form    `idenity = "value"`
 func KeyFromWhere(wh interface{}) schema.Key {
 	switch n := wh.(type) {
 	case *rel.SqlWhere:

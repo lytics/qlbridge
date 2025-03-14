@@ -86,10 +86,10 @@ func main() {
 
 // Example of a custom Function, that we are adding into the Expression VM
 //
-//         select
-//              user_id AS theuserid, email, item_count * 2, reg_date
-//         FROM stdio
-//         WHERE email_is_valid(email)
+//	select
+//	     user_id AS theuserid, email, item_count * 2, reg_date
+//	FROM stdio
+//	WHERE email_is_valid(email)
 type EmailIsValid struct{}
 
 func (m *EmailIsValid) Validate(n *expr.FuncNode) (expr.EvaluatorFunc, error) {

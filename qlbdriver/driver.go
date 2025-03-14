@@ -20,7 +20,6 @@ Usage
 		// Use db here
 
 	}
-
 */
 package qlbdriver
 

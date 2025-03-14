@@ -159,7 +159,8 @@ msgLoop:
 }
 
 // On Task stepper we don't Run it, rather use a
-//   Next() explicit call from end user
+//
+//	Next() explicit call from end user
 type TaskStepper struct {
 	*TaskBase
 }

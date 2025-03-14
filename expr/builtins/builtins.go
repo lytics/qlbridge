@@ -140,8 +140,7 @@ func LoadAllBuiltins() {
 
 // uuid generates a new uuid
 //
-//    uuid() =>  "...."
-//
+//	uuid() =>  "...."
 type UuidGenerate struct{}
 
 // Type string

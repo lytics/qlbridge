@@ -23,9 +23,9 @@ var (
 // to allow these custom file-types to be queried with SQL.
 //
 // Features of Filehandler
-// - File() Converts a cloudstorage object to a FileInfo that describes the File.
-// - Scanner() create a file-scanner, will allow the scanner to implement any
-//   custom file-type reading (csv, protobuf, json, enrcyption).
+//   - File() Converts a cloudstorage object to a FileInfo that describes the File.
+//   - Scanner() create a file-scanner, will allow the scanner to implement any
+//     custom file-type reading (csv, protobuf, json, enrcyption).
 //
 // The File Reading, Opening, Listing is a separate layer, see FileSource
 // for the Cloudstorage layer.

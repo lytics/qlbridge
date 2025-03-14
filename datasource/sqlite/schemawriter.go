@@ -13,7 +13,7 @@ import (
 var (
 
 // normal tables
-//defaultSchemaTables = []string{"tables", "databases", "columns", "global_variables", "session_variables","functions", "procedures", "engines", "status", "indexes"}
+// defaultSchemaTables = []string{"tables", "databases", "columns", "global_variables", "session_variables","functions", "procedures", "engines", "status", "indexes"}
 )
 
 func init() {

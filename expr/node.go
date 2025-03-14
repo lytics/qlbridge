@@ -352,7 +352,6 @@ func copyNodes(nodes []Node) []Node {
 	return newNodes
 }
 
-
 // FindFirstIdentity Recursively descend down a node looking for first Identity Field
 //
 //	min(year)                 == year

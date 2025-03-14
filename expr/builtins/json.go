@@ -15,10 +15,9 @@ var _ = u.EMPTY
 
 // JsonPath jmespath json parser http://jmespath.org/
 //
-//     json_field = `[{"name":"n1","ct":8,"b":true, "tags":["a","b"]},{"name":"n2","ct":10,"b": false, "tags":["a","b"]}]`
+//	json_field = `[{"name":"n1","ct":8,"b":true, "tags":["a","b"]},{"name":"n2","ct":10,"b": false, "tags":["a","b"]}]`
 //
-//     json.jmespath(json_field, "[?name == 'n1'].name | [0]")  =>  "n1"
-//
+//	json.jmespath(json_field, "[?name == 'n1'].name | [0]")  =>  "n1"
 type JsonPath struct{}
 
 func (m *JsonPath) Type() value.ValueType { return value.UnknownType }

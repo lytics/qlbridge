@@ -15,9 +15,8 @@ var _ = u.EMPTY
 
 // len length of array types
 //
-//    len([1,2,3])     =>  3, true
-//    len(not_a_field)   =>  -- NilInt, false
-//
+//	len([1,2,3])     =>  3, true
+//	len(not_a_field)   =>  -- NilInt, false
 type Length struct{}
 
 // Type is IntType
@@ -63,13 +62,12 @@ func lenEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // ArrayIndex  array.index choose the nth element of an array
 //
-//     // given context input of
-//     "items" = [1,2,3]
+//	// given context input of
+//	"items" = [1,2,3]
 //
-//     array.index(items, 1)     =>  1, true
-//     array.index(items, 5)     =>  nil, false
-//     array.index(items, -1)    =>  3, true
-//
+//	array.index(items, 1)     =>  1, true
+//	array.index(items, 5)     =>  nil, false
+//	array.index(items, -1)    =>  3, true
 type ArrayIndex struct{}
 
 // Type unknown - returns single value from SliceValue array
@@ -108,12 +106,12 @@ func arrayIndexEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool
 
 // array.slice  slice element m -> n of a slice.  First arg must be a slice.
 //
-//    // given context of
-//    "items" = [1,2,3,4,5]
+//	// given context of
+//	"items" = [1,2,3,4,5]
 //
-//    array.slice(items, 1, 3)     =>  [2,3], true
-//    array.slice(items, 2)        =>  [3,4,5], true
-//    array.slice(items, -2)       =>  [4,5], true
+//	array.slice(items, 1, 3)     =>  [2,3], true
+//	array.slice(items, 2)        =>  [3,4,5], true
+//	array.slice(items, -2)       =>  [4,5], true
 type ArraySlice struct{}
 
 // Type Unknown for Array Slice
@@ -208,8 +206,7 @@ func arraySliceEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool
 // Map Create a map from two values.   If the right side value is nil
 // then does not evaluate.
 //
-//     map(left, right)    => map[string]value{left:right}
-//
+//	map(left, right)    => map[string]value{left:right}
 type MapFunc struct{}
 
 // Type is MapValueType
@@ -236,9 +233,8 @@ func mapEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // MapTime()    Create a map[string]time of each key
 //
-//    maptime(field)    => map[string]time{field_value:message_timestamp}
-//    maptime(field, timestamp) => map[string]time{field_value:timestamp}
-//
+//	maptime(field)    => map[string]time{field_value:message_timestamp}
+//	maptime(field, timestamp) => map[string]time{field_value:timestamp}
 type MapTime struct{}
 
 // Type MapTime
@@ -282,13 +278,13 @@ func mapTimeEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 // - May pass as many match strings as you want.
 // - Must match on Prefix of key.
 //
-//  given input context of:
-//     {"score_value":24,"event_click":true, "tag_apple": "apple", "label_orange": "orange"}
+//	given input context of:
+//	   {"score_value":24,"event_click":true, "tag_apple": "apple", "label_orange": "orange"}
 //
-//     match("score_") => {"value":24}
-//     match("amount_") => false
-//     match("event_") => {"click":true}
-//     match("label_","tag_") => {"apple":"apple","orange":"orange"}
+//	   match("score_") => {"value":24}
+//	   match("amount_") => false
+//	   match("event_") => {"click":true}
+//	   match("label_","tag_") => {"apple":"apple","orange":"orange"}
 type Match struct{}
 
 // Type is MapValueType
@@ -328,11 +324,10 @@ func matchEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // MapKeys:  Take a map and extract array of keys
 //
-//    //given input:
-//    {"tag.1":"news","tag.2":"sports"}
+//	//given input:
+//	{"tag.1":"news","tag.2":"sports"}
 //
-//    mapkeys(match("tag.")) => []string{"news","sports"}
-//
+//	mapkeys(match("tag.")) => []string{"news","sports"}
 type MapKeys struct{}
 
 // Type []string aka strings
@@ -368,11 +363,10 @@ func mapKeysEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // MapValues:  Take a map and extract array of values
 //
-//    // given input:
-//    {"tag.1":"news","tag.2":"sports"}
+//	// given input:
+//	{"tag.1":"news","tag.2":"sports"}
 //
-//    mapvalue(match("tag.")) => []string{"1","2"}
-//
+//	mapvalue(match("tag.")) => []string{"1","2"}
 type MapValues struct{}
 
 // Type strings aka []string
@@ -409,11 +403,10 @@ func mapValuesEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool)
 
 // MapInvert:  Take a map and invert key/values
 //
-//    // given input:
-//    tags = {"1":"news","2":"sports"}
+//	// given input:
+//	tags = {"1":"news","2":"sports"}
 //
-//    mapinvert(tags) => map[string]string{"news":"1","sports":"2"}
-//
+//	mapinvert(tags) => map[string]string{"news":"1","sports":"2"}
 type MapInvert struct{}
 
 // Type MapValue

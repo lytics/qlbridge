@@ -317,7 +317,8 @@ func joinNodesForFrom(stmt *SqlSelect, from *SqlSource, node expr.Node, depth in
 }
 
 // We need to find all columns used in the given Node (where/join expression)
-//  to ensure we have those columns in projection for sub-queries
+//
+//	to ensure we have those columns in projection for sub-queries
 func columnsFromJoin(from *SqlSource, node expr.Node, cols Columns) Columns {
 	if node == nil {
 		return cols

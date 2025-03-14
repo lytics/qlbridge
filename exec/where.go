@@ -20,7 +20,8 @@ type Where struct {
 }
 
 // NewWhere create new Where Clause
-//  filters vs final differ bc the Final does final column aliasing
+//
+//	filters vs final differ bc the Final does final column aliasing
 func NewWhere(ctx *plan.Context, p *plan.Where) *Where {
 	if p.Final {
 		return NewWhereFinal(ctx, p)
