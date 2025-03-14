@@ -1,73 +1,48 @@
-package es2gen
+package esgen
 
 import (
 	"fmt"
 	"strconv"
 
-	u "github.com/araddon/gou"
-
 	"github.com/lytics/qlbridge/expr"
-	"github.com/lytics/qlbridge/generators/elasticsearch/gentypes"
+	"github.com/lytics/qlbridge/generators/gentypes"
 	"github.com/lytics/qlbridge/lex"
 	"github.com/lytics/qlbridge/value"
 )
-
-var _ = u.EMPTY
 
 type floatval interface {
 	Float() float64
 }
 
-// scalar returns a JSONable representation of a scalar node type for use in ES
-// filters.
-//
-// Does not support Null.
-//
-func scalar(node expr.Node) (interface{}, bool) {
-	switch n := node.(type) {
-
-	case *expr.StringNode:
-		return n.Text, true
-
-	case *expr.NumberNode:
-		if n.IsInt {
-			// ES supports string encoded ints
-			return n.Int64, true
-		}
-		return n.Float64, true
-
-	case *expr.ValueNode:
-		// Make sure this is a scalar value node
-		switch n.Value.Type() {
-		case value.BoolType, value.IntType, value.StringType, value.TimeType:
-			return n.String(), true
-		case value.NumberType:
-			nn, ok := n.Value.(floatval)
-			if !ok {
-				return nil, false
-			}
-			return nn.Float(), true
-		}
-	case *expr.IdentityNode:
-		if _, err := strconv.ParseBool(n.Text); err == nil {
-			return n.Text, true
-		}
-
-	}
-	return "", false
-}
-
 // makeRange returns a range filter for Elasticsearch given the 3 nodes that
 // make up a comparison.
 func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (interface{}, error) {
+
 	rhsval, ok := scalar(rhs)
 	if !ok {
-		return nil, fmt.Errorf("qlindex: unsupported type for comparison: %T", rhs)
+		return nil, fmt.Errorf("unsupported type for comparison: %T", rhs)
 	}
 
-	// Convert scalars from strings to floats if lhs is numeric and rhs is a
-	// float (ES handles ints as strings just fine).
-	if lhs.Numeric() {
+	rhv := value.NewValue(rhsval)
+
+	// Convert scalars to correct type
+	switch lhs.Type {
+	case value.IntType, value.MapIntType:
+		// TODO:  we might need to change the operator???
+		//  given lh identity "purchase_count" = int = 10
+		//  right hand side = float 9.7
+		iv, ok := value.ValueToInt64(rhv)
+		if !ok {
+			return nil, fmt.Errorf("Could not convert %T %v to int", rhsval, rhsval)
+		}
+		rhsval = iv
+	case value.NumberType, value.MapNumberType:
+		fv, ok := value.ValueToFloat64(rhv)
+		if !ok {
+			return nil, fmt.Errorf("Could not convert %T %v to float", rhsval, rhsval)
+		}
+		rhsval = fv
+	default:
 		if rhsstr, ok := rhsval.(string); ok {
 			if rhsf, err := strconv.ParseFloat(rhsstr, 64); err == nil {
 				// rhsval can be converted to a float!
@@ -78,7 +53,7 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (interf
 
 	/*
 		"nested": {
-			"filter": {
+			"query": {
 			    "term": {
 			        "map_actioncounts.k": "Web hit"
 			    }
@@ -87,36 +62,40 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (interf
 		}
 
 		"nested": {
-			"filter": {
-			    "and": [
-			        {
-			            "term": {
-			                "mapvals_fields.k": "has_data"
-			            }
-			        },
-			        {
-			            "term": {
-			                "mapvals_fields.b": true
-			            }
-			        }
-			    ]
+			"query": {
+			    "bool": {
+			      "must": [
+			          {
+			              "term": {
+			                  "mapvals_fields.k": "has_data"
+			              }
+			          },
+			          {
+			              "term": {
+			                  "mapvals_fields.b": true
+			              }
+			          }
+			      ]
+			    }
 			},
 			"path": "mapvals_fields"
 		}
 		"nested": {
-			"filter": {
-			    "and": [
-			        {
-			            "term": {
-			                "k": "open"
-			            }
-			        },
-			        {
-			            "range": {
-			                "f": {"gte": 7}
-			            }
-			        }
-			    ]
+			"query": {
+				"bool": {
+					"must": [
+						{
+							"term": {
+								"k": "open"
+							}
+						},
+						{
+							"range": {
+								"f": {"gte": 7}
+							}
+						}
+					]
+				}
 			},
 			"path": "map_events"
 		}
@@ -154,29 +133,31 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (interf
 func makeBetween(lhs *gentypes.FieldType, lower, upper interface{}) (interface{}, error) {
 	/*
 		"nested": {
-			"filter": {
-			    "and": [
-			        {
-			            "term": {
-			                "k": "open"
-			            }
-			        },
-			        {
-			            "range": {
-			                "f": {"gt": 7}
-			            }
-			        },
-			        {
-			            "range": {
-			                "f": {"lt": 15}
-			            }
-			        }
-			    ]
+			"query": {
+				"bool": {
+					"must": [
+						{
+							"term": {
+								"k": "open"
+							}
+						},
+						{
+							"range": {
+								"f": {"gt": 7}
+							}
+						},
+						{
+							"range": {
+								"f": {"lt": 15}
+							}
+						}
+					]
+				}
 			},
 			"path": "map_events"
 		}
 
-		"and": [
+		"must": [
 		    {
 		        "range": {
 		            "f": {"gt": 7}
@@ -196,44 +177,50 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper interface{}) (interface{}
 
 	if lhs.Nested() {
 		fl = append(fl, Term("k", lhs.Field))
-		return &nested{&NestedFilter{
-			Filter: &and{fl},
-			Path:   lhs.Path,
+		return &nested{&NestedQuery{
+			Query:          &boolean{must{fl}},
+			Path:           lhs.Path,
+			IgnoreUnmapped: true,
 		}}, nil
 	}
-	return &and{fl}, nil
+	return &boolean{must{fl}}, nil
 }
 
 // makeWildcard returns a wildcard/like query
-//  {"query": {"wildcard": {field: value}}}
-func makeWildcard(lhs *gentypes.FieldType, value string) (interface{}, error) {
+//
+//	{"wildcard": {field: value}}
+func makeWildcard(lhs *gentypes.FieldType, value string, addStars bool) (interface{}, error) {
 	/*
 		"nested": {
-			"filter": {
-			    "and": [
-			        {
-			            "term": { "map_events.k": "open" }
-			        },
-			        { "wildcard": {"map_events.v": "hel"}
-			        }
-			    ]
+			"query": {
+				"bool": {
+					"must": [
+						{
+							"term": { "map_events.k": "open" }
+						},
+						{
+							"wildcard": {"map_events.v": "hel"}
+						}
+					]
+				}
 			},
 			"path": "map_events"
 		}
 
-		{"query": {"wildcard": {field: value}}}
+		{"wildcard": {field: value}}
 	*/
 	fieldName := lhs.Field
 
 	if lhs.Nested() {
 		fieldName = lhs.PathAndPrefix(value)
 	}
-	wc := Wildcard(fieldName, value)
+	wc := Wildcard(fieldName, value, addStars)
 	if lhs.Nested() {
 		fl := []interface{}{wc, Term(fmt.Sprintf("%s.k", lhs.Path), lhs.Field)}
-		return &nested{&NestedFilter{
-			Filter: &and{fl},
-			Path:   lhs.Path,
+		return &nested{&NestedQuery{
+			Query:          &boolean{must{fl}},
+			Path:           lhs.Path,
+			IgnoreUnmapped: true,
 		}}, nil
 	}
 	return &wc, nil
@@ -243,8 +230,9 @@ func makeWildcard(lhs *gentypes.FieldType, value string) (interface{}, error) {
 func makeTimeWindowQuery(lhs *gentypes.FieldType, threshold, window, ts int64) (interface{}, error) {
 	/*
 		"nested": {
-			"filter": {
-				"and": [
+			"query": {
+			  "bool":{
+				"must": [
 					{
 						"term": { "timebucket_visits.threshold": 1 }
 					},
@@ -262,6 +250,7 @@ func makeTimeWindowQuery(lhs *gentypes.FieldType, threshold, window, ts int64) (
 						}
 					},
 				]
+			  }
 			}
 			"path": "timebucket_visits"
 		}
@@ -274,8 +263,9 @@ func makeTimeWindowQuery(lhs *gentypes.FieldType, threshold, window, ts int64) (
 		&RangeFilter{Range: map[string]RangeQry{lhs.Field + ".exit": {GTE: ts}}},
 	}
 
-	return &nested{&NestedFilter{
-		Filter: &and{fl},
-		Path:   lhs.Field,
+	return &nested{&NestedQuery{
+		Query:          &boolean{must{fl}},
+		Path:           lhs.Field,
+		IgnoreUnmapped: true,
 	}}, nil
 }

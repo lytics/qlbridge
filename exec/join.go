@@ -25,8 +25,8 @@ var (
 type KeyEvaluator func(msg schema.Message) driver.Value
 
 // Evaluate messages to create JoinKey based message, where the
-//    Join Key (composite of each value in join expr) hashes consistently
 //
+//	Join Key (composite of each value in join expr) hashes consistently
 type JoinKey struct {
 	*TaskBase
 	p        *plan.JoinKey
@@ -34,14 +34,14 @@ type JoinKey struct {
 }
 
 // A JoinKey task that evaluates the compound JoinKey to allow
-//  for parallelized join's
 //
-//   source1   ->  JoinKey  ->  hash-route
-//                                         \
-//                                          --  join  -->
-//                                         /
-//   source2   ->  JoinKey  ->  hash-route
+//	for parallelized join's
 //
+//	 source1   ->  JoinKey  ->  hash-route
+//	                                       \
+//	                                        --  join  -->
+//	                                       /
+//	 source2   ->  JoinKey  ->  hash-route
 func NewJoinKey(ctx *plan.Context, p *plan.JoinKey) *JoinKey {
 	m := &JoinKey{
 		TaskBase: NewTaskBase(ctx),
@@ -98,7 +98,6 @@ func (m *JoinKey) Run() error {
 }
 
 // Scans 2 source tasks for rows, evaluate keys, use for join
-//
 type JoinMerge struct {
 	*TaskBase
 	leftStmt  *rel.SqlSource
@@ -109,24 +108,24 @@ type JoinMerge struct {
 }
 
 // A very stupid naive parallel join merge, uses Key() as value to merge
-//   two different input channels
 //
-//   source1   ->
-//                \
-//                  --  join  -->
-//                /
-//   source2   ->
+//	two different input channels
+//
+//	source1   ->
+//	             \
+//	               --  join  -->
+//	             /
+//	source2   ->
 //
 // Distributed:
 //
-//   source1a  ->                |-> --  join  -->
-//   source1b  -> key-hash-route |-> --  join  -->  reduce ->
-//   source1n  ->                |-> --  join  -->
-//                               |-> --  join  -->
-//   source2a  ->                |-> --  join  -->
-//   source2b  -> key-hash-route |-> --  join  -->
-//   source2n  ->                |-> --  join  -->
-//
+//	source1a  ->                |-> --  join  -->
+//	source1b  -> key-hash-route |-> --  join  -->  reduce ->
+//	source1n  ->                |-> --  join  -->
+//	                            |-> --  join  -->
+//	source2a  ->                |-> --  join  -->
+//	source2b  -> key-hash-route |-> --  join  -->
+//	source2n  ->                |-> --  join  -->
 func NewJoinNaiveMerge(ctx *plan.Context, l, r TaskRunner, p *plan.JoinMerge) *JoinMerge {
 
 	m := &JoinMerge{

@@ -32,8 +32,9 @@ func NewProjection(ctx *plan.Context, p *plan.Projection) *Projection {
 }
 
 // In Process projections are used when mapping multiple sources together
-//  and additional columns such as those used in Where, GroupBy etc are used
-//  even if they will not be used in Final projection
+//
+//	and additional columns such as those used in Where, GroupBy etc are used
+//	even if they will not be used in Final projection
 func NewProjectionInProcess(ctx *plan.Context, p *plan.Projection) *Projection {
 	s := &Projection{
 		TaskBase: NewTaskBase(ctx),

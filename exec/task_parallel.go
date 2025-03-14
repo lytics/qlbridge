@@ -17,11 +17,12 @@ var (
 )
 
 // A parallel set of tasks, this starts each child task and offers up
-//   an output channel that is a merger of each child
 //
-//  --> \
-//  --> - ->
-//  --> /
+//	 an output channel that is a merger of each child
+//
+//	--> \
+//	--> - ->
+//	--> /
 type TaskParallel struct {
 	*TaskBase
 	in      TaskRunner

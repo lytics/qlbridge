@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"database/sql/driver"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -23,12 +24,13 @@ var (
 )
 
 // Csv DataSource, implements qlbridge schema DataSource, SourceConn, Scanner
-//   to allow csv files to be full featured databases.
-//   - very, very naive scanner, forward only single pass
-//   - can open a file with .Open()
-//   - assumes comma delimited
-//   - not thread-safe
-//   - does not implement write operations
+//
+//	to allow csv files to be full featured databases.
+//	- very, very naive scanner, forward only single pass
+//	- can open a file with .Open()
+//	- assumes comma delimited
+//	- not thread-safe
+//	- does not implement write operations
 type CsvDataSource struct {
 	table    string
 	tbl      *schema.Table
@@ -56,16 +58,14 @@ func NewCsvSource(table string, indexCol int, ior io.Reader, exit <-chan bool) (
 
 	first2, err := buf.Peek(2)
 	if err != nil {
-		u.Errorf("Error opening bufio.peek for csv reader %v", err)
-		return nil, err
+		return nil, fmt.Errorf("opening bufio.peek for csv reader: %w", err)
 	}
 
 	// TODO:  move this compression to the file-reader not here
-	if err == nil && len(first2) == 2 && bytes.Equal(first2, []byte{'\x1F', '\x8B'}) {
+	if len(first2) == 2 && bytes.Equal(first2, []byte{'\x1F', '\x8B'}) {
 		gr, err := gzip.NewReader(buf)
 		if err != nil {
-			u.Errorf("Could not open reader? %v", err)
-			return nil, err
+			return nil, fmt.Errorf("opening reader: %w", err)
 		}
 		m.gz = gr
 		m.csvr = csv.NewReader(gr)
@@ -73,7 +73,6 @@ func NewCsvSource(table string, indexCol int, ior io.Reader, exit <-chan bool) (
 		m.csvr = csv.NewReader(buf)
 	}
 
-	m.csvr.TrailingComma = true // allow empty fields
 	// if flagCsvDelimiter == "|" {
 	// 	m.csvr.Comma = '|'
 	// } else if flagCsvDelimiter == "\t" || flagCsvDelimiter == "t" {
@@ -81,10 +80,8 @@ func NewCsvSource(table string, indexCol int, ior io.Reader, exit <-chan bool) (
 	// }
 	headers, err := m.csvr.Read()
 	if err != nil {
-		u.Warnf("err csv %v", err)
 		return nil, err
 	}
-	//u.Debugf("headers: %v", headers)
 	m.headers = headers
 	m.colindex = make(map[string]int, len(headers))
 	for i, key := range headers {
@@ -93,7 +90,6 @@ func NewCsvSource(table string, indexCol int, ior io.Reader, exit <-chan bool) (
 		m.headers[i] = key
 	}
 	m.loadTable()
-	//u.Infof("csv headers: %v colIndex: %v", headers, m.colindex)
 	return &m, nil
 }
 
@@ -169,7 +165,6 @@ func (m *CsvDataSource) Next() schema.Message {
 			for i, val := range row {
 				vals[i] = val
 			}
-			//u.Debugf("headers: %#v \n\trows:  %#v", m.headers, row)
 			return NewSqlDriverMessageMap(m.rowct, vals, m.colindex)
 		}
 	}

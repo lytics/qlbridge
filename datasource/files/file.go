@@ -28,9 +28,11 @@ type FileTable struct {
 // Say a folder of "./tables" is the "root path" specified
 // then say it has folders for "table names" underneath a redundant "tables"
 // ./tables/
-//         /tables/
-//                /appearances/appearances1.csv
-//                /players/players1.csv
+//
+//	/tables/
+//	       /appearances/appearances1.csv
+//	       /players/players1.csv
+//
 // Name = "tables/appearances/appearances1.csv"
 // Table = "appearances"
 // PartialPath = tables/appearances
@@ -106,14 +108,13 @@ func FileInfoFromCloudObject(path string, obj cloudstorage.Object) *FileInfo {
 // There are different "table" naming conventions we use to
 // find table names.
 //
-// 1) Support multiple partitioned files in folder which is name of table
+//  1. Support multiple partitioned files in folder which is name of table
 //     rootpath/tables/nameoftable/nameoftable1.csv
 //     rootpath/tables/nameoftable/nameoftable2.csv
 //
-// 2) Suport Table as name of file inside folder
+//  2. Suport Table as name of file inside folder
 //     rootpath/users.csv
 //     rootpath/accounts.csv
-//
 func TableFromFileAndPath(path, fileIn string) string {
 
 	fileWithPath := fileIn

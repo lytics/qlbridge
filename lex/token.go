@@ -38,26 +38,24 @@ func (t Token) ErrMsg(l *Lexer, msg string) error {
 }
 
 /*
-
-	// List of datatypes from MySql, implement them as tokens?   or leave as Identity during
-	// DDL create/alter statements?
-	BOOL	TINYINT
-	BOOLEAN	TINYINT
-	CHARACTER VARYING(M)	VARCHAR(M)
-	FIXED	DECIMAL
-	FLOAT4	FLOAT
-	FLOAT8	DOUBLE
-	INT1	TINYINT
-	INT2	SMALLINT
-	INT3	MEDIUMINT
-	INT4	INT
-	INT8	BIGINT
-	LONG VARBINARY	MEDIUMBLOB
-	LONG VARCHAR	MEDIUMTEXT
-	LONG	MEDIUMTEXT
-	MIDDLEINT	MEDIUMINT
-	NUMERIC	DECIMAL
-
+// List of datatypes from MySql, implement them as tokens?   or leave as Identity during
+// DDL create/alter statements?
+BOOL	TINYINT
+BOOLEAN	TINYINT
+CHARACTER VARYING(M)	VARCHAR(M)
+FIXED	DECIMAL
+FLOAT4	FLOAT
+FLOAT8	DOUBLE
+INT1	TINYINT
+INT2	SMALLINT
+INT3	MEDIUMINT
+INT4	INT
+INT8	BIGINT
+LONG VARBINARY	MEDIUMBLOB
+LONG VARCHAR	MEDIUMTEXT
+LONG	MEDIUMTEXT
+MIDDLEINT	MEDIUMINT
+NUMERIC	DECIMAL
 */
 const (
 	// List of all TokenTypes Note we do NOT use IOTA because it is evil

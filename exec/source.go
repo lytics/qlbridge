@@ -29,13 +29,13 @@ type RequiresContext interface {
 // interface is called ExecutorSource.
 //
 // Examples of Sources:
-// 1) table      -- FROM table
-// 2) channels   -- FROM stream
-// 3) join       -- SELECT t1.name, t2.salary
-//                       FROM employee AS t1
-//                       INNER JOIN info AS t2
-//                       ON t1.name = t2.name;
-// 4) sub-select -- SELECT * FROM (SELECT 1, 2, 3) AS t1;
+//  1. table      -- FROM table
+//  2. channels   -- FROM stream
+//  3. join       -- SELECT t1.name, t2.salary
+//     FROM employee AS t1
+//     INNER JOIN info AS t2
+//     ON t1.name = t2.name;
+//  4. sub-select -- SELECT * FROM (SELECT 1, 2, 3) AS t1;
 type Source struct {
 	*TaskBase
 	p          *plan.Source

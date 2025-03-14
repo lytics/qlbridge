@@ -6,14 +6,11 @@ import (
 	"fmt"
 	"sync"
 
-	u "github.com/araddon/gou"
-	"github.com/pborman/uuid"
-
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/value"
+	"github.com/pborman/uuid"
 )
 
-var _ = u.EMPTY
 var loadOnce sync.Once
 
 const yymmTimeLayout = "0601"
@@ -143,8 +140,7 @@ func LoadAllBuiltins() {
 
 // uuid generates a new uuid
 //
-//    uuid() =>  "...."
-//
+//	uuid() =>  "...."
 type UuidGenerate struct{}
 
 // Type string

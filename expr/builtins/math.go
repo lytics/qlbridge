@@ -10,10 +10,9 @@ import (
 
 // Sqrt square root function.  Must be able to coerce to number.
 //
-//    sqrt(4)            =>  2, true
-//    sqrt(9)            =>  3, true
-//    sqrt(not_number)   =>  0, false
-//
+//	sqrt(4)            =>  2, true
+//	sqrt(9)            =>  3, true
+//	sqrt(not_number)   =>  0, false
 type Sqrt struct{}
 
 // Type is NumberType
@@ -44,10 +43,9 @@ func sqrtEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // Pow exponents, raise x to the power of y
 //
-//    pow(5,2)            =>  25, true
-//    pow(3,2)            =>  9, true
-//    pow(not_number,2)   =>  NilNumber, false
-//
+//	pow(5,2)            =>  25, true
+//	pow(3,2)            =>  9, true
+//	pow(not_number,2)   =>  NilNumber, false
 type Pow struct{}
 
 // Type is Number

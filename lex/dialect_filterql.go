@@ -44,29 +44,30 @@ func NewFilterQLLexer(input string) *Lexer {
 
 // LexFilterClause Handle Filter QL Main Statement
 //
-//    FILTER := ( <filter_bool_expr> | <filter_expr> )
+//	FILTER := ( <filter_bool_expr> | <filter_expr> )
 //
-//    <filter_bool_expr> :=  ( AND | OR ) '(' ( <filter_bool_expr> | <filter_expr> ) [, ( <filter_bool_expr> | <filter_expr> ) ] ')'
+//	<filter_bool_expr> :=  ( AND | OR ) '(' ( <filter_bool_expr> | <filter_expr> ) [, ( <filter_bool_expr> | <filter_expr> ) ] ')'
 //
-//    <filter_expr> :=  <expr>
+//	<filter_expr> :=  <expr>
 //
 // Examples:
 //
-//    FILTER
-///      AND (
-//          daysago(datefield) < 100
-//          , domain(url) == "google.com"
-//          , INCLUDE name_of_filter
-//          ,
-//          , OR (
-//              momentum > 20
-//             , propensity > 50
-//          )
-//       )
-//    ALIAS myfilter
+//	FILTER
 //
-//    FILTER x > 7
+// /      AND (
 //
+//	      daysago(datefield) < 100
+//	      , domain(url) == "google.com"
+//	      , INCLUDE name_of_filter
+//	      ,
+//	      , OR (
+//	          momentum > 20
+//	         , propensity > 50
+//	      )
+//	   )
+//	ALIAS myfilter
+//
+//	FILTER x > 7
 func LexFilterClause(l *Lexer) StateFn {
 
 	if l.SkipWhiteSpacesNewLine() {

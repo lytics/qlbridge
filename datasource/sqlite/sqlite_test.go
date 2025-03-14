@@ -25,7 +25,6 @@ import (
 /*
 TODO:
 - the schema doesn't exists/isn't getting loaded.
-
 */
 var (
 	testFile = "./test.db"

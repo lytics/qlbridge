@@ -433,9 +433,6 @@ func (m *Schema) addschemaForTableUnlocked(tableName string, ss *Schema) {
 }
 
 func (m *Schema) loadTable(tableName string) error {
-
-	// u.Infof("%p schema.%v loadTable(%q)", m, m.Name, tableName)
-
 	if m.DS == nil {
 		return nil
 	}
@@ -468,12 +465,11 @@ func (m *Schema) loadTable(tableName string) error {
 
 // NewTable create a new table for a schema.
 func NewTable(table string) *Table {
-	tpb := TablePb{
-		Name:         strings.ToLower(table),
-		NameOriginal: table,
-	}
 	t := &Table{
-		TablePb:  tpb,
+		TablePb: TablePb{
+			Name:         strings.ToLower(table),
+			NameOriginal: table,
+		},
 		Fields:   make([]*Field, 0),
 		FieldMap: make(map[string]*Field),
 	}
@@ -620,18 +616,17 @@ func (m *Table) Marshal() ([]byte, error) {
 }
 
 func NewFieldBase(name string, valType value.ValueType, size int, desc string) *Field {
-	f := FieldPb{
+	return &Field{FieldPb: FieldPb{
 		Name:        name,
 		Description: desc,
 		Length:      uint32(size),
 		Type:        uint32(valType),
 		NativeType:  uint32(valType), // You need to over-ride this to change it
-	}
-	return &Field{FieldPb: f}
+	}}
 }
 func NewField(name string, valType value.ValueType, size int, allowNulls bool, defaultVal driver.Value, key, collation, description string) *Field {
 	jb, _ := json.Marshal(defaultVal)
-	f := FieldPb{
+	return &Field{FieldPb: FieldPb{
 		Name:        name,
 		Extra:       description,
 		Description: description,
@@ -642,10 +637,7 @@ func NewField(name string, valType value.ValueType, size int, allowNulls bool, d
 		NoNulls:     !allowNulls,
 		DefVal:      jb,
 		Key:         key,
-	}
-	return &Field{
-		FieldPb: f,
-	}
+	}}
 }
 func (m *Field) ValueType() value.ValueType { return value.ValueType(m.Type) }
 func (m *Field) Id() uint64                 { return m.idx }

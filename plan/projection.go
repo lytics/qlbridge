@@ -13,7 +13,8 @@ import (
 )
 
 // A static projection has already had its column/types defined
-//  and doesn't need to use internal schema to find it, often internal SHOW/DESCRIBE
+//
+//	and doesn't need to use internal schema to find it, often internal SHOW/DESCRIBE
 func NewProjectionStatic(proj *rel.Projection) *Projection {
 	return &Projection{Proj: proj, PlanBase: NewPlanBase(false)}
 }

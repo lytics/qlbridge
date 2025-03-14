@@ -14,7 +14,6 @@ import (
 var _ = u.EMPTY
 
 // ToString cast as string.  must be able to convert to string
-//
 type ToString struct{}
 
 // Type string
@@ -34,11 +33,10 @@ func toStringEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) 
 
 // Cast type coercion, cast to an explicit type.
 //
-//    cast(identity AS <type>) => 5.0
-//    cast(reg_date AS string) => "2014/01/12"
+//	cast(identity AS <type>) => 5.0
+//	cast(reg_date AS string) => "2014/01/12"
 //
 // Types:  [char, string, int, float]
-//
 type Cast struct{}
 
 // Type one of value types
@@ -103,7 +101,6 @@ func castEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 }
 
 // ToBool cast as boolean
-//
 type ToBool struct{}
 
 // Type bool
@@ -128,12 +125,11 @@ func toBoolEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
 // ToInt Convert to Integer:   Best attempt at converting to integer.
 //
-//   toint("5")          => 5, true
-//   toint("5.75")       => 5, true
-//   toint("5,555")      => 5555, true
-//   toint("$5")         => 5, true
-//   toint("5,555.00")   => 5555, true
-//
+//	toint("5")          => 5, true
+//	toint("5.75")       => 5, true
+//	toint("5,555")      => 5555, true
+//	toint("$5")         => 5, true
+//	toint("5,555.00")   => 5555, true
 type ToInt struct{}
 
 // Type integer
@@ -165,12 +161,11 @@ func toIntEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 
 // ToNumber Convert to Number:   Best attempt at converting to integer
 //
-//   tonumber("5") => 5.0
-//   tonumber("5.75") => 5.75
-//   tonumber("5,555") => 5555
-//   tonumber("$5") => 5.00
-//   tonumber("5,555.00") => 5555
-//
+//	tonumber("5") => 5.0
+//	tonumber("5.75") => 5.75
+//	tonumber("5,555") => 5555
+//	tonumber("$5") => 5.00
+//	tonumber("5,555.00") => 5555
 type ToNumber struct{}
 
 // Type number
@@ -195,10 +190,9 @@ func toNumberEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) 
 // for negative numbers, converting to a uint adds the negative value to the
 // max uint value (18446744073709551615).
 //
-//   unsign(-32847623329847) => 18446711226086221769
-//   unsign(876) => 876
-//   unsign("-70") => 18446744073709551546
-//
+//	unsign(-32847623329847) => 18446711226086221769
+//	unsign(876) => 876
+//	unsign("-70") => 18446744073709551546
 type Unsign struct{}
 
 // Type number

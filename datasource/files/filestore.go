@@ -75,9 +75,10 @@ type FileStoreCreator func(*schema.Schema) (FileStore, error)
 // Created by FileStoreCreator
 //
 // FileStoreCreator(schema) -> FileStore
-//           FileStore.Objects() -> File
-//                    FileHandler(File) -> FileScanner
-//                         FileScanner.Next() ->  Row
+//
+//	FileStore.Objects() -> File
+//	         FileHandler(File) -> FileScanner
+//	              FileScanner.Next() ->  Row
 type FileStore interface {
 	cloudstorage.StoreReader
 }

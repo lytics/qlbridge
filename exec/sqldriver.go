@@ -60,15 +60,16 @@ func DisableRecover() {
 // sql.Driver Interface implementation.
 //
 // Notes about Value return types:
-//     Value is a value that drivers must be able to handle.
-//     It is either nil or an instance of one of these types:
 //
-//       int64
-//       float64
-//       bool
-//       []byte
-//       string   [*] everywhere except from Rows.Next.
-//       time.Time
+//	Value is a value that drivers must be able to handle.
+//	It is either nil or an instance of one of these types:
+//
+//	  int64
+//	  float64
+//	  bool
+//	  []byte
+//	  string   [*] everywhere except from Rows.Next.
+//	  time.Time
 type qlbdriver struct{}
 
 // Open returns a new connection to the database.
@@ -92,16 +93,17 @@ func (m *qlbdriver) Open(connInfo string) (driver.Conn, error) {
 
 // A stateful connection to database/source
 //
-//
 // Execer is an optional interface that may be implemented by a Conn.
-//        If a Conn does not implement Execer, the sql package's DB.Exec will
-//        first prepare a query, execute the statement, and then close the
-//        statement.
+//
+//	If a Conn does not implement Execer, the sql package's DB.Exec will
+//	first prepare a query, execute the statement, and then close the
+//	statement.
 //
 // Queryer is an optional interface that may be implemented by a Conn.
-//        If a Conn does not implement Queryer, the sql package's DB.Query will
-//        first prepare a query, execute the statement, and then close the
-//        statement.
+//
+//	If a Conn does not implement Queryer, the sql package's DB.Query will
+//	first prepare a query, execute the statement, and then close the
+//	statement.
 type qlbConn struct {
 	parallel bool   // Do we Run In Background Mode?  Default = true
 	connInfo string //
@@ -119,7 +121,6 @@ func (m *qlbConn) Exec(query string, args []driver.Value) (driver.Result, error)
 
 // Queryer implementation
 // Query may return ErrSkip
-//
 func (m *qlbConn) Query(query string, args []driver.Value) (driver.Rows, error) {
 	stmt := &qlbStmt{conn: m, query: query}
 	return stmt.Query(args)
@@ -160,7 +161,6 @@ func (conn *qlbTx) Rollback() error { return expr.ErrNotImplemented }
 //
 // Stmt is a prepared statement. It is bound to a Conn and not
 // used by multiple goroutines concurrently.
-//
 type qlbStmt struct {
 	job   *JobExecutor
 	query string
@@ -294,7 +294,6 @@ func (conn *qlbStmt) ColumnConverter(idx int) driver.ValueConverter { return nil
 // driver.Rows Interface implementation.
 //
 // Rows is an iterator over an executed query's results.
-//
 type qlbRows struct{}
 
 // Columns returns the names of the columns. The number of
@@ -320,7 +319,6 @@ func (conn *qlbRows) Next(dest []driver.Value) error { return expr.ErrNotImpleme
 // driver.Result Interface implementation.
 //
 // Result is the result of a query execution that doesn't return rows
-//
 type qlbResult struct {
 	lastId   int64
 	affected int64

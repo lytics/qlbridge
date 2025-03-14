@@ -143,3 +143,48 @@ func ValueAndPrefix(val interface{}) (interface{}, string) {
 	// Default to strings
 	return val, "s"
 }
+
+//TODO uncommment as part of https://github.com/lytics/lio/issues/10683
+// //DateMathToSeconds takes an expression like `now-1h` and converts it to `now-3600s`
+// // from experimentation ES does rounding on expressions to nested docs, such that
+// // `now-1d` matches everything updated today or yesterday.  For example if a nested field
+// // was updated 27 hours ago, `now-1d` should still match it.   The solution is to just
+// // do the rounding/convertion ourselfs and send ES seconds which are less ambiguous.
+// func DateMathToSeconds(expression string) string {
+// 	if len(expression) < 3 {
+// 		return expression
+// 	}
+
+// 	if strings.HasPrefix(expression, "now") {
+// 		expression = expression[3:]
+// 	}
+
+// 	numStr, unit := expression[:len(expression)-1], expression[len(expression)-1]
+
+// 	num, err := strconv.Atoi(numStr)
+// 	if err != nil {
+// 		return expression
+// 	}
+// 	pm := "+"
+// 	if num < 0 {
+// 		pm = ""
+// 	}
+
+// 	switch unit {
+// 	case 'y':
+// 		return expression
+// 	case 'M':
+// 		return expression
+// 	case 'w':
+// 		return fmt.Sprintf("now%s%vs", pm, num*7*24*3600)
+// 	case 'd':
+// 		return fmt.Sprintf("now%s%vs", pm, num*24*3600)
+// 	case 'h':
+// 		return fmt.Sprintf("now%s%vs", pm, num*3600)
+// 	case 'm':
+// 		return fmt.Sprintf("now%s%vs", pm, num*60)
+// 	case 's':
+// 		return expression
+// 	}
+// 	return expression
+// }
