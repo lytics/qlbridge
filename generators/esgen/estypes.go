@@ -1,18 +1,20 @@
-package es2gen
+package esgen
 
 import (
+	"encoding/json"
 	"strings"
 
 	u "github.com/araddon/gou"
 
-	"github.com/lytics/qlbridge/generators/elasticsearch/gentypes"
+	"github.com/lytics/qlbridge/generators/gentypes"
 )
 
 /*
-	Native go data types that map to the Elasticsearch
-	Search DSL
+Native go data types that map to the Elasticsearch
+Search DSL
 */
 var _ = u.EMPTY
+var _ = json.Marshal
 
 type BoolFilter struct {
 	Occurs         BoolOccurrence `json:"bool"`
@@ -41,7 +43,7 @@ func Exists(field *gentypes.FieldType) interface{} {
 	if field.Nested() {
 		/*
 			"nested": {
-				"filter": {
+				"query": {
 				    "term": {
 				        "map_actioncounts.k": "Web hit"
 				    }
@@ -49,31 +51,52 @@ func Exists(field *gentypes.FieldType) interface{} {
 				"path": "map_actioncounts"
 			}
 		*/
-		return &nested{&NestedFilter{
-			Filter: Term(field.Path+".k", field.Field),
-			Path:   field.Path,
+		return &nested{&NestedQuery{
+			Query: Term(field.Path+".k", field.Field),
+			Path:  field.Path,
 		}}
 		//Nested(field.Path, &term{map[string][]string{"k": field.Field}})
 	}
 	return &exists{map[string]string{"field": field.Field}}
 }
 
-type and struct {
-	Filters []interface{} `json:"and"`
+//	type and struct {
+//		Filters []interface{} `json:"and"`
+//	}
+type boolean struct {
+	Bool interface{} `json:"bool"`
+}
+type must struct {
+	Filters []interface{} `json:"must"`
 }
 
 type in struct {
 	Terms map[string][]interface{} `json:"terms"`
 }
 
-// In creates a new Elasticsearch terms filter {"terms": {field: values}}
+// In creates a new Elasticsearch terms filter
+//
+// {"terms": {field: values}}
+//
+//	{ "nested": {
+//	     "query": {
+//	        "bool" : {
+//	           "must" :[
+//	              {"term": { "k":fieldName}},
+//	              filter,
+//	           ]
+//	     } ,
+//	     "path":"path_to_obj"
+//	 }}
 func In(field *gentypes.FieldType, values []interface{}) interface{} {
 	if field.Nested() {
-		return &nested{&NestedFilter{
-			Filter: &and{
-				Filters: []interface{}{
-					&in{map[string][]interface{}{field.PathAndPrefix(""): values}},
-					Term(field.Path+".k", field.Field),
+		return &nested{&NestedQuery{
+			Query: &boolean{
+				&must{
+					Filters: []interface{}{
+						&in{map[string][]interface{}{field.PathAndPrefix(""): values}},
+						Term(field.Path+".k", field.Field),
+					},
 				},
 			},
 			Path: field.Path,
@@ -82,14 +105,18 @@ func In(field *gentypes.FieldType, values []interface{}) interface{} {
 	return &in{map[string][]interface{}{field.Field: values}}
 }
 
-// In creates a new Elasticsearch nested filter
-// { "nested": {
-//      "filter": {"and":[
-//               {"term": { "k":fieldName}},
-//               filter,
-//      ]} ,
-//      "path":"path_to_obj"
-//  }}
+// Nested creates a new Elasticsearch nested filter
+//
+//	{ "nested": {
+//	     "query": {
+//	        "bool" : {
+//	           "must" :[
+//	              {"term": { "k":fieldName}},
+//	              filter,
+//	           ]
+//	     } ,
+//	     "path":"path_to_obj"
+//	 }}
 func Nested(field *gentypes.FieldType, filter interface{}) *nested {
 
 	// Hm.  Elasticsearch doc seems to insinuate we don't need
@@ -98,19 +125,22 @@ func Nested(field *gentypes.FieldType, filter interface{}) *nested {
 		Term(field.Path+".k", field.Field),
 		filter,
 	}
-	return &nested{&NestedFilter{
-		Filter: &and{fl},
-		Path:   field.Path,
+	n := nested{&NestedQuery{
+		Query: &boolean{&must{fl}},
+		Path:  field.Path,
 	}}
+	// by, _ := json.MarshalIndent(n, "", "  ")
+	// u.Infof("NESTED4:  \n%s", string(by))
+	return &n
 }
 
 type nested struct {
-	Nested *NestedFilter `json:"nested,omitempty"`
+	Nested *NestedQuery `json:"nested,omitempty"`
 }
 
-type NestedFilter struct {
-	Filter interface{} `json:"filter"`
-	Path   string      `json:"path"`
+type NestedQuery struct {
+	Query interface{} `json:"query"`
+	Path  string      `json:"path"`
 }
 
 type RangeQry struct {
@@ -147,10 +177,6 @@ type wildcard struct {
 	Wildcard map[string]string `json:"wildcard"`
 }
 
-type wildcardquery struct {
-	Query wildcard `json:"query"`
-}
-
 func wcFunc(val string) string {
 	if len(val) < 1 {
 		return val
@@ -169,16 +195,17 @@ func wcFunc(val string) string {
 
 // Wilcard creates a new Elasticserach wildcard query
 //
-//   {"query": {"wildcard": {field: value}}}
+//	{"wildcard": {field: value}}
 //
 // nested
-//  {"nested": {
-//     "filter" : { "and" : [
-//             {"query": {"wildcard": {"v": value}}},
-//             {"term":{"k": field_key}}
-//     "path": path
-//    }
-//  }
-func Wildcard(field, value string) *wildcardquery {
-	return &wildcardquery{Query: wildcard{Wildcard: map[string]string{field: wcFunc(value)}}}
+//
+//	{"nested": {
+//	   "filter" : { "and" : [
+//	           {"wildcard": {"v": value}},
+//	           {"term":{"k": field_key}}
+//	   "path": path
+//	  }
+//	}
+func Wildcard(field, value string) *wildcard {
+	return &wildcard{Wildcard: map[string]string{field: wcFunc(value)}}
 }

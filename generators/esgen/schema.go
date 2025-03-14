@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/lytics/qlbridge/expr"
-	"github.com/lytics/qlbridge/generators/elasticsearch/gentypes"
+	"github.com/lytics/qlbridge/generators/gentypes"
 	"github.com/lytics/qlbridge/value"
 )
 
@@ -28,7 +28,6 @@ func exprValueType(s gentypes.SchemaColumns, n expr.Node) value.ValueType {
 // filters.
 //
 // Does not support Null.
-//
 func scalar(node expr.Node) (interface{}, bool) {
 	switch n := node.(type) {
 

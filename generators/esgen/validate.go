@@ -6,7 +6,7 @@ import (
 	u "github.com/araddon/gou"
 
 	"github.com/lytics/qlbridge/expr"
-	"github.com/lytics/qlbridge/generators/elasticsearch/gentypes"
+	"github.com/lytics/qlbridge/generators/gentypes"
 	"github.com/lytics/qlbridge/lex"
 	"github.com/lytics/qlbridge/rel"
 	"github.com/lytics/qlbridge/value"

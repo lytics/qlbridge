@@ -1,18 +1,18 @@
-package es2gen
+package esgen
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/araddon/gou"
+	u "github.com/araddon/gou"
 
 	"github.com/lytics/qlbridge/expr"
+	"github.com/lytics/qlbridge/generators/gentypes"
 	"github.com/lytics/qlbridge/lex"
 	"github.com/lytics/qlbridge/rel"
 	"github.com/lytics/qlbridge/vm"
-
-	"github.com/lytics/qlbridge/generators/elasticsearch/gentypes"
 )
 
 var (
@@ -20,7 +20,7 @@ var (
 	// This *shouldn't* happen, but is better than a stack overflow
 	MaxDepth = 1000
 
-	_ = gou.EMPTY
+	_ = u.EMPTY
 )
 
 // copy-pasta from entity to avoid the import
@@ -60,7 +60,7 @@ func (fg *FilterGenerator) walkExpr(node expr.Node, depth int) (interface{}, err
 	if depth > MaxDepth {
 		return nil, fmt.Errorf("hit max depth on segment generation. bad query?")
 	}
-	//gou.Debugf("%d fg.expr T:%T  %#v", depth, node, node)
+	//u.Debugf("%d fg.expr T:%T  %#v", depth, node, node)
 	var err error
 	var filter interface{}
 	switch n := node.(type) {
@@ -85,7 +85,7 @@ func (fg *FilterGenerator) walkExpr(node expr.Node, depth int) (interface{}, err
 		if n.Bool() {
 			return MatchAll, nil
 		}
-		gou.Warnf("What is this? %v", n)
+		u.Warnf("What is this? %v", n)
 	case *expr.IncludeNode:
 		if incErr := vm.ResolveIncludes(fg.inc, n); incErr != nil {
 			return nil, incErr
@@ -94,13 +94,12 @@ func (fg *FilterGenerator) walkExpr(node expr.Node, depth int) (interface{}, err
 	case *expr.FuncNode:
 		filter, err = fg.funcExpr(n, depth+1)
 	default:
-		gou.Warnf("not handled %v", node)
+		u.Warnf("not handled %v", node)
 		return nil, fmt.Errorf("qlindex: unsupported node in expression: %T (%s)", node, node)
 	}
 	if err != nil {
 		// Convert MissingField errors to a logical `false`
-		if _, ok := err.(*gentypes.MissingFieldError); ok {
-			//gou.Debugf("depth=%d filters=%s missing field: %s", depth, node, err)
+		if errors.Is(err, &gentypes.ErrorMissingField{}) {
 			return MatchNone, nil
 		}
 		return nil, err
@@ -116,15 +115,12 @@ func (fg *FilterGenerator) walkExpr(node expr.Node, depth int) (interface{}, err
 }
 
 func (fg *FilterGenerator) unaryExpr(node *expr.UnaryNode, depth int) (interface{}, error) {
-	//gou.Debugf("urnary %v", node.Operator.T.String())
 	switch node.Operator.T {
 	case lex.TokenExists:
 		ft, err := fg.fieldType(node.Arg)
 		if err != nil {
-			//gou.Debugf("exists err: %q", err)
 			return nil, err
 		}
-		//gou.Debugf("exists %s", ft)
 		return Exists(ft), nil
 
 	case lex.TokenNegate:
@@ -157,8 +153,7 @@ func (fg *FilterGenerator) booleanExpr(bn *expr.BooleanNode, depth int) (interfa
 		it, err := fg.walkExpr(fe, depth+1)
 		if err != nil {
 			// Convert MissingField errors to a logical `false`
-			if _, ok := err.(*gentypes.MissingFieldError); ok {
-				//gou.Debugf("depth=%d filters=%s missing field: %s", depth, fs, err)
+			if errors.Is(err, &gentypes.ErrorMissingField{}) {
 				if !and {
 					// Simply skip missing fields in ORs
 					continue
@@ -311,23 +306,23 @@ func (fg *FilterGenerator) funcExpr(node *expr.FuncNode, depth int) (interface{}
 
 		threshold, ok := node.Args[1].(*expr.NumberNode)
 		if !ok {
-			return nil, fmt.Errorf("unsupported type for 'timewindow' argument. must be number, got %T", node.Args[1])
+			return nil, fmt.Errorf("qlindex: unsupported type for 'timewindow' argument. must be number, got %T", node.Args[1])
 		}
 
 		if !threshold.IsInt {
-			return nil, fmt.Errorf("unsupported type for 'timewindow' argument. must be number, got %T", node.Args[2])
+			return nil, fmt.Errorf("qlindex: unsupported type for 'timewindow' argument. must be number, got %T", node.Args[2])
 		}
 
 		window, ok := node.Args[2].(*expr.NumberNode)
 		if !ok {
-			return nil, fmt.Errorf("unsupported type for 'timewindow' argument. must be number, got %T", node.Args[2])
+			return nil, fmt.Errorf("qlindex: unsupported type for 'timewindow' argument. must be number, got %T", node.Args[2])
 		}
 
 		if !window.IsInt {
-			return nil, fmt.Errorf("unsupported type for 'timewindow' argument. must be integer, got float %s", node.Args[2])
+			return nil, fmt.Errorf("qlindex: unsupported type for 'timewindow' argument. must be integer, got float %s", node.Args[2])
 		}
 
 		return makeTimeWindowQuery(lhs, threshold.Int64, window.Int64, int64(DayBucket(fg.ts)))
 	}
-	return nil, fmt.Errorf("unsupported function: %s", node.Name)
+	return nil, fmt.Errorf("qlindex: unsupported function: %s", node.Name)
 }
