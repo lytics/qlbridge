@@ -5,23 +5,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/generators"
 	"github.com/lytics/qlbridge/rel"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSegmentQLIndexPlan(t *testing.T) {
-
 	for _, backend := range []generators.SearchBackend{generators.BackendBleve, generators.BackendElasticsearch} {
-		t.Run(fmt.Sprintf("Backend %v", backend), func(t *testing.T) {
+		t.Run(fmt.Sprintf("Backend %s", backend), func(t *testing.T) {
 			g := generators.NewGenerator(time.Now(), nil, nil, backend)
-
 			fs, err := rel.ParseFilterQL(`FILTER x==1`)
-			assert.Equal(t, nil, err)
+			require.Equal(t, nil, err)
 			_, err = g.Walk(fs)
-			assert.Equal(t, nil, err)
+			require.Equal(t, nil, err)
 		})
 	}
 }
@@ -31,22 +28,14 @@ func TestSegmentQLIndexPlan(t *testing.T) {
 //
 // Includers should *not* return (nil, nil), but instead return an error when
 // names cannot be resolved.
-//
-// Fixes #6169 #6176
 func TestIncluderNilReturn(t *testing.T) {
-
 	for _, backend := range []generators.SearchBackend{generators.BackendBleve, generators.BackendElasticsearch} {
 		t.Run(fmt.Sprintf("Backend %v", backend), func(t *testing.T) {
 			g := generators.NewGenerator(time.Now(), nilincluder{}, nil)
 			fs, err := rel.ParseFilterQL(`FILTER INCLUDE xyz`)
-			if err != nil {
-				t.Fatalf("error parsing filterql: %v", err)
-			}
+			require.NoError(t, err)
 			_, err = g.Walk(fs)
-			if err == nil {
-				t.Fatal("expected an error when using nilincluder but didn't receive one!")
-			}
-			t.Logf("expected error from ES Generator: %v", err)
+			require.Error(t, err)
 		})
 	}
 }

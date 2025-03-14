@@ -1,4 +1,4 @@
-package qlindex
+package generators
 
 import (
 	"time"
@@ -20,6 +20,16 @@ type (
 	// SearchBackend indicates which search engine to generate queries for
 	SearchBackend int
 )
+
+func (b SearchBackend) String() string {
+	switch b {
+	case BackendElasticsearch:
+		return "elasticsearch"
+	case BackendBleve:
+		return "bleve"
+	}
+	return "unknown"
+}
 
 const (
 	// BackendElasticsearch generates queries for Elasticsearch

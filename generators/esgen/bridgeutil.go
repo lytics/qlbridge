@@ -4,15 +4,11 @@ import (
 	"fmt"
 	"strconv"
 
-	u "github.com/araddon/gou"
-
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/generators/gentypes"
 	"github.com/lytics/qlbridge/lex"
 	"github.com/lytics/qlbridge/value"
 )
-
-var _ = u.EMPTY
 
 type floatval interface {
 	Float() float64
@@ -29,7 +25,6 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (interf
 
 	rhv := value.NewValue(rhsval)
 
-	u.Debugf("makeRange:  lh:%+v %v  %v", lhs, rhsval, rhs)
 	// Convert scalars to correct type
 	switch lhs.Type {
 	case value.IntType, value.MapIntType:
@@ -183,8 +178,9 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper interface{}) (interface{}
 	if lhs.Nested() {
 		fl = append(fl, Term("k", lhs.Field))
 		return &nested{&NestedQuery{
-			Query: &boolean{must{fl}},
-			Path:  lhs.Path,
+			Query:          &boolean{must{fl}},
+			Path:           lhs.Path,
+			IgnoreUnmapped: true,
 		}}, nil
 	}
 	return &boolean{must{fl}}, nil
@@ -193,7 +189,7 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper interface{}) (interface{}
 // makeWildcard returns a wildcard/like query
 //
 //	{"wildcard": {field: value}}
-func makeWildcard(lhs *gentypes.FieldType, value string) (interface{}, error) {
+func makeWildcard(lhs *gentypes.FieldType, value string, addStars bool) (interface{}, error) {
 	/*
 		"nested": {
 			"query": {
@@ -218,12 +214,13 @@ func makeWildcard(lhs *gentypes.FieldType, value string) (interface{}, error) {
 	if lhs.Nested() {
 		fieldName = lhs.PathAndPrefix(value)
 	}
-	wc := Wildcard(fieldName, value)
+	wc := Wildcard(fieldName, value, addStars)
 	if lhs.Nested() {
 		fl := []interface{}{wc, Term(fmt.Sprintf("%s.k", lhs.Path), lhs.Field)}
 		return &nested{&NestedQuery{
-			Query: &boolean{must{fl}},
-			Path:  lhs.Path,
+			Query:          &boolean{must{fl}},
+			Path:           lhs.Path,
+			IgnoreUnmapped: true,
 		}}, nil
 	}
 	return &wc, nil
@@ -267,7 +264,8 @@ func makeTimeWindowQuery(lhs *gentypes.FieldType, threshold, window, ts int64) (
 	}
 
 	return &nested{&NestedQuery{
-		Query: &boolean{must{fl}},
-		Path:  lhs.Field,
+		Query:          &boolean{must{fl}},
+		Path:           lhs.Field,
+		IgnoreUnmapped: true,
 	}}, nil
 }

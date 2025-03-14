@@ -54,6 +54,9 @@ func fieldType(s gentypes.SchemaColumns, n expr.Node) (*gentypes.FieldType, erro
 		return nil, fmt.Errorf("expected left-hand identity but found %s = %s", n.NodeType(), n)
 	}
 
+	if s == nil {
+		return nil, gentypes.MissingField(ident.Text)
+	}
 	// Try to get field info from schema
 	ft, ok := s.ColumnInfo(ident.Text)
 	if ok {

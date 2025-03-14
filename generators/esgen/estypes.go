@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	u "github.com/araddon/gou"
-
 	"github.com/lytics/qlbridge/generators/gentypes"
 )
 
@@ -13,7 +11,6 @@ import (
 Native go data types that map to the Elasticsearch
 Search DSL
 */
-var _ = u.EMPTY
 var _ = json.Marshal
 
 type BoolFilter struct {
@@ -39,7 +36,6 @@ type exists struct {
 
 // Exists creates a new Elasticsearch filter {"exists": {"field": field}}
 func Exists(field *gentypes.FieldType) interface{} {
-	//u.Debugf("exists?  nested?%v  for %s", field.Nested(), field.String())
 	if field.Nested() {
 		/*
 			"nested": {
@@ -52,8 +48,9 @@ func Exists(field *gentypes.FieldType) interface{} {
 			}
 		*/
 		return &nested{&NestedQuery{
-			Query: Term(field.Path+".k", field.Field),
-			Path:  field.Path,
+			Query:          Term(field.Path+".k", field.Field),
+			Path:           field.Path,
+			IgnoreUnmapped: true,
 		}}
 		//Nested(field.Path, &term{map[string][]string{"k": field.Field}})
 	}
@@ -99,7 +96,8 @@ func In(field *gentypes.FieldType, values []interface{}) interface{} {
 					},
 				},
 			},
-			Path: field.Path,
+			Path:           field.Path,
+			IgnoreUnmapped: true,
 		}}
 	}
 	return &in{map[string][]interface{}{field.Field: values}}
@@ -126,8 +124,9 @@ func Nested(field *gentypes.FieldType, filter interface{}) *nested {
 		filter,
 	}
 	n := nested{&NestedQuery{
-		Query: &boolean{&must{fl}},
-		Path:  field.Path,
+		Query:          &boolean{&must{fl}},
+		Path:           field.Path,
+		IgnoreUnmapped: true,
 	}}
 	// by, _ := json.MarshalIndent(n, "", "  ")
 	// u.Infof("NESTED4:  \n%s", string(by))
@@ -139,8 +138,9 @@ type nested struct {
 }
 
 type NestedQuery struct {
-	Query interface{} `json:"query"`
-	Path  string      `json:"path"`
+	Query          interface{} `json:"query"`
+	Path           string      `json:"path"`
+	IgnoreUnmapped bool        `json:"ignore_unmapped,omitempty"`
 }
 
 type RangeQry struct {
@@ -177,8 +177,8 @@ type wildcard struct {
 	Wildcard map[string]string `json:"wildcard"`
 }
 
-func wcFunc(val string) string {
-	if len(val) < 1 {
+func wcFunc(val string, addStars bool) string {
+	if len(val) < 1 || !addStars {
 		return val
 	}
 	if val[0] == '*' || val[len(val)-1] == '*' {
@@ -206,6 +206,6 @@ func wcFunc(val string) string {
 //	   "path": path
 //	  }
 //	}
-func Wildcard(field, value string) *wildcard {
-	return &wildcard{Wildcard: map[string]string{field: wcFunc(value)}}
+func Wildcard(field, value string, addStars bool) *wildcard {
+	return &wildcard{Wildcard: map[string]string{field: wcFunc(value, addStars)}}
 }

@@ -104,7 +104,8 @@ func (fg *FilterGenerator) walkExpr(node expr.Node, depth int) (query.Query, err
 	}
 	if err != nil {
 		// Convert MissingField errors to a logical `false`
-		if strings.Contains(err.Error(), "missing field") {
+		var errMissingField *gentypes.ErrorMissingField
+		if errors.As(err, &errMissingField) {
 			return query.NewMatchNoneQuery(), nil
 		}
 		return nil, err
@@ -132,11 +133,6 @@ func (fg *FilterGenerator) unaryExpr(node *expr.UnaryNode, depth int) (query.Que
 		// Bleve doesn't have a direct exists query, so we use a WildcardQuery with "*"
 		// which will match any value in the field
 		fieldName := ft.Field
-		// Claude hallucinated ES stuff
-		// 	if ft.Nested() {
-		// 		// Handle nested fields for Bleve
-		// 		fieldName = strings.Replace(ft.Path+"_"+ft.Field, ".", "_", -1)
-		// 	}
 
 		wildcardQuery := query.NewWildcardQuery("*")
 		wildcardQuery.SetField(fieldName)
@@ -182,7 +178,8 @@ func (fg *FilterGenerator) booleanExpr(bn *expr.BooleanNode, depth int) (query.Q
 		it, err := fg.walkExpr(fe, depth+1)
 		if err != nil {
 			// Convert MissingField errors to a logical `false`
-			if strings.Contains(err.Error(), "missing field") {
+			var errMissingField *gentypes.ErrorMissingField
+			if errors.As(err, &errMissingField) {
 				if !and {
 					// Simply skip missing fields in ORs
 					continue
@@ -261,7 +258,7 @@ func queryForScalarArg(fieldName string, rhs any) query.Query {
 	}
 }
 
-func (fg *FilterGenerator) binaryExpr(node *expr.BinaryNode, depth int) (query.Query, error) {
+func (fg *FilterGenerator) binaryExpr(node *expr.BinaryNode, _ int) (query.Query, error) {
 	// Type check binary expression arguments as they must be:
 	// Identifier-Operator-Literal
 	lhs, err := fg.fieldType(node.Args[0])
@@ -345,7 +342,7 @@ func (fg *FilterGenerator) binaryExpr(node *expr.BinaryNode, depth int) (query.Q
 	}
 }
 
-func (fg *FilterGenerator) triExpr(node *expr.TriNode, depth int) (query.Query, error) {
+func (fg *FilterGenerator) triExpr(node *expr.TriNode, _ int) (query.Query, error) {
 	switch op := node.Operator.T; op {
 	case lex.TokenBetween: // a BETWEEN b AND c
 		// Type check ternary expression arguments as they must be:
@@ -367,7 +364,7 @@ func (fg *FilterGenerator) triExpr(node *expr.TriNode, depth int) (query.Query, 
 	return nil, fmt.Errorf("unsupported ternary expression: %s", node.Operator.T)
 }
 
-func (fg *FilterGenerator) funcExpr(node *expr.FuncNode, depth int) (query.Query, error) {
+func (fg *FilterGenerator) funcExpr(node *expr.FuncNode, _ int) (query.Query, error) {
 	switch node.Name {
 	case "timewindow":
 		// See entity.EvalTimeWindow for code implementation. Checks if the contextual time is within the time buckets provided

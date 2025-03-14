@@ -10,20 +10,6 @@ import (
 	"github.com/lytics/qlbridge/value"
 )
 
-func exprValueType(s gentypes.SchemaColumns, n expr.Node) value.ValueType {
-
-	switch nt := n.(type) {
-	case *expr.NumberNode:
-		if !nt.IsInt {
-			return value.NumberType
-		}
-		return value.IntType
-	case *expr.StringNode:
-		return value.StringType
-	}
-	return value.UnknownType
-}
-
 // scalar returns a JSONable representation of a scalar node type for use in ES
 // filters.
 //
@@ -66,17 +52,19 @@ func fieldType(s gentypes.SchemaColumns, n expr.Node) (*gentypes.FieldType, erro
 
 	ident, ok := n.(*expr.IdentityNode)
 	if !ok {
-		return nil, fmt.Errorf("expected an identity but found %T (%s)", n, n)
+		return nil, fmt.Errorf("expected left-hand identity but found %s = %s", n.NodeType(), n)
+	}
+	if s == nil {
+		return nil, gentypes.MissingField(ident.Text)
 	}
 
-	// TODO: This shotgun approach sucks, see https://github.com/lytics/qlbridge/issues/159
+	// TODO (erin pentecost): This shotgun approach sucks, see https://github.com/lytics/qlbridge/issues/159
 	ft, ok := s.ColumnInfo(ident.Text)
 	if ok {
 		return ft, nil
 	}
 
 	//left, right, _ := expr.LeftRight(ident.Text)
-	//u.Debugf("left:%q right:%q isNamespaced?%v   key=%v", left, right, ident.HasLeftRight(), ident.OriginalText())
 	if ident.HasLeftRight() {
 		ft, ok := s.ColumnInfo(ident.OriginalText())
 		if ok {
@@ -89,10 +77,10 @@ func fieldType(s gentypes.SchemaColumns, n expr.Node) (*gentypes.FieldType, erro
 	//   `key_name.field value` -> "key_name", "field value"
 	//
 	// check if key is left.right
-	parts := strings.SplitN(ident.Text, ".", 2)
-	if len(parts) == 2 {
+	idx := strings.Index(ident.Text, ".")
+	if idx != -1 {
 		// Nested field lookup
-		ft, ok = s.ColumnInfo(parts[0])
+		ft, ok = s.ColumnInfo(ident.Text[:idx])
 		if ok {
 			return ft, nil
 		}
@@ -105,7 +93,7 @@ func fieldValueType(s gentypes.SchemaColumns, n expr.Node) (value.ValueType, err
 
 	ident, ok := n.(*expr.IdentityNode)
 	if !ok {
-		return value.UnknownType, fmt.Errorf("expected an identity but found %T (%s)", n, n)
+		return value.UnknownType, fmt.Errorf("expected left-hand identity but found %s = %s", n.NodeType(), n)
 	}
 
 	// TODO: This shotgun approach sucks, see https://github.com/lytics/qlbridge/issues/159
@@ -115,7 +103,6 @@ func fieldValueType(s gentypes.SchemaColumns, n expr.Node) (value.ValueType, err
 	}
 
 	//left, right, _ := expr.LeftRight(ident.Text)
-	//u.Debugf("left:%q right:%q isNamespaced?%v   key=%v", left, right, ident.HasLeftRight(), ident.OriginalText())
 	if ident.HasLeftRight() {
 		vt, ok := s.Column(ident.OriginalText())
 		if ok {

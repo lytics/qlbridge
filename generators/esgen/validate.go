@@ -3,26 +3,12 @@ package esgen
 import (
 	"fmt"
 
-	u "github.com/araddon/gou"
-
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/generators/gentypes"
 	"github.com/lytics/qlbridge/lex"
 	"github.com/lytics/qlbridge/rel"
 	"github.com/lytics/qlbridge/value"
 )
-
-var (
-	_ = u.EMPTY
-
-	// Ensure our schema implments filter validation
-	fakeValidator gentypes.FilterValidate
-)
-
-func init() {
-	tv := &TypeValidator{}
-	fakeValidator = tv.FilterValidate
-}
 
 type TypeValidator struct {
 	schema gentypes.SchemaColumns
@@ -37,8 +23,6 @@ func (m *TypeValidator) FilterValidate(stmt *rel.FilterStatement) error {
 }
 
 func (m *TypeValidator) walkNode(node expr.Node) error {
-
-	//u.Debugf("%d m.expr T:%T  %#v", depth, node, node)
 	switch n := node.(type) {
 	case *expr.UnaryNode:
 		return m.urnaryNode(n)
@@ -56,7 +40,6 @@ func (m *TypeValidator) walkNode(node expr.Node) error {
 	case *expr.FuncNode:
 		return m.funcExpr(n)
 	default:
-		u.Warnf("not handled type validation %v %T", node, node)
 		return fmt.Errorf("esgen: unsupported node in expression: %T (%s)", node, node)
 	}
 }
@@ -130,10 +113,10 @@ func (m *TypeValidator) binaryNode(node *expr.BinaryNode) error {
 	return nil
 }
 
-func (m *TypeValidator) triNode(node *expr.TriNode) error {
+func (m *TypeValidator) triNode(_ *expr.TriNode) error {
 	return nil
 }
 
-func (m *TypeValidator) funcExpr(node *expr.FuncNode) error {
+func (m *TypeValidator) funcExpr(_ *expr.FuncNode) error {
 	return nil
 }
