@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -64,12 +65,11 @@ func NewJsonSource(table string, rc io.ReadCloser, exit <-chan bool, lh FileLine
 	buf := bufio.NewReader(rc)
 	first2, err := buf.Peek(2)
 	if err != nil {
-		u.Warnf("error opening bufio.peek for json reader: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("opening bufio.peek for json reader: %w", err)
 	}
 
 	// Gzip Files have these 2 byte prefix
-	if err == nil && len(first2) == 2 && bytes.Equal(first2, []byte{'\x1F', '\x8B'}) {
+	if len(first2) == 2 && bytes.Equal(first2, []byte{'\x1F', '\x8B'}) {
 		gr, err := gzip.NewReader(buf)
 		if err != nil {
 			u.Warnf("could not open gzip reader: %v", err)
@@ -173,8 +173,7 @@ func (m *JsonSource) jsonDefaultLine(line []byte) (schema.Message, error) {
 	jm := make(map[string]interface{})
 	err := json.Unmarshal(line, &jm)
 	if err != nil {
-		u.Warnf("could not read json line: %v  %s", err, string(line))
-		return nil, err
+		return nil, fmt.Errorf("could not read json line: %w %s", err, string(line))
 	}
 	vals := make([]driver.Value, len(jm))
 	keys := make(map[string]int, len(jm))
@@ -184,6 +183,5 @@ func (m *JsonSource) jsonDefaultLine(line []byte) (schema.Message, error) {
 		keys[k] = i
 		i++
 	}
-	u.Debugf("json data: %#v \n%#v", keys, vals)
 	return NewSqlDriverMessageMap(m.rowct, vals, keys), nil
 }

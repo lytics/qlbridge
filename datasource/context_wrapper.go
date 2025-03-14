@@ -68,7 +68,8 @@ type state struct {
 }
 
 // our stack vars that have come from strings in vm eval engine
-//    such as "user.Name" will try to find struct value with .Name
+//
+//	such as "user.Name" will try to find struct value with .Name
 type namedvar struct {
 	name  string
 	value reflect.Value
@@ -205,7 +206,8 @@ func (s *state) evalField(dot reflect.Value, fieldName string, node expr.Node, a
 	panic("not reached")
 }
 
-func (s *state) evalCall(dot, fun reflect.Value, node expr.Node, name string, args []expr.Node, final reflect.Value) reflect.Value {
+// func (s *state) evalCall(dot, fun reflect.Value, node expr.Node, name string, args []expr.Node, final reflect.Value) reflect.Value {
+func (s *state) evalCall(_, fun reflect.Value, _ expr.Node, name string, _ []expr.Node, _ reflect.Value) reflect.Value {
 	typ := fun.Type()
 	if !goodFunc(typ) {
 		// TODO: This could still be a confusing error; maybe goodFunc should provide info.
