@@ -255,7 +255,7 @@ func TestBleve(t *testing.T) {
 	require.NoError(t, err, "Failed to parse filter")
 
 	g := NewGenerator(time.Now(), nil, bookSchema)
-	payload, err := g.Walk(filter)
+	payload, err := g.WalkExpr(filter.Filter)
 	require.NoError(t, err, "Failed to walk filter")
 
 	q := payload.Filter.(query.Query)

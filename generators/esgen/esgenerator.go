@@ -9,7 +9,6 @@ import (
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/generators/gentypes"
 	"github.com/lytics/qlbridge/lex"
-	"github.com/lytics/qlbridge/rel"
 	"github.com/lytics/qlbridge/vm"
 )
 
@@ -39,9 +38,9 @@ func (fg *FilterGenerator) fieldType(n expr.Node) (*gentypes.FieldType, error) {
 	return fieldType(fg.schema, n)
 }
 
-func (fg *FilterGenerator) Walk(stmt *rel.FilterStatement) (*gentypes.Payload, error) {
+func (fg *FilterGenerator) WalkExpr(node expr.Node) (*gentypes.Payload, error) {
 	payload := &gentypes.Payload{Size: new(int)}
-	f, err := fg.walkExpr(stmt.Filter, 0)
+	f, err := fg.walkExpr(node, 0)
 	if err != nil {
 		return nil, err
 	}

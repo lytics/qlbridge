@@ -17,7 +17,7 @@ func TestSegmentQLIndexPlan(t *testing.T) {
 			g := generators.NewGenerator(time.Now(), nil, nil, backend)
 			fs, err := rel.ParseFilterQL(`FILTER x==1`)
 			require.Equal(t, nil, err)
-			_, err = g.Walk(fs)
+			_, err = g.WalkExpr(fs.Filter)
 			require.Equal(t, nil, err)
 		})
 	}
@@ -34,7 +34,7 @@ func TestIncluderNilReturn(t *testing.T) {
 			g := generators.NewGenerator(time.Now(), nilincluder{}, nil)
 			fs, err := rel.ParseFilterQL(`FILTER INCLUDE xyz`)
 			require.NoError(t, err)
-			_, err = g.Walk(fs)
+			_, err = g.WalkExpr(fs.Filter)
 			require.Error(t, err)
 		})
 	}

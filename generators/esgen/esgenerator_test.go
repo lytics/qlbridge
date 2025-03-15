@@ -66,7 +66,7 @@ func TestWalk(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fs := test.filter(t)
-			p, err := g.Walk(fs)
+			p, err := g.WalkExpr(fs.Filter)
 			require.NoError(t, err)
 			test.asserts(t, p)
 		})
