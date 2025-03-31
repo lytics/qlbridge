@@ -7,14 +7,13 @@ import (
 	"github.com/lytics/qlbridge/generators/blevegen"
 	"github.com/lytics/qlbridge/generators/esgen"
 	"github.com/lytics/qlbridge/generators/gentypes"
-	"github.com/lytics/qlbridge/rel"
 )
 
 type (
 	// Generator interface accepts a FilterStatement and walks
 	// the ast statement generating an elasticsearch payload
 	Generator interface {
-		Walk(stmt *rel.FilterStatement) (*gentypes.Payload, error)
+		WalkExpr(stmt expr.Node) (*gentypes.Payload, error)
 	}
 
 	// SearchBackend indicates which search engine to generate queries for
