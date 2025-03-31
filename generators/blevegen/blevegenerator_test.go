@@ -185,6 +185,7 @@ var batchMaps = map[string]map[string]interface{}{
 			"name":  "John Doe",
 			"email": "john@example.com",
 		},
+		"year": 2023,                                     // Numeric value
 		"tags": []string{"sample", "document", "nested"}, // Array
 		"metadata": map[string]interface{}{ // Nested map with mixed types (level 2)
 			"created": "2023-01-01",
@@ -200,10 +201,12 @@ var batchMaps = map[string]map[string]interface{}{
 			"name":  "Jane Smith",
 			"email": "jane@example.com",
 		},
+		"year": 2022, // Numeric value
 		"tags": []string{"another", "document"},
 	},
 	"doc3": {
 		"_type":   "book",
+		"year":    1989, // Numeric value
 		"title":   "Third Document",
 		"content": "This is the content of the third document",
 		"metadata": map[string]interface{}{
@@ -220,6 +223,7 @@ var bookSchema = schema{
 		"metadata": value.MapValueType,
 		"content":  value.StringType,
 		"tags":     value.StringsType,
+		"year":     value.IntType,
 	},
 }
 
@@ -250,20 +254,36 @@ func TestBleve(t *testing.T) {
 		t.Logf("  Document ID: %s, Score: %f\n", hit.ID, hit.Score)
 	}
 
-	filterQlStr := `FILTER AND(EXISTS tags, title = "Sample Document", author.name LIKE "John %", metadata.views > 41, tags IN ("sample", "document")) `
-	filter, err := rel.ParseFilterQL(filterQlStr)
-	require.NoError(t, err, "Failed to parse filter")
+	{
+		filterQlStr := `FILTER AND(EXISTS tags, title = "Sample Document", author.name LIKE "John %", metadata.views > 41, tags IN ("sample", "document")) `
+		filter, err := rel.ParseFilterQL(filterQlStr)
+		require.NoError(t, err, "Failed to parse filter")
 
-	g := NewGenerator(time.Now(), nil, bookSchema)
-	payload, err := g.WalkExpr(filter.Filter)
-	require.NoError(t, err, "Failed to walk filter")
+		g := NewGenerator(time.Now(), nil, bookSchema)
+		payload, err := g.WalkExpr(filter.Filter)
+		require.NoError(t, err, "Failed to walk filter")
 
-	q := payload.Filter.(query.Query)
-	searchRequest := bleve.NewSearchRequest(q)
-	res, err := indexer.index.Search(searchRequest)
-	require.NoError(t, err, "Failed to search bleve")
+		q := payload.Filter.(query.Query)
+		searchRequest := bleve.NewSearchRequest(q)
+		res, err := indexer.index.Search(searchRequest)
+		require.NoError(t, err, "Failed to search bleve")
+		assert.Equal(t, 1, int(res.Total), "Search results for `%s`: %v hits\n", filterQlStr, res.Total)
+	}
+	{
+		sqlStr := `SELECT * FROM book WHERE title = "Sample Document"`
+		filter, err := rel.ParseSql(sqlStr)
+		require.NoError(t, err, "Failed to parse sql")
 
-	assert.Equal(t, 1, int(res.Total), "Search results for `%s`: %v hits\n", filterQlStr, res.Total)
+		g := NewGenerator(time.Now(), nil, bookSchema)
+		payload, err := g.WalkExpr(filter.(*rel.SqlSelect).Where.Expr)
+		require.NoError(t, err, "Failed to walk sql")
+
+		q := payload.Filter.(query.Query)
+		searchRequest := bleve.NewSearchRequest(q)
+		res, err := indexer.index.Search(searchRequest)
+		require.NoError(t, err, "Failed to search bleve")
+		assert.Equal(t, 1, int(res.Total), "Search results for `%s`: %v hits\n", sqlStr, res.Total)
+	}
 
 	// Delete a document
 	err = indexer.DeleteDocument("doc2")

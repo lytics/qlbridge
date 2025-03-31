@@ -222,7 +222,7 @@ func queryForScalarArg(fieldName string, rhs any) query.Query {
 	// Handle different types of equality queries
 	switch v := rhs.(type) {
 	case string:
-		q := query.NewMatchQuery("^" + v + "$")
+		q := query.NewMatchPhraseQuery("^" + v + "$")
 		q.SetField(fieldName)
 		return q
 	case int, int64, float64:
