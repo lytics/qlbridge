@@ -1269,7 +1269,7 @@ func LexListOfArgs(l *Lexer) StateFn {
 		l.Emit(TokenComma)
 		return LexListOfArgs
 	case '*':
-		if &l.lastToken != nil && l.lastToken.T == TokenLeftParenthesis {
+		if l.lastToken.T != TokenNil && l.lastToken.T == TokenLeftParenthesis {
 			l.Emit(TokenStar)
 			return nil
 		}
