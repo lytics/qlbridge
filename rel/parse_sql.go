@@ -794,6 +794,9 @@ func (m *Sqlbridge) parseCreate() (*SqlCreate, error) {
 			req.Engine = engine
 		case lex.TokenWith:
 		default:
+			if m.isEnd() {
+				return req, nil
+			}
 			return nil, m.ErrMsg("Expected (cols) ENGINE | WITH ... ")
 		}
 	case lex.TokenSource:
@@ -1684,8 +1687,8 @@ func (m *Sqlbridge) parseCreateCols() ([]*DdlColumn, error) {
 				return nil, err
 			}
 		case lex.TokenPrimary:
-			col = &DdlColumn{Kw: m.Next().T}
-			if strings.ToLower(m.Next().V) != "key" {
+			col = &DdlColumn{Kw: m.Next().T, Key: lex.TokenKey}
+			if m.Next().T != lex.TokenKey {
 				return nil, m.ErrMsg("expected 'PRIMARY KEY'")
 			}
 			if m.Next().T != lex.TokenLeftParenthesis {
@@ -1694,21 +1697,25 @@ func (m *Sqlbridge) parseCreateCols() ([]*DdlColumn, error) {
 
 		PrimaryKeyLoop:
 			for {
-
 				switch m.Cur().T {
+				case lex.TokenComma:
+					m.Next() // consume ,
 				case lex.TokenRightParenthesis:
 					m.Next() // consume )
 					break PrimaryKeyLoop
 				case lex.TokenIdentity:
-					col = &DdlColumn{Name: strings.ToLower(m.Next().V), Kw: lex.TokenIdentity}
-				case lex.TokenConstraint:
-					col = &DdlColumn{Kw: m.Next().T}
-				case lex.TokenPrimary:
-					col = &DdlColumn{Kw: m.Next().T}
-					if strings.ToLower(m.Cur().V) != "key" {
-						return nil, m.ErrMsg("expected 'PRIMARY KEY'")
-					}
-					m.Next()
+					id := strings.ToLower(m.Next().V)
+					col.Name = id
+					col.IndexCols = append(col.IndexCols, id)
+					// col = &DdlColumn{Name: strings.ToLower(m.Next().V), Kw: lex.TokenIdentity}
+				// case lex.TokenConstraint:
+				// 	col.Kw = m.Next().T
+				// case lex.TokenPrimary:
+				// 	col.Kw = m.Next().T
+				// 	if strings.ToLower(m.Cur().V) != "key" {
+				// 		return nil, m.ErrMsg("expected 'PRIMARY KEY'")
+				// 	}
+				// 	m.Next()
 
 				default:
 					return nil, m.ErrMsg("expected identity")
@@ -1887,8 +1894,6 @@ func (m *Sqlbridge) parseDdlColumn(col *DdlColumn) error {
 		  ID int(11) NOT NULL AUTO_INCREMENT,
 		  Email char(150) NOT NULL DEFAULT '',
 	*/
-
-	//u.Debugf("create col after colstart?:   %v  ", m.Cur())
 
 	switch m.Cur().T {
 	case lex.TokenTypeDef, lex.TokenTypeBool, lex.TokenTypeTime,

@@ -442,7 +442,6 @@ func LexCreate(l *Lexer) StateFn {
 		l.Push("LexCreate", LexCreate)
 		return lexNotExists
 	default:
-		return nil
 	}
 	return nil
 }
@@ -613,6 +612,10 @@ func LexDdlTable(l *Lexer) StateFn {
 
 	l.backup()
 	word := strings.ToLower(l.PeekWord())
+	if word == "if" {
+		l.Push("LexDdlTable", LexDdlTable)
+		return lexNotExists
+	}
 	//u.Debugf("looking table col start:  word=%s", word)
 	r = l.Peek()
 	if r == ',' {
@@ -715,9 +718,21 @@ func LexDdlAlterColumn(l *Lexer) StateFn {
 		l.ConsumeWord(word)
 		l.Emit(TokenTypeText)
 		return l.clauseState()
+	case "float":
+		l.ConsumeWord(word)
+		l.Emit(TokenTypeFloat)
+		return l.clauseState()
+	case "boolean":
+		l.ConsumeWord(word)
+		l.Emit(TokenTypeBool)
+		return l.clauseState()
 	case "bigint":
 		l.ConsumeWord(word)
 		l.Emit(TokenTypeBigInt)
+		return l.clauseState()
+	case "time":
+		l.ConsumeWord(word)
+		l.Emit(TokenTypeTime)
 		return l.clauseState()
 	case "varchar":
 		l.ConsumeWord(word)
@@ -886,9 +901,17 @@ func LexDdlTableColumn(l *Lexer) StateFn {
 			return LexListOfArgs
 		}
 		return LexDdlTableColumn
+	case "float":
+		l.ConsumeWord(word)
+		l.Emit(TokenTypeFloat)
+		return LexDdlTableColumn
 	case "text":
 		l.ConsumeWord(word)
 		l.Emit(TokenTypeText)
+		return LexDdlTableColumn
+	case "boolean":
+		l.ConsumeWord(word)
+		l.Emit(TokenTypeBool)
 		return LexDdlTableColumn
 	case "bigint":
 		l.ConsumeWord(word)
@@ -899,6 +922,10 @@ func LexDdlTableColumn(l *Lexer) StateFn {
 			l.Push("LexParenRight", LexParenRight)
 			return LexListOfArgs
 		}
+		return LexDdlTableColumn
+	case "time":
+		l.ConsumeWord(word)
+		l.Emit(TokenTypeTime)
 		return LexDdlTableColumn
 	case "varchar":
 		l.ConsumeWord(word)
