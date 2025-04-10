@@ -708,6 +708,7 @@ func LexMatchClosure(tok TokenType, nextFn StateFn) StateFn {
 			return nextFn
 		}
 		u.Warnf("unexpected token: %v   peek:%s", tok, l.PeekX(20))
+		fmt.Println("Unexpected token:", l.current())
 		return l.errorToken("Unexpected token:" + l.current())
 	}
 }
@@ -763,6 +764,7 @@ func LexDialectForStatement(l *Lexer) StateFn {
 			}
 
 		}
+		fmt.Println("Unexpected keyword:", peekWord)
 		return l.errorToken("un recognized keyword token:" + peekWord)
 
 	}

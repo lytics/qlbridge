@@ -784,14 +784,18 @@ func (m *Sqlbridge) parseCreate() (*SqlCreate, error) {
 
 		// ENGINE
 		discardComments(m)
-		if strings.ToLower(m.Cur().V) != "engine" {
-			return nil, m.ErrMsg("Expected (cols) ENGINE ... ")
+		switch m.Cur().T {
+		case lex.TokenEngine:
+			// Engine is Optional
+			engine, err := ParseWith(m.SqlTokenPager)
+			if err != nil {
+				return nil, err
+			}
+			req.Engine = engine
+		case lex.TokenWith:
+		default:
+			return nil, m.ErrMsg("Expected (cols) ENGINE | WITH ... ")
 		}
-		engine, err := ParseWith(m.SqlTokenPager)
-		if err != nil {
-			return nil, err
-		}
-		req.Engine = engine
 	case lex.TokenSource:
 		// just with
 	case lex.TokenSchema:
@@ -2049,18 +2053,20 @@ func (m *Sqlbridge) isEnd() bool {
 }
 
 func ParseWith(pg expr.TokenPager) (u.JsonHelper, error) {
-	if pg.Cur().T != lex.TokenWith {
+	if pg.Cur().T != lex.TokenWith && pg.Cur().T != lex.TokenEngine {
 		// This is an optional statement
 		return nil, nil
 	}
-	pg.Next() // consume WITH
+	if pg.Cur().T == lex.TokenWith {
+		pg.Next()
+	}
 	jh := make(u.JsonHelper)
 	switch pg.Cur().T {
 	case lex.TokenLeftBrace: // {
 		if err := ParseJsonObject(pg, jh); err != nil {
 			return nil, err
 		}
-	case lex.TokenIdentity:
+	case lex.TokenIdentity, lex.TokenEngine:
 		// name=value pairs
 		if err := ParseKeyValue(pg, jh); err != nil {
 			return nil, err
@@ -2252,11 +2258,14 @@ func ParseJsonArray(pg expr.TokenPager) ([]interface{}, error) {
 }
 
 func ParseKeyValue(pg expr.TokenPager, jh u.JsonHelper) error {
-	if pg.Cur().T != lex.TokenIdentity {
+	if pg.Cur().T != lex.TokenEngine && pg.Cur().T != lex.TokenIdentity {
 		return pg.ErrMsg("Expected key/identity for key=value, array")
 	}
 
 	for {
+		if pg.Cur().T == lex.TokenDefault {
+			pg.Next() // consume default
+		}
 		key := pg.Cur().V
 		pg.Next()
 
@@ -2305,7 +2314,7 @@ func ParseKeyValue(pg expr.TokenPager, jh u.JsonHelper) error {
 			return pg.ErrMsg("Expected value")
 		}
 		pg.Next() // consume value
-		if pg.Cur().T != lex.TokenComma {
+		if pg.Cur().T != lex.TokenComma && pg.Cur().T != lex.TokenDefault {
 			return nil
 		}
 		pg.Next() // consume comma

@@ -951,6 +951,10 @@ func LexEngineKeyValue(l *Lexer) StateFn {
 		l.ConsumeWord(word)
 		l.Emit(TokenDefault)
 		return LexEngineKeyValue
+	case ",":
+		l.ConsumeWord(word)
+		l.Emit(TokenComma)
+		return LexEngineKeyValue
 	case "=":
 		return LexExpression
 	}

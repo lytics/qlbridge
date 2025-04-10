@@ -5,6 +5,7 @@ import (
 
 	u "github.com/araddon/gou"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/lex"
@@ -57,7 +58,7 @@ func TestSqlParseFail(t *testing.T) {
 	assert.Equal(t, nil, err)
 
 	tests = []string{
-		`SELECT x, y 
+		`SELECT x, y
 		-- a comment
 		FROM user LIMIT "hello";`,
 		`SELECT "hello" LIMIT "5x"`,
@@ -76,7 +77,7 @@ func TestSqlParseOnly(t *testing.T) {
 	t.Parallel()
 
 	parseSqlTest(t, `
-	SELECT exists(firstname), x 
+	SELECT exists(firstname), x
 	-- lets use the user table
 	-- another for good meausre
 	FROM user
@@ -87,14 +88,14 @@ func TestSqlParseOnly(t *testing.T) {
 	parseSqlTest(t, "SELECT exists(firstname), user_id FROM user")
 
 	parseSqlTest(t, `
-	SELECT exists(firstname), x 
+	SELECT exists(firstname), x
 	-- lets use the user table
 	-- another for good meausre
 	FROM user;
 	`)
 
 	parseSqlTest(t, `
-	SELECT 
+	SELECT
 			event                           AS my_event
 			                                            IF event != "stuff"
 			                                            AND NOT(hasprefix(event,"gh."))
@@ -108,23 +109,23 @@ func TestSqlParseOnly(t *testing.T) {
 		SELECT event FROM nothing
 		WHERE
 			(
-				not(exists(@@whitelist)) 
-				OR len(@@whitelist) == 0 
+				not(exists(@@whitelist))
+				OR len(@@whitelist) == 0
 				OR host(url) IN hosts(@@whitelist)
-			) 
-			AND exists(version) 
+			)
+			AND exists(version)
 			AND eq(version, 4)
 	`)
 
 	parseSqlTest(t, `
 		SELECT a.language, a.template, Count(*) AS count
-		FROM 
+		FROM
 			(Select Distinct language, template FROM content) AS a
 			Left Join users AS b
 				On b.language = a.language AND b.template = b.template
 		GROUP BY a.language, a.template`)
 
-	parseSqlTest(t, `SELECT 
+	parseSqlTest(t, `SELECT
             lol AS notlol IF AND (
                     or (
                         event IN ("rq", "ab"),
@@ -154,51 +155,51 @@ func TestSqlParseOnly(t *testing.T) {
 	parseSqlTest(t, "SELECT `appearances`.`G_ph` AS `field` FROM `appearances` ORDER BY `appearances`.`G_ph` ASC LIMIT 500 OFFSET 0")
 
 	parseSqlTest(t, `
-		select  @@session.auto_increment_increment as auto_increment_increment, 
-					@@character_set_client as character_set_client, 
-					@@character_set_connection as character_set_connection, 
-					@@character_set_results as character_set_results, 
-					@@character_set_server as character_set_server, 
-					@@init_connect as init_connect, 
-					@@interactive_timeout as interactive_timeout, 
-					@@license as license, 
+		select  @@session.auto_increment_increment as auto_increment_increment,
+					@@character_set_client as character_set_client,
+					@@character_set_connection as character_set_connection,
+					@@character_set_results as character_set_results,
+					@@character_set_server as character_set_server,
+					@@init_connect as init_connect,
+					@@interactive_timeout as interactive_timeout,
+					@@license as license,
 					@@lower_case_table_names as lower_case_table_names,
-					@@max_allowed_packet as max_allowed_packet, 
-					@@net_buffer_length as net_buffer_length, 
-					@@net_write_timeout as net_write_timeout, 
-					@@query_cache_size as query_cache_size, 
-					@@query_cache_type as query_cache_type, 
-					@@sql_mode as sql_mode, 
-					@@system_time_zone as system_time_zone, 
-					@@time_zone as time_zone, 
-					@@tx_isolation as tx_isolation, 
+					@@max_allowed_packet as max_allowed_packet,
+					@@net_buffer_length as net_buffer_length,
+					@@net_write_timeout as net_write_timeout,
+					@@query_cache_size as query_cache_size,
+					@@query_cache_type as query_cache_type,
+					@@sql_mode as sql_mode,
+					@@system_time_zone as system_time_zone,
+					@@time_zone as time_zone,
+					@@tx_isolation as tx_isolation,
 					@@wait_timeout as wait_timeout
 	`)
 
 	parseSqlTest(t, `
 		SELECT a.language, a.template, Count(*) AS count
-		FROM 
+		FROM
 			(Select Distinct language, template FROM content) AS a
 			Left Join users AS b
 				On b.language = a.language AND b.template = b.template
 		GROUP BY a.language, a.template`)
 
 	parseSqlTest(t, `
-		SELECT 
+		SELECT
 			u.user_id, o.item_id, u.reg_date, u.email, o.price, o.order_date
-		FROM users AS u 
+		FROM users AS u
 		INNER JOIN (
 				SELECT price, order_date, user_id from ORDERS
 				WHERE user_id IS NOT NULL AND price > 10
-			) AS o 
+			) AS o
 			ON u.user_id = o.user_id
 	`)
 
 	parseSqlTest(t, `
-		SELECT 
+		SELECT
 			t1.name, t2.salary, t3.price
-		FROM employee AS t1 
-		INNER JOIN info AS t2 
+		FROM employee AS t1
+		INNER JOIN info AS t2
 			ON t1.name = t2.name
 		INNER JOIN orders AS t3
 			ON t3.id = t2.fake_id;`)
@@ -226,13 +227,13 @@ func TestSqlParseOnly(t *testing.T) {
 	parseSqlTest(t, `DESCRIBE mytable`)
 
 	parseSqlTest(t, `CREATE SOURCE mysource;`)
-	parseSqlTest(t, `CREATE OR REPLACE VIEW viewx 
-		AS SELECT a, b FROM mydb.tbl 
+	parseSqlTest(t, `CREATE OR REPLACE VIEW viewx
+		AS SELECT a, b FROM mydb.tbl
 		WITH stuff = "hello";`)
 	parseSqlTest(t, `CREATE schema IF NOT EXISTS github_archive WITH {
        "type":"elasticsearch",
        "schema":"github_archive",
-       "hosts": ["http://127.0.0.1:9200"] 
+       "hosts": ["http://127.0.0.1:9200"]
     };`)
 
 	parseSqlTest(t, `show tables`)
@@ -259,12 +260,12 @@ func TestSqlParseOnly(t *testing.T) {
 	parseSqlTest(t, `SELECT count(*), email FROM users WHERE emaildomain(email) = "gmail.com" GROUP BY email WITH distributed = true;`)
 	parseSqlTest(t, "select url, `_nmob`, `_cc`, `_uida` from events123 WHERE exists(url) LIMIT 500 WITH distributed = true;")
 
-	parseSqlTest(t, `SELECT 
+	parseSqlTest(t, `SELECT
             lol AS notlol IF hey == 0
         FROM nothing
         WHERE this != that;`)
 
-	parseSqlTest(t, `SELECT 
+	parseSqlTest(t, `SELECT
             lol AS notlol IF AND (
                     or (
                         event IN ("rq", "ab"),
@@ -276,16 +277,16 @@ func TestSqlParseOnly(t *testing.T) {
         WHERE this != that;`)
 
 	parseSqlTest(t, `
-		SELECT 
+		SELECT
 			t1.name, t2.salary
-		FROM employee AS t1 
-		INNER JOIN info AS t2 
+		FROM employee AS t1
+		INNER JOIN info AS t2
 		ON t1.name = t2.name;`)
 	parseSqlTest(t, `
-		SELECT 
+		SELECT
 			t1.name, t2.salary
-		FROM employee AS t1 
-		INNER JOIN info AS t2 
+		FROM employee AS t1
+		INNER JOIN info AS t2
 		ON t1.name = t2.name;`)
 	parseSqlTest(t, `select
 	        user_id, email
@@ -373,10 +374,10 @@ func TestSqlParseAstCheck(t *testing.T) {
 	sel, ok = req.(*rel.SqlSelect)
 	assert.True(t, ok, "is SqlSelect: %T", req)
 
-	sql = `select repository.name, repository.stargazers 
-		FROM github_fork 
+	sql = `select repository.name, repository.stargazers
+		FROM github_fork
 		WHERE eq(repository.name,"dataux")
-		GROUP BY repository.name 
+		GROUP BY repository.name
 		HAVING eq(repository.name,"dataux")
 		ORDER BY ` + "`repository.stargazers`" + ` DESC
 		limit 9;`
@@ -394,10 +395,10 @@ func TestSqlParseAstCheck(t *testing.T) {
 	assert.True(t, err != nil, "Must fail parse: %v", err)
 	//assert.True(t, reqNil == nil, "Must fail parse: %v", reqNil)
 
-	sql = `select repository.name, respository.language, repository.stargazers 
-		FROM github_fork 
-		WHERE 
-			eq(repository.name,"dataux") 
+	sql = `select repository.name, respository.language, repository.stargazers
+		FROM github_fork
+		WHERE
+			eq(repository.name,"dataux")
 			AND repository.language = "go"
 			AND repository.name NOT LIKE "docker"
 	`
@@ -410,11 +411,11 @@ func TestSqlParseAstCheck(t *testing.T) {
 
 	sql = `
 		SELECT
-			actor, repository.name, repository.stargazers_count, repository.language 
+			actor, repository.name, repository.stargazers_count, repository.language
 		FROM github_watch
 		WHERE
-				repository.language = "go" 
-				AND repository.forks_count > 1000 
+				repository.language = "go"
+				AND repository.forks_count > 1000
 				AND repository.description NOT LIKE "docker";`
 	req, err = rel.ParseSql(sql)
 	assert.True(t, err == nil && req != nil, "Must parse: %s  \n\t%v", sql, err)
@@ -425,11 +426,11 @@ func TestSqlParseAstCheck(t *testing.T) {
 
 	sql = `
 		EXPLAIN EXTENDED SELECT
-			actor, repository.name, repository.stargazers_count, repository.language 
+			actor, repository.name, repository.stargazers_count, repository.language
 		FROM github_watch
 		WHERE
-				repository.language = "go" 
-				AND repository.forks_count > 1000 
+				repository.language = "go"
+				AND repository.forks_count > 1000
 				AND repository.description NOT LIKE "docker";`
 	req, err = rel.ParseSql(sql)
 	assert.True(t, err == nil && req != nil, "Must parse: %s  \n\t%v", sql, err)
@@ -465,10 +466,10 @@ func TestSqlAggregateTypeSelect(t *testing.T) {
 
 func TestSqlParseFromTypes(t *testing.T) {
 	t.Parallel()
-	sql := `select gh.repository.name, gh.id, gp.date 
+	sql := `select gh.repository.name, gh.id, gp.date
 		FROM github_fork as gh
 		INNER JOIN github_push AS gp ON gp.repo_id = gh.repo_id
-		WHERE 
+		WHERE
 			gh.repository.language = "go"
 	`
 	req, err := rel.ParseSql(sql)
@@ -496,10 +497,10 @@ func TestSqlParseFromTypes(t *testing.T) {
 
 	// 3 join tables
 	sql = `
-		SELECT 
+		SELECT
 			t1.name, t2.salary, t3.price
-		FROM employee AS t1 
-		INNER JOIN info AS t2 
+		FROM employee AS t1
+		INNER JOIN info AS t2
 			ON t1.name = t2.name
 		INNER JOIN orders AS t3
 			ON t3.id = t2.fake_id;`
@@ -624,19 +625,21 @@ func TestSqlUpdate(t *testing.T) {
 func TestSqlCreate(t *testing.T) {
 	t.Parallel()
 	sql := `
-	CREATE TABLE articles 
+	CREATE TABLE articles
 		 (
 		  ID int(11) NOT NULL AUTO_INCREMENT,
 		  Email char(150) NOT NULL DEFAULT '' COMMENT "email hello",
 		  PRIMARY KEY (ID),
 		  CONSTRAINT emails_fk FOREIGN KEY (Email) REFERENCES Emails (Email) COMMENT "hello constraint"
-		) ENGINE=InnoDB AUTO_INCREMENT=4080 DEFAULT CHARSET=utf8
+		) ENGINE=InnoDB, AUTO_INCREMENT=4080, DEFAULT CHARSET=utf8
 	WITH stuff = "hello";`
 	req, err := rel.ParseSql(sql)
-	assert.Equal(t, nil, err)
-	assert.NotEqual(t, nil, req)
+	require.NoError(t, err)
+	assert.NotNil(t, req)
 	cs, ok := req.(*rel.SqlCreate)
 	assert.True(t, ok, "wanted SqlCreate got %T", req)
+	assert.NotEmpty(t, cs.Engine)
+	assert.NotEmpty(t, cs.With)
 	assert.Equal(t, lex.TokenCreate, cs.Keyword(), "Has keyword CREATE")
 	assert.Equal(t, "TABLE", cs.Tok.V, "Wanted TABLE: got %q", cs.Tok.V)
 	assert.Equal(t, "articles", cs.Identity, "has articles: %v", cs.Identity)
@@ -690,7 +693,7 @@ func TestWithJson(t *testing.T) {
 		WITH {
 			"key":"value2"
 			,"keyint":45,
-			"keyfloat":55.5, 
+			"keyfloat":55.5,
 			"keybool": true,
 			"keyarraymixed":["a",2,"b"],
 			"keyarrayobj":[
