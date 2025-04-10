@@ -650,6 +650,94 @@ func TestSqlCreate(t *testing.T) {
 	assert.Equal(t, "email hello", c2.Comment, "%+v", c2)
 	assert.Equal(t, "char", c2.DataType, "%+v", c2)
 	assert.Equal(t, 150, c2.DataTypeSize, "%+v", c2)
+
+	// Test IF NOT EXISTS
+	sql = `CREATE TABLE IF NOT EXISTS new_table (id INT PRIMARY KEY)`
+	req, err = rel.ParseSql(sql)
+	require.NoError(t, err)
+	cs, ok = req.(*rel.SqlCreate)
+	require.True(t, ok, "wanted SqlCreate got %T", req)
+	assert.True(t, cs.IfNotExists, "Expected IfNotExists to be true")
+	assert.Equal(t, "new_table", cs.Identity)
+	assert.Equal(t, 1, len(cs.Cols))
+
+	// Test various column types and constraints
+	sql = `
+	CREATE TABLE complex_table (
+		user_id BIGINT UNIQUE NOT NULL,
+		name VARCHAR(100) DEFAULT 'anonymous',
+		description TEXT,
+		created_ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		score FLOAT,
+		is_active BOOLEAN,
+		PRIMARY KEY (user_id, name)
+	)`
+	req, err = rel.ParseSql(sql)
+	require.NoError(t, err)
+	cs, ok = req.(*rel.SqlCreate)
+	require.True(t, ok, "wanted SqlCreate got %T", req)
+	assert.Equal(t, "complex_table", cs.Identity)
+	require.Equal(t, 7, len(cs.Cols), "Expected 7 columns") // 6 defined + 1 primary key constraint
+
+	// Check specific columns
+	col0 := cs.Cols[0]
+	assert.Equal(t, "user_id", col0.Name)
+	assert.Equal(t, "bigint", col0.DataType)
+	assert.True(t, col0.Unique, "Expected user_id to be UNIQUE")
+	assert.True(t, col0.NotNull, "Expected user_id to be NOT NULL")
+
+	col1 := cs.Cols[1]
+	assert.Equal(t, "name", col1.Name)
+	assert.Equal(t, "varchar", col1.DataType)
+	assert.Equal(t, 100, col1.DataTypeSize)
+	assert.Equal(t, "'anonymous'", col1.Default, "Expected default value for name")
+
+	col3 := cs.Cols[3]
+	assert.Equal(t, "created_ts", col3.Name)
+	assert.Equal(t, "timestamp", col3.DataType)
+	assert.Equal(t, "CURRENT_TIMESTAMP", col3.Default, "Expected default value for created_ts")
+
+	// Check primary key constraint (represented as a column definition in this parser)
+	pkCol := cs.Cols[6]
+	assert.Equal(t, lex.TokenKey, pkCol.Constraint)
+	assert.Equal(t, "PRIMARY", pkCol.Kw)
+	require.Equal(t, 2, len(pkCol.IndexCols), "Expected 2 columns in primary key")
+	assert.Equal(t, "user_id", pkCol.IndexCols[0])
+	assert.Equal(t, "name", pkCol.IndexCols[1])
+
+	// Test CREATE TABLE AS SELECT
+	sql = `CREATE TABLE users_backup AS SELECT user_id, email FROM users WHERE active = true`
+	req, err = rel.ParseSql(sql)
+	require.NoError(t, err)
+	cs, ok = req.(*rel.SqlCreate)
+	require.True(t, ok, "wanted SqlCreate got %T", req)
+	assert.Equal(t, "users_backup", cs.Identity)
+	assert.Nil(t, cs.Cols, "Expected no explicit columns for CREATE TABLE AS SELECT")
+	require.NotNil(t, cs.Select, "Expected SELECT statement to be present")
+	assert.Equal(t, "users", cs.Select.From[0].Name)
+	require.Equal(t, 2, len(cs.Select.Columns))
+	assert.Equal(t, "user_id", cs.Select.Columns[0].Expr.String())
+	assert.Equal(t, "email", cs.Select.Columns[1].Expr.String())
+	require.NotNil(t, cs.Select.Where)
+	assert.Equal(t, "active = true", cs.Select.Where.String())
+
+	// Test CREATE TABLE with simple primary key
+	parseSqlTest(t, `CREATE TABLE simple_pk (col1 INT, col2 VARCHAR(10), PRIMARY KEY (col1))`)
+
+	// Test CREATE TABLE with different quoting
+	parseSqlTest(t, "CREATE TABLE `quoted_table` (`id` INT, `value` TEXT)")
+	parseSqlTest(t, `CREATE TABLE "another.quoted.table" ("id" INT, "value" TEXT)`) // Assuming "" is a valid quote char
+
+	// Test CREATE TABLE with OR REPLACE (though might be VIEW specific in some dialects)
+	// Let's assume it parses for TABLE too for robustness
+	sql = `CREATE OR REPLACE TABLE my_table (id INT)`
+	req, err = rel.ParseSql(sql)
+	require.NoError(t, err)
+	cs, ok = req.(*rel.SqlCreate)
+	require.True(t, ok, "wanted SqlCreate got %T", req)
+	assert.True(t, cs.OrReplace, "Expected OrReplace to be true")
+	assert.Equal(t, "my_table", cs.Identity)
+
 }
 
 func TestSqlDrop(t *testing.T) {
