@@ -17,9 +17,8 @@ func init() {
 }
 
 func parseSqlTest(t *testing.T, sql string) {
-	u.Debugf("parsing sql: %s", sql)
 	sqlRequest, err := rel.ParseSql(sql)
-	assert.Equal(t, nil, err, "%v", err)
+	assert.NoError(t, err)
 	assert.NotEqual(t, nil, sqlRequest, "Must parse: %s  \n\t%v", sql, err)
 }
 func parseSqlError(t *testing.T, sql string) {
@@ -86,6 +85,7 @@ func TestSqlParseOnly(t *testing.T) {
 	`)
 
 	parseSqlTest(t, "SELECT exists(firstname), user_id FROM user")
+	parseSqlTest(t, "SELECT count(*) FROM user")
 
 	parseSqlTest(t, `
 	SELECT exists(firstname), x
@@ -668,7 +668,7 @@ func TestSqlCreate(t *testing.T) {
 		name VARCHAR(100) DEFAULT 'anonymous',
 		description TEXT NOT NULL,
 		created_ts TIME,
-		score FLOAT,
+		embedding FLOAT[128],
 		is_active BOOLEAN,
 		PRIMARY KEY (user_id, name)
 	)`
@@ -682,12 +682,12 @@ func TestSqlCreate(t *testing.T) {
 	// Check specific columns
 	col0 := cs.Cols[0]
 	assert.Equal(t, "user_id", col0.Name)
-	assert.Equal(t, "BIGINT", col0.DataType)
+	assert.Equal(t, "bigint", col0.DataType)
 	assert.Equal(t, col0.Key, lex.TokenUnique, "Expected user_id to be UNIQUE")
 
 	col1 := cs.Cols[1]
 	assert.Equal(t, "name", col1.Name)
-	assert.Equal(t, "VARCHAR", col1.DataType)
+	assert.Equal(t, "varchar", col1.DataType)
 	assert.Equal(t, 100, col1.DataTypeSize)
 	assert.Equal(t, `"anonymous"`, col1.Default.String(), "Expected default value for name")
 
@@ -696,7 +696,11 @@ func TestSqlCreate(t *testing.T) {
 
 	col3 := cs.Cols[3]
 	assert.Equal(t, "created_ts", col3.Name)
-	assert.Equal(t, "TIME", col3.DataType)
+	assert.Equal(t, "time", col3.DataType)
+	col4 := cs.Cols[4]
+	assert.Equal(t, "embedding", col4.Name)
+	assert.Equal(t, "float[]", col4.DataType)
+	assert.Equal(t, 128, col4.DataTypeSize)
 
 	// Check primary key constraint (represented as a column definition in this parser)
 	pkCol := cs.Cols[6]

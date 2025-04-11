@@ -1175,17 +1175,28 @@ func LexUrnaryNot(l *Lexer) StateFn {
 	return nil
 }
 
-// LexParenRight:  look for end of paren, of which we have descended and consumed start
-func LexParenRight(l *Lexer) StateFn {
+// LexMatchingEnd:  look for end rune, of which we have descended and consumed start
+// For parens and brackets
+func LexMatchingEnd(l *Lexer, end rune, endTokenType TokenType) StateFn {
 	l.SkipWhiteSpaces()
 	// first rune must be closing Parenthesis
 	r := l.Next()
 	//u.Debugf("LexParenRight:  %v  eof?%v", string(r), r == eof)
-	if r != ')' {
-		return l.errorToken("expression must end with a paren: ) " + l.current())
+	if r != end {
+		return l.errorToken(fmt.Sprintf("expression must end with %c but got: :%s", end, l.current()))
 	}
-	l.Emit(TokenRightParenthesis)
+	l.Emit(endTokenType)
 	return nil // ascend
+}
+
+// LexBracketRight:  look for end of bracket, of which we have descended and consumed start
+func LexBracketRight(l *Lexer) StateFn {
+	return LexMatchingEnd(l, ']', TokenRightBracket)
+}
+
+// LexParenRight:  look for end of paren, of which we have descended and consumed start
+func LexParenRight(l *Lexer) StateFn {
+	return LexMatchingEnd(l, ')', TokenRightParenthesis)
 }
 
 // LexParenLeft:  look for end of paren, of which we have descended and consumed start
@@ -1265,6 +1276,9 @@ func LexListOfArgs(l *Lexer) StateFn {
 		l.Emit(TokenLeftParenthesis)
 		//l.Push("LexParenRight", LexParenRight)
 		return LexListOfArgs
+	case '[':
+		l.Emit(TokenLeftBracket)
+		return LexListOfArgs
 	case ',':
 		l.Emit(TokenComma)
 		return LexListOfArgs
@@ -1282,6 +1296,7 @@ func LexListOfArgs(l *Lexer) StateFn {
 		l.backup()
 		return nil
 	case ']':
+		l.backup()
 		return nil
 	default:
 		// So, not comma, * so either is Expression, Identity, Value
