@@ -1276,9 +1276,10 @@ func LexListOfArgs(l *Lexer) StateFn {
 		l.Emit(TokenLeftParenthesis)
 		//l.Push("LexParenRight", LexParenRight)
 		return LexListOfArgs
-	case '[':
-		l.Emit(TokenLeftBracket)
-		return LexListOfArgs
+		// TODO (ajr) Why was this here? It messes up array parsing?
+		// 	case '[':
+		// 		l.emit(tokenleftbracket)
+		// 		return LexListOfArgs
 	case ',':
 		l.Emit(TokenComma)
 		return LexListOfArgs
@@ -3027,7 +3028,6 @@ func LexNumber(l *Lexer) StateFn {
 func LexNumberOrDuration(l *Lexer) StateFn {
 	l.SkipWhiteSpaces()
 	typ, ok := scanNumericOrDuration(l, true)
-	u.Debugf("typ%T   %v", typ, ok)
 	if !ok {
 		return l.errorf("bad number syntax: %q", l.input[l.start:l.pos])
 	}

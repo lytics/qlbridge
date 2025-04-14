@@ -908,6 +908,8 @@ func LexDdlTableColumn(l *Lexer) StateFn {
 		if p == '[' {
 			l.Push("LexDdlTableColumn", LexDdlTableColumn)
 			l.Push("LexBracketRight", LexBracketRight)
+			l.Emit(TokenLeftBracket)
+			l.Next()
 			return LexListOfArgs
 		}
 		return LexDdlTableColumn

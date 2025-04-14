@@ -18,8 +18,8 @@ func init() {
 
 func parseSqlTest(t *testing.T, sql string) {
 	sqlRequest, err := rel.ParseSql(sql)
-	assert.NoError(t, err)
-	assert.NotEqual(t, nil, sqlRequest, "Must parse: %s  \n\t%v", sql, err)
+	require.NoError(t, err)
+	require.NotEqual(t, nil, sqlRequest, "Must parse: %s  \n\t%v", sql, err)
 }
 func parseSqlError(t *testing.T, sql string) {
 	u.Debugf("parse looking for error sql: %s", sql)
@@ -75,6 +75,7 @@ func TestSqlParseFail(t *testing.T) {
 func TestSqlParseOnly(t *testing.T) {
 	t.Parallel()
 
+	parseSqlTest(t, `insert into mytable (id, str, arr) values (0, "a", [1.0]),(1,"b", [2.3]);`)
 	parseSqlTest(t, `
 	SELECT exists(firstname), x
 	-- lets use the user table

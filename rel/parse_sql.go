@@ -1092,7 +1092,6 @@ func (m *Sqlbridge) parseValueList() ([][]*ValueColumn, error) {
 	values := make([][]*ValueColumn, 0)
 
 	for {
-
 		//u.Debug(m.Cur().String())
 		switch m.Cur().T {
 		case lex.TokenLeftParenthesis:
@@ -1145,7 +1144,6 @@ func (m *Sqlbridge) parseValueList() ([][]*ValueColumn, error) {
 				return nil, err
 			}
 			row = append(row, &ValueColumn{Value: arrayVal})
-			u.Infof("what is token?  %v peek:%v", m.Cur(), m.Peek())
 		case lex.TokenComma:
 			// don't need to do anything
 		case lex.TokenUdfExpr:
