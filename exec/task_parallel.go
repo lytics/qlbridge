@@ -41,10 +41,10 @@ func NewTaskParallel(ctx *plan.Context) *TaskParallel {
 func (m *TaskParallel) PrintDag(depth int) {
 
 	prefix := ""
-	for i := 0; i < depth; i++ {
+	for range depth {
 		prefix += "\t"
 	}
-	for i := 0; i < len(m.runners); i++ {
+	for i := range m.runners {
 		t := m.runners[i]
 		switch tt := t.(type) {
 		case TaskPrinter:
@@ -79,7 +79,7 @@ func (m *TaskParallel) Setup(depth int) error {
 	for _, task := range m.runners {
 		task.MessageOutSet(m.msgOutCh)
 	}
-	for i := 0; i < len(m.runners); i++ {
+	for i := range m.runners {
 		//u.Debugf("%d  Setup: %T", depth, m.runners[i])
 		if err := m.runners[i].Setup(depth + 1); err != nil {
 			return err

@@ -31,7 +31,7 @@ func main() {
 	expr.FuncAdd("email_is_valid", &EmailIsValid{})
 
 	// This is the evaluation context which will be evaluated against the expressions
-	evalContext := datasource.NewContextSimpleNative(map[string]interface{}{
+	evalContext := datasource.NewContextSimpleNative(map[string]any{
 		"int5":     5,
 		"str5":     "5",
 		"created":  dateparse.MustParse("12/18/2015"),

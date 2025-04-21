@@ -64,7 +64,7 @@ func TestInlineIncludes(t *testing.T) {
 	t1 := time.Now()
 
 	readers := []expr.ContextReader{
-		datasource.NewContextMap(map[string]interface{}{
+		datasource.NewContextMap(map[string]any{
 			"name":       "bob",
 			"city":       "Peoria, IL",
 			"zip":        5,
@@ -171,7 +171,7 @@ func TestGraphIncludes(t *testing.T) {
 	t1 := time.Now()
 
 	readers := []expr.ContextReader{
-		datasource.NewContextMap(map[string]interface{}{
+		datasource.NewContextMap(map[string]any{
 			"name":       "bob",
 			"city":       "Peoria, IL",
 			"zip":        5,

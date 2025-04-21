@@ -144,7 +144,7 @@ func NewStaticDataSource(name string, indexedCol int, data [][]driver.Value, col
 
 // StaticDataValue is used to create a static name=value pair that matches
 // DataSource interfaces
-func NewStaticDataValue(name string, data interface{}) *StaticDataSource {
+func NewStaticDataValue(name string, data any) *StaticDataSource {
 	row := []driver.Value{data}
 	ds := NewStaticDataSource(name, 0, [][]driver.Value{row}, []string{name})
 	return ds
@@ -214,7 +214,7 @@ func (m *StaticDataSource) Next() schema.Message {
 }
 
 // interface for Upsert.Put()
-func (m *StaticDataSource) Put(ctx context.Context, key schema.Key, row interface{}) (schema.Key, error) {
+func (m *StaticDataSource) Put(ctx context.Context, key schema.Key, row any) (schema.Key, error) {
 
 	//u.Infof("%p Put(),  row:%#v", m, row)
 	switch rowVals := row.(type) {
@@ -287,7 +287,7 @@ func (m *StaticDataSource) Put(ctx context.Context, key schema.Key, row interfac
 	}
 }
 
-func (m *StaticDataSource) PutMulti(ctx context.Context, keys []schema.Key, src interface{}) ([]schema.Key, error) {
+func (m *StaticDataSource) PutMulti(ctx context.Context, keys []schema.Key, src any) ([]schema.Key, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -322,7 +322,7 @@ func (m *StaticDataSource) Delete(key driver.Value) (int, error) {
 }
 
 // DeleteExpression Delete using a Where Expression
-func (m *StaticDataSource) DeleteExpression(p interface{}, where expr.Node) (int, error) {
+func (m *StaticDataSource) DeleteExpression(p any, where expr.Node) (int, error) {
 
 	_, ok := p.(*plan.Delete)
 	if !ok {

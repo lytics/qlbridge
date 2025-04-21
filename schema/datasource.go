@@ -133,7 +133,7 @@ type (
 	// - accepts the plan context used in this upsert/insert/update
 	// - returns a connection which must be closed
 	ConnMutation interface {
-		CreateMutator(pc interface{} /*plan.Context*/) (ConnMutator, error)
+		CreateMutator(pc any /*plan.Context*/) (ConnMutator, error)
 	}
 	// ConnMutator Mutator Connection
 	ConnMutator interface {
@@ -143,19 +143,19 @@ type (
 	// ConnUpsert Mutation interface for Put
 	//  - assumes datasource understands key(s?)
 	ConnUpsert interface {
-		Put(ctx context.Context, key Key, value interface{}) (Key, error)
-		PutMulti(ctx context.Context, keys []Key, src interface{}) ([]Key, error)
+		Put(ctx context.Context, key Key, value any) (Key, error)
+		PutMulti(ctx context.Context, keys []Key, src any) ([]Key, error)
 	}
 	// ConnPatchWhere pass through where expression to underlying datasource
 	// Used for update statements WHERE x = y
 	ConnPatchWhere interface {
-		PatchWhere(ctx context.Context, where expr.Node, patch interface{}) (int64, error)
+		PatchWhere(ctx context.Context, where expr.Node, patch any) (int64, error)
 	}
 	// ConnDeletion deletion interface for data sources
 	ConnDeletion interface {
 		// Delete using this key
 		Delete(driver.Value) (int, error)
 		// Delete with given expression
-		DeleteExpression(p interface{} /* plan.Delete */, n expr.Node) (int, error)
+		DeleteExpression(p any /* plan.Delete */, n expr.Node) (int, error)
 	}
 )

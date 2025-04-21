@@ -54,7 +54,7 @@ func jsonPathEval(expression string) expr.EvaluatorFunc {
 		val := args[0].ToString()
 
 		// Validate that this is valid json?
-		var data interface{}
+		var data any
 		if err := json.Unmarshal([]byte(val), &data); err != nil {
 			return nil, false
 		}

@@ -2208,12 +2208,12 @@ func parseJsonKeyValue(pg expr.TokenPager, jh u.JsonHelper) error {
 	}
 }
 
-func ParseJsonArray(pg expr.TokenPager) ([]interface{}, error) {
+func ParseJsonArray(pg expr.TokenPager) ([]any, error) {
 	if pg.Cur().T != lex.TokenLeftBracket {
 		return nil, pg.ErrMsg("Expected json [")
 	}
 
-	la := make([]interface{}, 0)
+	la := make([]any, 0)
 	pg.Next() // Consume [
 	for {
 		//u.Debug(pg.Cur())

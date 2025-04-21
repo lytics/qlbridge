@@ -26,7 +26,7 @@ func TestDateBoundaries(t *testing.T) {
 
 	t1 := time.Now()
 
-	evalCtx := datasource.NewContextMapTs(map[string]interface{}{
+	evalCtx := datasource.NewContextMapTs(map[string]any{
 		"last_event":           t1.Add(time.Hour * -12),
 		"subscription_expires": t1.Add(time.Hour * 24 * 6),
 		"lastevent":            map[string]time.Time{"signedup": t1},
@@ -152,7 +152,7 @@ func TestDateMath(t *testing.T) {
 	t1 := time.Now()
 
 	readers := []expr.ContextReader{
-		datasource.NewContextMap(map[string]interface{}{
+		datasource.NewContextMap(map[string]any{
 			"event":                "login",
 			"last_event":           t1,
 			"signedup":             t1,

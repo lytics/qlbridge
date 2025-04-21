@@ -49,7 +49,7 @@ func verifyIdentity(t *testing.T, input, expects string, isIdentity bool) {
 func TestLexerOverrideMaxDepth(t *testing.T) {
 	{
 		l := NewLexerWithOptions(WithInput("SELECT x from y;"), WithDepthLimit(-1), WithDialect(SqlDialect))
-		for i := 0; i < maxDepth+100; i++ {
+		for range maxDepth + 100 {
 			l.Push("fake", LexNumber)
 		}
 		assert.Len(t, l.stack, maxDepth+100)
@@ -58,7 +58,7 @@ func TestLexerOverrideMaxDepth(t *testing.T) {
 	// no override
 	{
 		l := NewLexerWithOptions(WithInput("SELECT x from y;"), WithDialect(SqlDialect))
-		for i := 0; i < maxDepth+100; i++ {
+		for range maxDepth + 100 {
 			l.Push("fake", LexNumber)
 		}
 		assert.Len(t, l.stack, maxDepth)
@@ -71,7 +71,7 @@ func TestLexer(t *testing.T) {
 	verifyIdentity(t, `table_name`, "table_name", true)
 	Trace = orig
 	l := NewSqlLexer("SELECT x from y;")
-	for i := 0; i < maxDepth+100; i++ { // NOTE (2022-12) (mh): Any amount over maxDepth works
+	for range maxDepth + 100 { // NOTE (2022-12) (mh): Any amount over maxDepth works
 		l.Push("fake", LexNumber)
 	}
 	// Should not infinitely push

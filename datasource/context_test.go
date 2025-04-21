@@ -17,7 +17,7 @@ var (
 	vals   = []driver.Value{1, "name", time.Now()}
 	cols   = []string{"id", "name", "time"}
 	colidx = map[string]int{"id": 0, "name": 1, "time": 2}
-	data   = make(map[string]interface{})
+	data   = make(map[string]any)
 	datav  = make(map[string]value.Value)
 )
 
@@ -66,14 +66,14 @@ func TestContext(t *testing.T) {
 		t.Run("test.context", contextReaderTests(ctx))
 	}
 
-	ctxValues := make([]interface{}, len(ctxall))
+	ctxValues := make([]any, len(ctxall))
 	for i, ctx := range ctxall {
 		ctxValues[i] = ctx
 	}
 	// make sure it doesn't panic
 	datasource.MessageConversion(ctxValues)
 
-	mv2 := make(map[string]interface{})
+	mv2 := make(map[string]any)
 	for i, val := range vals {
 		mv2[cols[i]] = val
 	}

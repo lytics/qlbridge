@@ -180,7 +180,7 @@ func (m *Projection) projectionEvaluator(isFinal bool) MessageHandler {
 					if len(columns) > 1 {
 						//   select *, myvar, 1
 						newRow := make([]driver.Value, colCt)
-						for curi := 0; curi < colIdx; curi++ {
+						for curi := range colIdx {
 							newRow[curi] = row[curi]
 						}
 						row = newRow
@@ -258,7 +258,7 @@ func (m *Projection) projectionEvaluator(isFinal bool) MessageHandler {
 				if col.Star {
 					starRow := mt.Row()
 					newRow := make([]driver.Value, len(starRow)+len(colIndex))
-					for curi := 0; curi < i; curi++ {
+					for curi := range i {
 						newRow[curi] = row[curi]
 					}
 					row = newRow

@@ -292,7 +292,7 @@ func joinEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 		return value.EmptyStringValue, false
 	}
 	args := make([]string, 0)
-	for i := 0; i < len(vals)-1; i++ {
+	for i := range len(vals) - 1 {
 		switch valTyped := vals[i].(type) {
 		case value.SliceValue:
 			svals := make([]string, len(valTyped.Val()))

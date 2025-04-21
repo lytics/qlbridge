@@ -153,7 +153,7 @@ type (
 		Nil() bool
 		// Is this an error, or unable to evaluate from Vm?
 		Err() bool
-		Value() interface{}
+		Value() any
 		ToString() string
 		Type() ValueType
 	}
@@ -223,7 +223,7 @@ type (
 		v map[string]time.Time
 	}
 	StructValue struct {
-		v interface{}
+		v any
 	}
 	JsonValue struct {
 		v json.RawMessage
@@ -285,7 +285,7 @@ func ValueFromString(vt string) ValueType {
 // NewValue creates a new Value type from a native Go value.
 //
 // Defaults to StructValue for unknown types.
-func NewValue(goVal interface{}) Value {
+func NewValue(goVal any) Value {
 
 	switch val := goVal.(type) {
 	case nil:
@@ -374,7 +374,7 @@ func NewValue(goVal interface{}) Value {
 		return NewTimeValue(val)
 	case *time.Time:
 		return NewTimeValue(*val)
-	case map[string]interface{}:
+	case map[string]any:
 		return NewMapValue(val)
 	case map[string]string:
 		return NewMapStringValue(val)
@@ -404,7 +404,7 @@ func NewValue(goVal interface{}) Value {
 			vals[i] = NewValue(v)
 		}
 		return NewSliceValues(vals)
-	case []interface{}:
+	case []any:
 		if len(val) > 0 {
 			switch val[0].(type) {
 			case string:
@@ -436,7 +436,7 @@ func NewValue(goVal interface{}) Value {
 		switch rv.Kind() {
 		case reflect.Slice:
 			vals := make([]Value, rv.Len())
-			for i := 0; i < rv.Len(); i++ {
+			for i := range rv.Len() {
 				e := rv.Index(i).Interface()
 				vals[i] = NewValue(e)
 			}
@@ -456,7 +456,7 @@ func NewNumberNil() NumberValue {
 func (m NumberValue) Nil() bool                    { return math.IsNaN(m.v) }
 func (m NumberValue) Err() bool                    { return math.IsNaN(m.v) }
 func (m NumberValue) Type() ValueType              { return NumberType }
-func (m NumberValue) Value() interface{}           { return m.v }
+func (m NumberValue) Value() any                   { return m.v }
 func (m NumberValue) Val() float64                 { return m.v }
 func (m NumberValue) MarshalJSON() ([]byte, error) { return marshalFloat(float64(m.v)) }
 func (m NumberValue) ToString() string             { return fmt.Sprintf("%v", m.v) }
@@ -475,7 +475,7 @@ func NewIntNil() IntValue {
 func (m IntValue) Nil() bool                    { return m.v == math.MinInt32 }
 func (m IntValue) Err() bool                    { return m.v == math.MinInt32 }
 func (m IntValue) Type() ValueType              { return IntType }
-func (m IntValue) Value() interface{}           { return m.v }
+func (m IntValue) Value() any                   { return m.v }
 func (m IntValue) Val() int64                   { return m.v }
 func (m IntValue) MarshalJSON() ([]byte, error) { return marshalFloat(float64(m.v)) }
 func (m IntValue) NumberValue() NumberValue     { return NewNumberValue(float64(m.v)) }
@@ -498,7 +498,7 @@ func NewBoolValue(v bool) BoolValue {
 func (m BoolValue) Nil() bool                    { return false }
 func (m BoolValue) Err() bool                    { return false }
 func (m BoolValue) Type() ValueType              { return BoolType }
-func (m BoolValue) Value() interface{}           { return m.v }
+func (m BoolValue) Value() any                   { return m.v }
 func (m BoolValue) Val() bool                    { return m.v }
 func (m BoolValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m BoolValue) ToString() string             { return strconv.FormatBool(m.v) }
@@ -510,7 +510,7 @@ func NewStringValue(v string) StringValue {
 func (m StringValue) Nil() bool                    { return len(m.v) == 0 }
 func (m StringValue) Err() bool                    { return false }
 func (m StringValue) Type() ValueType              { return StringType }
-func (m StringValue) Value() interface{}           { return m.v }
+func (m StringValue) Value() any                   { return m.v }
 func (m StringValue) Val() string                  { return m.v }
 func (m StringValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m StringValue) NumberValue() NumberValue {
@@ -532,7 +532,7 @@ func NewStringsValue(v []string) StringsValue {
 func (m StringsValue) Nil() bool                    { return len(m.v) == 0 }
 func (m StringsValue) Err() bool                    { return false }
 func (m StringsValue) Type() ValueType              { return StringsType }
-func (m StringsValue) Value() interface{}           { return m.v }
+func (m StringsValue) Value() any                   { return m.v }
 func (m StringsValue) Val() []string                { return m.v }
 func (m *StringsValue) Append(sv string)            { m.v = append(m.v, sv) }
 func (m StringsValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
@@ -577,7 +577,7 @@ func NewByteSliceValue(v []byte) ByteSliceValue {
 func (m ByteSliceValue) Nil() bool                    { return len(m.v) == 0 }
 func (m ByteSliceValue) Err() bool                    { return false }
 func (m ByteSliceValue) Type() ValueType              { return ByteSliceType }
-func (m ByteSliceValue) Value() interface{}           { return m.v }
+func (m ByteSliceValue) Value() any                   { return m.v }
 func (m ByteSliceValue) Val() []byte                  { return m.v }
 func (m ByteSliceValue) ToString() string             { return string(m.v) }
 func (m ByteSliceValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
@@ -586,7 +586,7 @@ func (m ByteSliceValue) Len() int                     { return len(m.v) }
 func NewSliceValues(v []Value) SliceValue {
 	return SliceValue{v: v}
 }
-func NewSliceValuesNative(iv []interface{}) SliceValue {
+func NewSliceValuesNative(iv []any) SliceValue {
 	vs := make([]Value, len(iv))
 	for i, v := range iv {
 		vs[i] = NewValue(v)
@@ -594,11 +594,11 @@ func NewSliceValuesNative(iv []interface{}) SliceValue {
 	return SliceValue{v: vs}
 }
 
-func (m SliceValue) Nil() bool          { return len(m.v) == 0 }
-func (m SliceValue) Err() bool          { return false }
-func (m SliceValue) Type() ValueType    { return SliceValueType }
-func (m SliceValue) Value() interface{} { return m.v }
-func (m SliceValue) Val() []Value       { return m.v }
+func (m SliceValue) Nil() bool       { return len(m.v) == 0 }
+func (m SliceValue) Err() bool       { return false }
+func (m SliceValue) Type() ValueType { return SliceValueType }
+func (m SliceValue) Value() any      { return m.v }
+func (m SliceValue) Val() []Value    { return m.v }
 func (m SliceValue) ToString() string {
 	sv := make([]string, len(m.Val()))
 	for i, val := range m.v {
@@ -611,15 +611,15 @@ func (m *SliceValue) Append(v Value)              { m.v = append(m.v, v) }
 func (m SliceValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m SliceValue) Len() int                     { return len(m.v) }
 func (m SliceValue) SliceValue() []Value          { return m.v }
-func (m SliceValue) Values() []interface{} {
-	vals := make([]interface{}, len(m.v))
+func (m SliceValue) Values() []any {
+	vals := make([]any, len(m.v))
 	for i, v := range m.v {
 		vals[i] = v.Value()
 	}
 	return vals
 }
 
-func NewMapValue(v map[string]interface{}) MapValue {
+func NewMapValue(v map[string]any) MapValue {
 	mv := make(map[string]Value)
 	for n, val := range v {
 		mv[n] = NewValue(val)
@@ -630,7 +630,7 @@ func NewMapValue(v map[string]interface{}) MapValue {
 func (m MapValue) Nil() bool                    { return len(m.v) == 0 }
 func (m MapValue) Err() bool                    { return false }
 func (m MapValue) Type() ValueType              { return MapValueType }
-func (m MapValue) Value() interface{}           { return m.v }
+func (m MapValue) Value() any                   { return m.v }
 func (m MapValue) Val() map[string]Value        { return m.v }
 func (m MapValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m MapValue) ToString() string             { return fmt.Sprintf("%v", m.v) }
@@ -686,7 +686,7 @@ func NewMapStringValue(v map[string]string) MapStringValue {
 func (m MapStringValue) Nil() bool                    { return len(m.v) == 0 }
 func (m MapStringValue) Err() bool                    { return false }
 func (m MapStringValue) Type() ValueType              { return MapStringType }
-func (m MapStringValue) Value() interface{}           { return m.v }
+func (m MapStringValue) Value() any                   { return m.v }
 func (m MapStringValue) Val() map[string]string       { return m.v }
 func (m MapStringValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m MapStringValue) ToString() string             { return fmt.Sprintf("%v", m.v) }
@@ -750,7 +750,7 @@ func NewMapIntValue(v map[string]int64) MapIntValue {
 func (m MapIntValue) Nil() bool                    { return len(m.v) == 0 }
 func (m MapIntValue) Err() bool                    { return false }
 func (m MapIntValue) Type() ValueType              { return MapIntType }
-func (m MapIntValue) Value() interface{}           { return m.v }
+func (m MapIntValue) Value() any                   { return m.v }
 func (m MapIntValue) Val() map[string]int64        { return m.v }
 func (m MapIntValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m MapIntValue) ToString() string             { return fmt.Sprintf("%v", m.v) }
@@ -792,7 +792,7 @@ func NewMapNumberValue(v map[string]float64) MapNumberValue {
 func (m MapNumberValue) Nil() bool                    { return len(m.v) == 0 }
 func (m MapNumberValue) Err() bool                    { return false }
 func (m MapNumberValue) Type() ValueType              { return MapNumberType }
-func (m MapNumberValue) Value() interface{}           { return m.v }
+func (m MapNumberValue) Value() any                   { return m.v }
 func (m MapNumberValue) Val() map[string]float64      { return m.v }
 func (m MapNumberValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m MapNumberValue) ToString() string             { return fmt.Sprintf("%v", m.v) }
@@ -833,7 +833,7 @@ func NewMapTimeValue(v map[string]time.Time) MapTimeValue {
 func (m MapTimeValue) Nil() bool                    { return len(m.v) == 0 }
 func (m MapTimeValue) Err() bool                    { return false }
 func (m MapTimeValue) Type() ValueType              { return MapTimeType }
-func (m MapTimeValue) Value() interface{}           { return m.v }
+func (m MapTimeValue) Value() any                   { return m.v }
 func (m MapTimeValue) Val() map[string]time.Time    { return m.v }
 func (m MapTimeValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m MapTimeValue) ToString() string             { return fmt.Sprintf("%v", m.v) }
@@ -867,7 +867,7 @@ func NewMapBoolValue(v map[string]bool) MapBoolValue {
 func (m MapBoolValue) Nil() bool                    { return len(m.v) == 0 }
 func (m MapBoolValue) Err() bool                    { return false }
 func (m MapBoolValue) Type() ValueType              { return MapBoolType }
-func (m MapBoolValue) Value() interface{}           { return m.v }
+func (m MapBoolValue) Value() any                   { return m.v }
 func (m MapBoolValue) Val() map[string]bool         { return m.v }
 func (m MapBoolValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m MapBoolValue) ToString() string             { return fmt.Sprintf("%v", m.v) }
@@ -894,15 +894,15 @@ func (m MapBoolValue) SliceValue() []Value {
 	return vs
 }
 
-func NewStructValue(v interface{}) StructValue {
+func NewStructValue(v any) StructValue {
 	return StructValue{v: v}
 }
 
 func (m StructValue) Nil() bool                    { return m.v == nil }
 func (m StructValue) Err() bool                    { return false }
 func (m StructValue) Type() ValueType              { return StructType }
-func (m StructValue) Value() interface{}           { return m.v }
-func (m StructValue) Val() interface{}             { return m.v }
+func (m StructValue) Value() any                   { return m.v }
+func (m StructValue) Val() any                     { return m.v }
 func (m StructValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m StructValue) ToString() string             { return fmt.Sprintf("%v", m.v) }
 
@@ -913,8 +913,8 @@ func NewJsonValue(v json.RawMessage) JsonValue {
 func (m JsonValue) Nil() bool                    { return m.v == nil }
 func (m JsonValue) Err() bool                    { return false }
 func (m JsonValue) Type() ValueType              { return JsonType }
-func (m JsonValue) Value() interface{}           { return m.v }
-func (m JsonValue) Val() interface{}             { return m.v }
+func (m JsonValue) Value() any                   { return m.v }
+func (m JsonValue) Val() any                     { return m.v }
 func (m JsonValue) MarshalJSON() ([]byte, error) { return []byte(m.v), nil }
 func (m JsonValue) ToString() string             { return string(m.v) }
 
@@ -925,7 +925,7 @@ func NewTimeValue(v time.Time) TimeValue {
 func (m TimeValue) Nil() bool                    { return m.v.IsZero() }
 func (m TimeValue) Err() bool                    { return false }
 func (m TimeValue) Type() ValueType              { return TimeType }
-func (m TimeValue) Value() interface{}           { return m.v }
+func (m TimeValue) Value() any                   { return m.v }
 func (m TimeValue) Val() time.Time               { return m.v }
 func (m TimeValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m TimeValue) ToString() string             { return strconv.FormatInt(m.Int(), 10) }
@@ -937,14 +937,14 @@ func NewErrorValue(v error) ErrorValue {
 	return ErrorValue{v: v}
 }
 
-func NewErrorValuef(v string, args ...interface{}) ErrorValue {
+func NewErrorValuef(v string, args ...any) ErrorValue {
 	return ErrorValue{v: fmt.Errorf(v, args...)}
 }
 
 func (m ErrorValue) Nil() bool                    { return false }
 func (m ErrorValue) Err() bool                    { return true }
 func (m ErrorValue) Type() ValueType              { return ErrorType }
-func (m ErrorValue) Value() interface{}           { return m.v }
+func (m ErrorValue) Value() any                   { return m.v }
 func (m ErrorValue) Val() error                   { return m.v }
 func (m ErrorValue) MarshalJSON() ([]byte, error) { return json.Marshal(m.v) }
 func (m ErrorValue) ToString() string             { return m.v.Error() }
@@ -960,7 +960,7 @@ func NewNilValue() NilValue {
 func (m NilValue) Nil() bool                    { return true }
 func (m NilValue) Err() bool                    { return false }
 func (m NilValue) Type() ValueType              { return NilType }
-func (m NilValue) Value() interface{}           { return nil }
-func (m NilValue) Val() interface{}             { return nil }
+func (m NilValue) Value() any                   { return nil }
+func (m NilValue) Val() any                     { return nil }
 func (m NilValue) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
 func (m NilValue) ToString() string             { return "" }

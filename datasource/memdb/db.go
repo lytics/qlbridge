@@ -183,7 +183,7 @@ func (m *dbConn) Next() schema.Message {
 }
 
 // Put interface for allowing this to accept writes via ConnUpsert.Put()
-func (m *dbConn) Put(ctx context.Context, key schema.Key, row interface{}) (schema.Key, error) {
+func (m *dbConn) Put(ctx context.Context, key schema.Key, row any) (schema.Key, error) {
 
 	switch rowVals := row.(type) {
 	case []driver.Value:
@@ -213,7 +213,7 @@ func (m *dbConn) putValues(txn *memdb.Txn, row []driver.Value) (schema.Key, erro
 	return schema.NewKeyUint(id), nil
 }
 
-func (m *dbConn) PutMulti(ctx context.Context, keys []schema.Key, objs interface{}) ([]schema.Key, error) {
+func (m *dbConn) PutMulti(ctx context.Context, keys []schema.Key, objs any) ([]schema.Key, error) {
 	txn := m.db.Txn(true)
 
 	switch rows := objs.(type) {
@@ -266,7 +266,7 @@ func (m *dbConn) Delete(key driver.Value) (int, error) {
 }
 
 // Delete using a Where Expression
-func (m *dbConn) DeleteExpression(p interface{}, where expr.Node) (int, error) {
+func (m *dbConn) DeleteExpression(p any, where expr.Node) (int, error) {
 
 	var deletedKeys []schema.Key
 	txn := m.db.Txn(true)

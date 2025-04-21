@@ -10,7 +10,7 @@ import (
 )
 
 type coerceInts struct {
-	v interface{}
+	v any
 	i int64
 }
 
@@ -44,7 +44,7 @@ func TestCoerceInts(t *testing.T) {
 }
 
 type coerceNumber struct {
-	v interface{}
+	v any
 	f float64
 }
 
@@ -128,7 +128,7 @@ func TestValueTypeFromString(t *testing.T) {
 }
 
 func TestCast(t *testing.T) {
-	good := func(expect interface{}, vt ValueType, v Value) {
+	good := func(expect any, vt ValueType, v Value) {
 		val, err := Cast(vt, v)
 		assert.Equal(t, nil, err)
 		assert.Equal(t, expect, val.Value())

@@ -17,7 +17,7 @@ type (
 	//
 	Message interface {
 		Id() uint64
-		Body() interface{}
+		Body() any
 	}
 	// MessageValues describes a message with array of driver.Value.
 	MessageValues interface {

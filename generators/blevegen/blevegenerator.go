@@ -205,7 +205,7 @@ func (fg *FilterGenerator) booleanExpr(bn *expr.BooleanNode, depth int) (query.Q
 	return boolQuery, nil
 }
 
-func convertToFloat64(value interface{}) float64 {
+func convertToFloat64(value any) float64 {
 	switch v := value.(type) {
 	case int:
 		return float64(v)

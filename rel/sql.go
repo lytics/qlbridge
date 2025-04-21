@@ -209,7 +209,7 @@ type (
 		OrReplace   bool         // OR REPLACE
 		IfNotExists bool         // IF NOT EXISTS
 		Cols        []*DdlColumn // columns
-		Engine      map[string]interface{}
+		Engine      map[string]any
 		With        u.JsonHelper
 		Select      *SqlSelect
 	}
@@ -1657,7 +1657,7 @@ func EqualWith(l, r u.JsonHelper) bool {
 			if !EqualWith(lvt, rh) {
 				return false
 			}
-		case map[string]interface{}:
+		case map[string]any:
 			rh, isHelper := rv.(u.JsonHelper)
 			if !isHelper {
 				return false

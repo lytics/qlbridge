@@ -20,7 +20,7 @@ func MatchNone() query.Query {
 }
 
 // Term creates a new Bleve term query
-func Term(fieldName string, value interface{}) query.Query {
+func Term(fieldName string, value any) query.Query {
 	termStr := fmt.Sprintf("%v", value)
 	termQuery := query.NewTermQuery(termStr)
 	termQuery.SetField(fieldName)
@@ -28,7 +28,7 @@ func Term(fieldName string, value interface{}) query.Query {
 }
 
 // In creates a new Bleve disjunction query (OR) for multiple terms
-func In(field *gentypes.FieldType, values []interface{}) query.Query {
+func In(field *gentypes.FieldType, values []any) query.Query {
 	fieldName := field.Field
 	if field.Nested() {
 		// Handle nested fields with dot notation for Bleve

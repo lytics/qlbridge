@@ -34,10 +34,10 @@ func NewTaskSequential(ctx *plan.Context) *TaskSequential {
 
 func (m *TaskSequential) PrintDag(depth int) {
 	prefix := ""
-	for i := 0; i < depth; i++ {
+	for range depth {
 		prefix += "\t"
 	}
-	for i := 0; i < len(m.runners); i++ {
+	for i := range m.runners {
 		t := m.runners[i]
 		switch tt := t.(type) {
 		case TaskPrinter:
@@ -81,7 +81,7 @@ func (m *TaskSequential) Setup(depth int) error {
 	// We don't need to setup the First(source) Input channel
 	m.depth = depth
 	m.setup = true
-	for i := 0; i < len(m.runners); i++ {
+	for i := range m.runners {
 		//u.Debugf("%d i:%d  Setup: %T p:%p", depth, i, m.runners[i], m.runners[i])
 		if err := m.runners[i].Setup(depth + 1); err != nil {
 			return err

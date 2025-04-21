@@ -31,7 +31,7 @@ func init() {
 	}
 }
 
-func debugf(f string, args ...interface{}) {
+func debugf(f string, args ...any) {
 	if Trace {
 		u.DoLog(3, u.DEBUG, fmt.Sprintf(f, args...))
 	}
@@ -239,7 +239,7 @@ func (l *Lexer) Next() (r rune) {
 }
 
 func (l *Lexer) skipX(ct int) {
-	for i := 0; i < ct; i++ {
+	for range ct {
 		l.Next()
 	}
 }
@@ -432,7 +432,7 @@ func (l *Lexer) ConsumeWord(word string) {
 
 // error returns an error token and terminates the scan by passing
 // back a nil pointer that will be the next state, terminating l.nextToken.
-func (l *Lexer) errorf(format string, args ...interface{}) StateFn {
+func (l *Lexer) errorf(format string, args ...any) StateFn {
 	l.tokens <- Token{T: TokenError, V: fmt.Sprintf(format, args...)}
 	return nil
 }
@@ -549,7 +549,7 @@ func (l *Lexer) tryMatch(matchTo string) bool {
 // Emits an error token and terminates the scan
 // by passing back a nil ponter that will be the next state
 // terminating lexer.next function
-func (l *Lexer) errorToken(format string, args ...interface{}) StateFn {
+func (l *Lexer) errorToken(format string, args ...any) StateFn {
 	//fmt.Sprintf(format, args...)
 	l.Emit(TokenError)
 	return nil
@@ -585,7 +585,7 @@ func (l *Lexer) isExpr() bool {
 	}
 	// Expressions are terminated by either a parenthesis
 	// never by spaces
-	for i := 0; i < len(l.input)-l.pos; i++ {
+	for i := range len(l.input) - l.pos {
 		r, _ := utf8.DecodeRuneInString(l.input[l.pos+i:])
 		if r == '(' && i > 0 {
 			return true

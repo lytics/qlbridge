@@ -41,7 +41,7 @@ type indexWrapper struct {
 	*schema.Index
 }
 
-func (s *indexWrapper) FromObject(obj interface{}) (bool, []byte, error) {
+func (s *indexWrapper) FromObject(obj any) (bool, []byte, error) {
 	switch row := obj.(type) {
 	case *datasource.SqlDriverMessage:
 		if len(row.Vals) < 0 {
@@ -60,7 +60,7 @@ func (s *indexWrapper) FromObject(obj interface{}) (bool, []byte, error) {
 	}
 }
 
-func (s *indexWrapper) FromArgs(args ...interface{}) ([]byte, error) {
+func (s *indexWrapper) FromArgs(args ...any) ([]byte, error) {
 	if len(args) != 1 {
 		return nil, fmt.Errorf("must provide only a single argument")
 	}

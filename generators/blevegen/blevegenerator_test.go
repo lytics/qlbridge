@@ -36,16 +36,16 @@ func NewBleveIndexerMemOnly() (*BleveIndexer, error) {
 	documentMapping := bleve.NewDocumentMapping()
 	keywordFieldMapping := bleve.NewKeywordFieldMapping()
 	keywordFieldMapping.Name = "title"
-	keywordFieldMapping.Store = false
-	keywordFieldMapping.IncludeTermVectors = false
-	keywordFieldMapping.IncludeInAll = false
-	keywordFieldMapping.DocValues = false
+	//keywordFieldMapping.Store = false
+	// keywordFieldMapping.IncludeTermVectors = false
+	// keywordFieldMapping.IncludeInAll = false
+	// keywordFieldMapping.DocValues = false
 	documentMapping.Fields = append(documentMapping.Fields, keywordFieldMapping)
 	indexMapping.AddDocumentMapping("book", documentMapping)
 	allDocumentMapping := bleve.NewDocumentMapping()
-	allDocumentMapping.Enabled = false
+	// allDocumentMapping.Enabled = false
 	indexMapping.AddDocumentMapping("_all", allDocumentMapping)
-	indexMapping.StoreDynamic = false
+	// indexMapping.StoreDynamic = false
 	// indexMapping.DocValuesDynamic = false
 	// indexMapping.IndexDynamic = false
 
@@ -104,7 +104,7 @@ func (nmi *BleveIndexer) Close() error {
 // IndexDocument indexes a single nested map
 // id: unique identifier for the document
 // data: the nested map to index (map[string]interface{})
-func (nmi *BleveIndexer) IndexDocument(id string, data map[string]interface{}) error {
+func (nmi *BleveIndexer) IndexDocument(id string, data map[string]any) error {
 	// Validate input
 	if id == "" {
 		return fmt.Errorf("document ID cannot be empty")
@@ -124,7 +124,7 @@ func (nmi *BleveIndexer) IndexDocument(id string, data map[string]interface{}) e
 
 // BatchIndexDocuments batch indexes multiple nested maps
 // documents: a map of document IDs to data maps
-func (nmi *BleveIndexer) BatchIndexDocuments(documents map[string]map[string]interface{}) error {
+func (nmi *BleveIndexer) BatchIndexDocuments(documents map[string]map[string]any) error {
 	// Create a new batch
 	batch := nmi.index.NewBatch()
 
@@ -177,7 +177,7 @@ func (nmi *BleveIndexer) DeleteDocument(id string) error {
 	return nil
 }
 
-var batchMaps = map[string]map[string]interface{}{
+var batchMaps = map[string]map[string]any{
 	"doc1": {
 		"_type": "book",
 		"title": "Sample Document",
@@ -185,9 +185,10 @@ var batchMaps = map[string]map[string]interface{}{
 			"name":  "John Doe",
 			"email": "john@example.com",
 		},
-		"year": 2023,                                     // Numeric value
-		"tags": []string{"sample", "document", "nested"}, // Array
-		"metadata": map[string]interface{}{ // Nested map with mixed types (level 2)
+		"year":    2023, // Numeric value
+		"revenue": 85.10,
+		"tags":    []string{"sample", "document", "nested"}, // Array
+		"metadata": map[string]any{ // Nested map with mixed types (level 2)
 			"created": "2023-01-01",
 			"updated": "2023-01-02",
 			"views":   42,   // Numeric value
@@ -201,15 +202,17 @@ var batchMaps = map[string]map[string]interface{}{
 			"name":  "Jane Smith",
 			"email": "jane@example.com",
 		},
-		"year": 2022, // Numeric value
-		"tags": []string{"another", "document"},
+		"year":    2022, // Numeric value
+		"revenue": 83.12,
+		"tags":    []string{"another", "document"},
 	},
 	"doc3": {
 		"_type":   "book",
 		"year":    1989, // Numeric value
+		"revenue": 183.12,
 		"title":   "Third Document",
 		"content": "This is the content of the third document",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"created": "2023-01-03",
 			"views":   10,
 		},
@@ -224,6 +227,7 @@ var bookSchema = schema{
 		"content":  value.StringType,
 		"tags":     value.StringsType,
 		"year":     value.IntType,
+		"revenue":  value.NumberType,
 	},
 }
 
@@ -255,7 +259,7 @@ func TestBleve(t *testing.T) {
 	}
 
 	{
-		filterQlStr := `FILTER AND(EXISTS tags, title = "Sample Document", author.name LIKE "John %", metadata.views > 41, tags IN ("sample", "document")) `
+		filterQlStr := `FILTER AND(EXISTS tags, revenue >= 83.0, title = "Sample Document", author.name LIKE "John %", metadata.views > 41, tags IN ("sample", "document")) `
 		filter, err := rel.ParseFilterQL(filterQlStr)
 		require.NoError(t, err, "Failed to parse filter")
 

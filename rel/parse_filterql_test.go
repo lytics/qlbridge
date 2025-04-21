@@ -235,7 +235,7 @@ func TestFilterQlFingerPrint(t *testing.T) {
 	assert.True(t, req1.FingerPrintID() == req2.FingerPrintID())
 
 	wrongCt := 0
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		fs, err := rel.ParseFilterSelect(`SELECT * FROM user.changes FILTER OR ( entered("abc123"), exited("abc123") ) WITH backfill=true, track_deltas = true;`)
 		if err != nil {
 			t.Fatalf("Must not have parse error %v", err)

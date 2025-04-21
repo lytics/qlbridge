@@ -102,7 +102,7 @@ func (m *qryconn) Columns() []string { return m.cols }
 
 // CreateMutator part of Mutator interface to allow this connection to have access
 // to the full plan context to take original sql statement and pass through to sqlite.
-func (m *qryconn) CreateMutator(pc interface{}) (schema.ConnMutator, error) {
+func (m *qryconn) CreateMutator(pc any) (schema.ConnMutator, error) {
 	if ctx, ok := pc.(*plan.Context); ok && ctx != nil {
 		m.TaskBase = exec.NewTaskBase(ctx)
 		m.stmt = ctx.Stmt
@@ -126,7 +126,7 @@ func (m *qryconn) Next() schema.Message {
 		}
 		//vals := make([]driver.Value, len(m.cols))
 		//u.Infof("expecting %d cols", len(m.cols))
-		readCols := make([]interface{}, len(m.cols))
+		readCols := make([]any, len(m.cols))
 		writeCols := make([]driver.Value, len(m.cols))
 		for i := range writeCols {
 			readCols[i] = &writeCols[i]
@@ -160,7 +160,7 @@ func (m *qryconn) Next() schema.Message {
 }
 
 // Put interface for Upsert.Put() to do single row insert based on key.
-func (m *qryconn) Put(ctx context.Context, key schema.Key, row interface{}) (schema.Key, error) {
+func (m *qryconn) Put(ctx context.Context, key schema.Key, row any) (schema.Key, error) {
 
 	//u.Infof("%p Put(),  row:%#v", m, row)
 	switch rowVals := row.(type) {
@@ -180,7 +180,7 @@ func (m *qryconn) Put(ctx context.Context, key schema.Key, row interface{}) (sch
 		} else if err == sql.ErrNoRows {
 			//u.Debugf("empty, now do insert")
 			//sdm := datasource.NewSqlDriverMessageMap(id, rowVals, m.tbl.FieldPositions)
-			ivals := make([]interface{}, len(rowVals))
+			ivals := make([]any, len(rowVals))
 			for i, v := range rowVals {
 				ivals[i] = v
 			}
@@ -206,7 +206,7 @@ func (m *qryconn) Put(ctx context.Context, key schema.Key, row interface{}) (sch
 	}
 }
 
-func (m *qryconn) PutMulti(ctx context.Context, keys []schema.Key, src interface{}) ([]schema.Key, error) {
+func (m *qryconn) PutMulti(ctx context.Context, keys []schema.Key, src any) ([]schema.Key, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -259,7 +259,7 @@ func (m *qryconn) WalkSourceSelect(planner plan.Planner, p *plan.Source) (plan.T
 }
 
 // DeleteExpression Delete using a Where Expression
-func (m *qryconn) DeleteExpression(p interface{}, where expr.Node) (int, error) {
+func (m *qryconn) DeleteExpression(p any, where expr.Node) (int, error) {
 
 	return -1, schema.ErrNotImplemented
 	/*

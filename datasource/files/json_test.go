@@ -39,7 +39,7 @@ func (m *jsonTestSource) Setup(ss *schema.Schema) error {
 	if os.Getenv("FILESTORE") != "" {
 		fileStore = os.Getenv("FILESTORE")
 	}
-	settings := u.JsonHelper(map[string]interface{}{
+	settings := u.JsonHelper(map[string]any{
 		"path":     "github",
 		"filetype": "json",
 		"format":   "github_json",

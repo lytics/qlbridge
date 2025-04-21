@@ -14,7 +14,7 @@ import (
 // filters.
 //
 // Does not support Null.
-func scalar(node expr.Node) (interface{}, bool) {
+func scalar(node expr.Node) (any, bool) {
 	switch n := node.(type) {
 
 	case *expr.StringNode:

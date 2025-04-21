@@ -38,7 +38,7 @@ const (
 )
 
 // NewGenerator creates a new query generator for the specified backend
-func NewGenerator(ts time.Time, inc expr.Includer, mapper gentypes.SchemaColumns, opts ...interface{}) Generator {
+func NewGenerator(ts time.Time, inc expr.Includer, mapper gentypes.SchemaColumns, opts ...any) Generator {
 	backend := BackendElasticsearch
 	if len(opts) > 0 {
 		optBackend, ok := opts[len(opts)-1].(SearchBackend)

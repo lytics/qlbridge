@@ -16,6 +16,7 @@ import (
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/lex"
 	"github.com/lytics/qlbridge/value"
+	"slices"
 )
 
 var (
@@ -184,10 +185,8 @@ func resolveInclude(ctx expr.Includer, inc *expr.IncludeNode, depth int, visited
 
 	// check if we've already seen this node in our visit stack
 	currentNode := inc.Identity.Text
-	for _, visited := range visitedIncludes {
-		if currentNode == visited {
-			return fmt.Errorf("%w: cycle encountered: %s->%s", ErrMaxDepth, strings.Join(visitedIncludes, "->"), currentNode)
-		}
+	if slices.Contains(visitedIncludes, currentNode) {
+		return fmt.Errorf("%w: cycle encountered: %s->%s", ErrMaxDepth, strings.Join(visitedIncludes, "->"), currentNode)
 	}
 	// add the node to our visit stack
 	visitedIncludes = append(visitedIncludes, currentNode)
@@ -707,10 +706,8 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 				return value.BoolValueFalse, true
 			case value.StringsValue:
 				for _, aval := range at.Val() {
-					for _, bstr := range bt.Val() {
-						if aval.ToString() == bstr {
-							return value.BoolValueTrue, true
-						}
+					if slices.Contains(bt.Val(), aval.ToString()) {
+						return value.BoolValueTrue, true
 					}
 				}
 				return value.BoolValueFalse, true
@@ -767,10 +764,8 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 				return value.BoolValueFalse, true
 			case value.StringsValue:
 				for _, astr := range at.Val() {
-					for _, bstr := range bt.Val() {
-						if astr == bstr {
-							return value.BoolValueTrue, true
-						}
+					if slices.Contains(bt.Val(), astr) {
+						return value.BoolValueTrue, true
 					}
 				}
 				return value.BoolValueFalse, true
@@ -1009,7 +1004,7 @@ func walkArray(ctx expr.EvalContext, node *expr.ArrayNode) (value.Value, bool) {
 
 	vals := make([]value.Value, len(node.Args))
 
-	for i := 0; i < len(node.Args); i++ {
+	for i := range node.Args {
 		v, _ := Eval(ctx, node.Args[i])
 		vals[i] = v
 	}

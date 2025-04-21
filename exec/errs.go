@@ -29,10 +29,10 @@ func (e errList) Error() string {
 	return strings.Join(a, "\n")
 }
 
-func params(args []driver.Value) []interface{} {
-	r := make([]interface{}, len(args))
+func params(args []driver.Value) []any {
+	r := make([]any, len(args))
 	for i, v := range args {
-		r[i] = interface{}(v)
+		r[i] = any(v)
 	}
 	return r
 }

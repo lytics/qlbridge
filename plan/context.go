@@ -56,7 +56,7 @@ type Context struct {
 
 	// Local State
 	Errors     []error
-	errRecover interface{}
+	errRecover any
 }
 
 // NewContext plan context

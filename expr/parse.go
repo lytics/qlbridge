@@ -24,7 +24,7 @@ func init() {
 	}
 }
 
-func debugf(depth int, f string, args ...interface{}) {
+func debugf(depth int, f string, args ...any) {
 	if Trace {
 		f = strings.Repeat("→ ", depth) + f
 		u.DoLog(3, u.DEBUG, fmt.Sprintf(f, args...))
@@ -212,7 +212,7 @@ func ParsePager(pager TokenPager) (Node, error) {
 }
 
 // errorf formats the error and terminates processing.
-func (t *tree) errorf(format string, args ...interface{}) {
+func (t *tree) errorf(format string, args ...any) {
 	panic(fmt.Sprintf(format, args...))
 }
 
