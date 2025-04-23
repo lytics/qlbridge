@@ -236,6 +236,29 @@ func TestLexSqlCreate(t *testing.T) {
 			tv(TokenEqual, "="),
 			tv(TokenValue, "hello"),
 		})
+
+	verifyTokens(t, `CREATE INDEX IF NOT EXISTS my_index ON my_table (col1, col2) WITH { "key": "value" };`,
+		[]Token{
+			tv(TokenCreate, "CREATE"),
+			tv(TokenIdentity, "INDEX"), // Assuming INDEX is treated as an Identity for now
+			tv(TokenIf, "IF"),
+			tv(TokenNegate, "NOT"),
+			tv(TokenExists, "EXISTS"),
+			tv(TokenIdentity, "my_index"),
+			tv(TokenOn, "ON"),
+			tv(TokenIdentity, "my_table"),
+			tv(TokenLeftParenthesis, "("),
+			tv(TokenIdentity, "col1"),
+			tv(TokenComma, ","),
+			tv(TokenIdentity, "col2"),
+			tv(TokenRightParenthesis, ")"),
+			tv(TokenWith, "WITH"),
+			tv(TokenLeftBracket, "{"),
+			tv(TokenValue, "key"),
+			tv(TokenColon, ":"),
+			tv(TokenValue, "value"),
+			tv(TokenRightBracket, "}"),
+		})
 }
 func TestLexSqlDrop(t *testing.T) {
 	// DROP {DATABASE | SCHEMA | SOURCE | TABLE} [IF EXISTS] db_name
