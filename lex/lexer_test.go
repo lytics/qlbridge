@@ -276,8 +276,8 @@ func verifyTokens(t *testing.T, sql string, tokens []Token) {
 	for _, goodToken := range tokens {
 		tok := l.NextToken()
 		//u.Debugf("got:%v  want:%v", tok, goodToken)
-		assert.Equal(t, tok.T, goodToken.T, "want='%v' has %v ", goodToken.T, tok)
-		assert.Equal(t, tok.V, goodToken.V, "want='%v' has %v ", goodToken.V, tok)
+		assert.Equal(t, tok.T, goodToken.T, "want='%q' has %q ", goodToken.T, tok)
+		assert.Equal(t, tok.V, goodToken.V, "want='%q' has %q ", goodToken.V, tok)
 	}
 }
 

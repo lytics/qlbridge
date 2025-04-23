@@ -159,7 +159,7 @@ var (
 		{Token: TokenChange, Lexer: LexDdlAlterColumn},
 		{Token: TokenWith, Lexer: LexJsonOrKeyValue, Optional: true},
 	}
-	// SqlCreate CREATE {SCHEMA | DATABASE | SOURCE | TABLE | VIEW | CONTINUOUSVIEW}
+	// SqlCreate CREATE {SCHEMA | INDEX | DATABASE | SOURCE | TABLE | VIEW | CONTINUOUSVIEW}
 	SqlCreate = []*Clause{
 		{Token: TokenCreate, Lexer: LexCreate},
 		{Token: TokenEngine, Lexer: LexDdlTableStorage, Optional: true},
@@ -397,6 +397,7 @@ func LexCreate(l *Lexer) StateFn {
 	/*
 		CREATE TABLE [IF NOT EXISTS] <identity> [WITH]
 		CREATE SOURCE [IF NOT EXISTS] <identity> [WITH]
+		CREATE INDEX [IF NOT EXISTS] <identity> [WITH]
 		CREATE [OR REPLACE] VIEW <identity> AS <select_statement> [WITH]
 	*/
 
@@ -412,6 +413,11 @@ func LexCreate(l *Lexer) StateFn {
 		l.ConsumeWord(keyWord)
 		l.Emit(TokenTable)
 		l.Push("LexDdlTable", LexDdlTable)
+		return nil
+	case "index":
+		l.ConsumeWord(keyWord)
+		l.Emit(TokenIndex)
+		l.Push("LexDdlIndex", LexDdlIndex)
 		return nil
 	case "source":
 		l.ConsumeWord(keyWord)
@@ -548,6 +554,72 @@ func LexDrop(l *Lexer) StateFn {
 	}
 	l.Push("LexIdentifier", LexIdentifier)
 	return lexNotExists
+}
+
+// LexDdlIndex data definition language index
+func LexDdlIndex(l *Lexer) StateFn {
+
+	/*
+		CREATE  INDEX [IF NOT EXISTS] index_name (column_name,...)
+	*/
+	l.SkipWhiteSpaces()
+	r := l.Next()
+
+	// Cover the logic and grouping
+	switch r {
+	case '(':
+		// Start of columns
+		l.Emit(TokenLeftParenthesis)
+		l.Push("LexDdlTableColumn", LexDdlIndex)
+		return LexColumnNames
+	case ')':
+		// end of columns
+		l.Emit(TokenRightParenthesis)
+		return LexDdlTableStorage
+	case '-', '/': // comment?
+		p := l.Peek()
+		if p == '-' {
+			l.backup()
+			l.Push("LexDdlIndex", LexDdlIndex)
+			return LexInlineComment
+		}
+		u.Warnf("unhandled comment non inline ")
+	case ';':
+		l.backup()
+		return nil
+	}
+
+	l.backup()
+	word := strings.ToLower(l.PeekWord())
+	switch word {
+	case "if":
+		l.Push("LexDdlIndex", LexDdlIndex)
+		return lexNotExists
+	case "with":
+		l.ConsumeWord("with")
+		l.Emit(TokenWith)
+		return LexJsonOrKeyValue
+	case "on":
+		l.ConsumeWord("on")
+		l.Emit(TokenOn)
+		return LexDdlIndex
+	}
+	r = l.Peek()
+	if r == ',' {
+		l.Emit(TokenComma)
+		l.Push("LexDdlIndex", l.clauseState())
+		return LexExpressionOrIdentity
+	}
+	if l.isNextKeyword(word) {
+		return nil
+	}
+	// ensure we don't get into a recursive death spiral here?
+	if len(l.stack) < 10 {
+		l.Push("LexDdlIndex", LexDdlIndex)
+	} else {
+		u.Errorf("Gracefully refusing to add more LexDdlIndex: ")
+	}
+	return LexExpressionOrIdentity
 }
 
 // LexDdlTable data definition language table

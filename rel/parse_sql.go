@@ -716,9 +716,9 @@ func (m *Sqlbridge) parseCreate() (*SqlCreate, error) {
 		}
 		req.OrReplace = true
 	}
-	// CREATE {DATABASE|SCHEMA|TABLE|VIEW|SOURCE|CONTINUOUSVIEW} <identity>
+	// CREATE {INDEX|DATABASE|SCHEMA|TABLE|VIEW|SOURCE|CONTINUOUSVIEW} <identity>
 	switch m.Cur().T {
-	case lex.TokenTable, lex.TokenSource, lex.TokenDatabase, lex.TokenSchema:
+	case lex.TokenTable, lex.TokenSource, lex.TokenIndex, lex.TokenDatabase, lex.TokenSchema:
 		req.Tok = m.Next()
 	case lex.TokenView, lex.TokenContinuousView:
 		req.Tok = m.Next()
@@ -744,7 +744,7 @@ func (m *Sqlbridge) parseCreate() (*SqlCreate, error) {
 		req.Select = sel
 		return req, nil
 	default:
-		return nil, m.ErrMsg("Expected view, table, source, schema, database, continuousview for CREATE got")
+		return nil, m.ErrMsg("Expected index, view, table, source, schema, database, continuousview for CREATE got")
 	}
 
 	// [IF NOT EXISTS]
@@ -803,6 +803,7 @@ func (m *Sqlbridge) parseCreate() (*SqlCreate, error) {
 		// just with
 	case lex.TokenSchema:
 		// just with for now
+	case lex.TokenIndex:
 	default:
 		return nil, fmt.Errorf("not implemented %v", req.Tok.V)
 	}
