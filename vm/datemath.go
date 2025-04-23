@@ -62,15 +62,44 @@ func compareBoundaries(currBoundary, newBoundary time.Time) time.Time {
 	return currBoundary
 }
 func evalBoundary(anchorTime, currBoundary time.Time, lhv value.Value, op lex.TokenType, val string) (time.Time, error) {
-	ct, ok := value.ValueToTime(lhv)
-	if !ok {
-		return currBoundary, fmt.Errorf("Could not convert %T: %v to time.Time", lhv, lhv)
-	}
-
 	// Given Anchor Time At calculate Relative Time Rt
 	rt, err := datemath.EvalAnchor(anchorTime, val)
 	if err != nil {
 		return currBoundary, err
+	}
+
+	ct, err := value.ValueToTime(lhv)
+	if err != nil && strings.Contains(err.Error(), "slice values") {
+		switch op {
+		case lex.TokenGT, lex.TokenGE:
+			bt := currBoundary
+			for _, val := range lhv.(value.SliceValue).SliceValue() {
+				ct, err := value.ValueToTime(val)
+				if err != nil {
+					return time.Time{}, fmt.Errorf("converting slice value: %w", err)
+				}
+				if rt.Before(ct) {
+					bt = compareBoundaries(currBoundary, anchorTime.Add(ct.Sub(rt)))
+				}
+			}
+			return bt, nil
+		case lex.TokenLT, lex.TokenLE:
+			bt := currBoundary
+			for _, val := range lhv.(value.SliceValue).SliceValue() {
+				ct, err := value.ValueToTime(val)
+				if err != nil {
+					return time.Time{}, fmt.Errorf("converting slice value: %w", err)
+				}
+				if !ct.Before(rt) {
+					bt = compareBoundaries(bt, anchorTime.Add(ct.Sub(rt)))
+				}
+			}
+			return bt, nil
+		default:
+			return currBoundary, nil
+		}
+	} else if err != nil {
+		return currBoundary, fmt.Errorf("Could not convert %T: %v to time.Time %w", lhv, lhv, err)
 	}
 
 	// Ct = Comparison time, left hand side of expression

@@ -264,9 +264,9 @@ func mapTimeEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 		}
 		k = strings.ToLower(kitem.ToString())
 
-		var ok bool
-		ts, ok = value.ValueToTime(args[1])
-		if !ok {
+		var err error
+		ts, err = value.ValueToTime(args[1])
+		if err != nil {
 			return value.EmptyMapTimeValue, false
 		}
 	}

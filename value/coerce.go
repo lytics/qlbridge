@@ -79,8 +79,8 @@ func Cast(valType ValueType, val Value) (Value, error) {
 		}
 
 	case TimeType:
-		t, ok := ValueToTime(val)
-		if ok {
+		t, err := ValueToTime(val)
+		if err != nil {
 			return NewTimeValue(t), nil
 		}
 	case StringType:
@@ -312,55 +312,61 @@ func ValueToInt64(val Value) (int64, bool) {
 
 // StringToTimeAnchor Convert a string type to a time if possible.
 // If "now-3d" then use date-anchoring ie if prefix = 'now'.
-func StringToTimeAnchor(val string, anchor time.Time) (time.Time, bool) {
+func StringToTimeAnchor(val string, anchor time.Time) (time.Time, error) {
 	if len(val) > 3 && strings.ToLower(val[:3]) == "now" {
 		// Is date math
 		t, err := datemath.EvalAnchor(anchor, val)
 		if err != nil {
-			return time.Time{}, false
+			return time.Time{}, fmt.Errorf("failed to eval datemath anchor: %w", err)
 		}
-		return t, true
+		return t, nil
 	}
 
 	t, err := dateparse.ParseAny(val)
-	if err == nil {
-		return t, true
+	if err != nil {
+		return t, fmt.Errorf("failed to parse time %v: %w", val, err)
 	}
-	return time.Time{}, false
+	return t, nil
 }
 
 // ValueToTime Convert a value type to a time if possible
-func ValueToTime(val Value) (time.Time, bool) {
+func ValueToTime(val Value) (time.Time, error) {
 	return ValueToTimeAnchor(val, time.Now())
 }
 
 // ValueToTimeAnchor given a value, and a time anchor, conver to time.
 // use "now-3d" anchoring if has prefix "now".
-func ValueToTimeAnchor(val Value, anchor time.Time) (time.Time, bool) {
+func ValueToTimeAnchor(val Value, anchor time.Time) (time.Time, error) {
 	switch v := val.(type) {
 	case TimeValue:
-		return v.Val(), true
-	case StringValue:
-		return StringToTimeAnchor(v.Val(), anchor)
+		return v.Val(), nil
 	case StringsValue:
 		vals := v.Val()
 		if len(vals) < 1 {
-			return time.Time{}, false
+			return time.Time{}, fmt.Errorf("empty string slice")
 		}
 		return StringToTimeAnchor(vals[0], anchor)
+	case SliceValue:
+		vals := v.SliceValue()
+		if len(vals) < 1 {
+			return time.Time{}, fmt.Errorf("empty slice")
+		}
+		return time.Time{}, fmt.Errorf("slice values")
+	case StringValue:
+		return StringToTimeAnchor(v.Val(), anchor)
 	case IntValue, NumberValue:
 		t, err := dateparse.ParseIn(v.ToString(), time.Local)
 		if err != nil {
-			return time.Time{}, false
+			return t, fmt.Errorf("parsing number: %w", err)
 		}
 		if t.Year() < 1800 || t.Year() > 2120 {
-			return t, false
+			return t, fmt.Errorf("year outside of time bounds 1800, 2120: %w", err)
 		}
-		return t, true
+		return t, nil
 	default:
 		//u.Warnf("un-handled type to time? %#v", val)
 	}
-	return time.Time{}, false
+	return time.Time{}, fmt.Errorf("unhandled type to time: %#v", val)
 }
 
 // StringToFloat64 converts a string to a float
