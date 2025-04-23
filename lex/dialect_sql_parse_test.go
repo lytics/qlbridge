@@ -62,6 +62,8 @@ func TestSqlParser(t *testing.T) {
 			 CONSTRAINT emails_fk FOREIGN KEY (Email) REFERENCES Emails (Email)
 		   ) ENGINE=InnoDB AUTO_INCREMENT=4080 DEFAULT CHARSET=utf8;`)
 
+	parseSqlTest(t, `CREATE INDEX IF NOT EXISTS my_index ON my_table (col1, col2) WITH { "key": "value" };`)
+
 	// DROP
 	parseSqlTest(t, `DROP CONTINUOUSVIEW viewx WITH stuff = "hello";`)
 }
