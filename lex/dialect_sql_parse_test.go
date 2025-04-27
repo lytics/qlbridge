@@ -3,9 +3,8 @@ package lex_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/lytics/qlbridge/rel"
+	"github.com/stretchr/testify/assert"
 )
 
 func parseSqlTest(t *testing.T, sql string) {

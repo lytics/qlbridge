@@ -560,7 +560,7 @@ func LexDrop(l *Lexer) StateFn {
 func LexDdlIndex(l *Lexer) StateFn {
 
 	/*
-		CREATE  INDEX [IF NOT EXISTS] index_name (column_name,...)
+		CREATE  INDEX [IF NOT EXISTS] index_name ON table_name (column_name,...)
 	*/
 	l.SkipWhiteSpaces()
 	r := l.Next()

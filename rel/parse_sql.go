@@ -804,6 +804,34 @@ func (m *Sqlbridge) parseCreate() (*SqlCreate, error) {
 	case lex.TokenSchema:
 		// just with for now
 	case lex.TokenIndex:
+		if m.Cur().T != lex.TokenOn {
+			return nil, m.ErrMsg("Expected ON")
+		}
+		m.Next() // consume ON
+
+		if m.Cur().T != lex.TokenIdentity {
+			return nil, m.ErrMsg("Expected Identity table name")
+		}
+
+		req.Parent = m.Cur().V
+		m.Next() // consume Identity
+
+		discardComments(m)
+		if m.Cur().T != lex.TokenLeftParenthesis {
+			return nil, m.ErrMsg("Expected (cols) ")
+		}
+		m.Next() // consume paren
+
+		// list of columns comma separated
+		cols, err := m.parseCreateCols()
+		if err != nil {
+			u.Error(err)
+			return nil, err
+		}
+		req.Cols = cols
+
+		// ENGINE
+		discardComments(m)
 	default:
 		return nil, fmt.Errorf("not implemented %v", req.Tok.V)
 	}

@@ -205,6 +205,7 @@ type (
 	SqlCreate struct {
 		Raw         string       // full original raw statement
 		Identity    string       // identity of table, view, etc
+		Parent      string       // identity of table, view, etc
 		Tok         lex.Token    // CREATE [INDEX|TABLE,VIEW,CONTINUOUSVIEW,TRIGGER] etc
 		OrReplace   bool         // OR REPLACE
 		IfNotExists bool         // IF NOT EXISTS

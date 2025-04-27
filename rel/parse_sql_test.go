@@ -625,7 +625,17 @@ func TestSqlUpdate(t *testing.T) {
 
 func TestSqlCreate(t *testing.T) {
 	t.Parallel()
-	sql := `
+	// Test IF NOT EXISTS
+	sql := `CREATE INDEX IF NOT EXISTS idx_users_id ON new_table (id)`
+	req, err := rel.ParseSql(sql)
+	require.NoError(t, err)
+	cs, ok := req.(*rel.SqlCreate)
+	require.True(t, ok, "wanted SqlCreate got %T", req)
+	assert.True(t, cs.IfNotExists, "Expected IfNotExists to be true")
+	assert.Equal(t, "idx_users_id", cs.Identity)
+	assert.Equal(t, "new_table", cs.Engine["table"])
+	assert.Equal(t, 1, len(cs.Cols))
+	sql = `
 	CREATE TABLE articles
 		 (
 		  ID int(11) NOT NULL AUTO_INCREMENT,
@@ -634,10 +644,10 @@ func TestSqlCreate(t *testing.T) {
 		  CONSTRAINT emails_fk FOREIGN KEY (Email) REFERENCES Emails (Email) COMMENT "hello constraint"
 		) ENGINE=InnoDB, AUTO_INCREMENT=4080, DEFAULT CHARSET=utf8
 	WITH stuff = "hello";`
-	req, err := rel.ParseSql(sql)
+	req, err = rel.ParseSql(sql)
 	require.NoError(t, err)
 	assert.NotNil(t, req)
-	cs, ok := req.(*rel.SqlCreate)
+	cs, ok = req.(*rel.SqlCreate)
 	assert.True(t, ok, "wanted SqlCreate got %T", req)
 	assert.NotEmpty(t, cs.Engine)
 	assert.NotEmpty(t, cs.With)
