@@ -269,6 +269,9 @@ func FilterMatchEval(ctx expr.EvalContext, vals []value.Value) (value.Value, boo
 		lv := make([]string, 0, val.Len())
 
 		for _, slv := range val.SliceValue() {
+			switch slv.Type() {
+			case value.StringType:
+			}
 			sv := slv.ToString()
 			filteredIn := false
 			for _, filter := range filters {

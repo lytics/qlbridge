@@ -33,33 +33,38 @@ func (m *JsonPath) Validate(n *expr.FuncNode) (expr.EvaluatorFunc, error) {
 	default:
 		return nil, fmt.Errorf("expected a string expression for jmespath got %T", jn)
 	}
-
-	parser := jmespath.NewParser()
-	_, err := parser.Parse(jsonPathExpr)
+	jmes, err := jmespath.Compile(jsonPathExpr)
 	if err != nil {
-		// if syntaxError, ok := err.(jmespath.SyntaxError); ok {
-		// 	u.Warnf("%s\n%s\n", syntaxError, syntaxError.HighlightLocation())
-		// }
 		return nil, err
 	}
-	return jsonPathEval(jsonPathExpr), nil
+	return jsonPathEval(jmes), nil
 }
 
-func jsonPathEval(expression string) expr.EvaluatorFunc {
+func jsonPathEval(jmes *jmespath.JMESPath) expr.EvaluatorFunc {
 	return func(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 		if args[0] == nil || args[0].Err() || args[0].Nil() {
 			return nil, false
 		}
-
-		val := args[0].ToString()
-
-		// Validate that this is valid json?
+		a := args[0]
+		var val []byte
+		var err error
+		switch {
+		case a.Type().IsMap() || a.Type().IsSlice():
+			// TODO (ajr): need to recursively change value.Value to interface{} and extract the values
+			// this is a bit of a hack to do that
+			val, err = json.Marshal(a.Value())
+			if err != nil {
+				return nil, false
+			}
+		default:
+			val = []byte(args[0].ToString())
+		}
 		var data interface{}
-		if err := json.Unmarshal([]byte(val), &data); err != nil {
+		if err := json.Unmarshal(val, &data); err != nil {
 			return nil, false
 		}
 
-		result, err := jmespath.Search(expression, data)
+		result, err := jmes.Search(data)
 		if err != nil {
 			return nil, false
 		}

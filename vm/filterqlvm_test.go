@@ -10,9 +10,11 @@ import (
 	"github.com/araddon/dateparse"
 	u "github.com/araddon/gou"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/lytics/qlbridge/datasource"
 	"github.com/lytics/qlbridge/expr"
+	"github.com/lytics/qlbridge/filterqlvm"
 	"github.com/lytics/qlbridge/rel"
 	"github.com/lytics/qlbridge/value"
 	"github.com/lytics/qlbridge/vm"
@@ -126,6 +128,7 @@ func TestFilterQlVm(t *testing.T) {
 		`FILTER NOT ( Created > "now-1d") `,                        // Date Math (negated)
 		`FILTER NOT ( FakeDate > "now-1d") `,                       // Date Math (negated, missing field)
 		`FILTER Updated > "now-2h"`,                                // Date Math
+		`FILTER Updated < "now-30m"`,                               // Date Math
 		`FILTER transactions < "now-1h"`,                           // Date Compare with []time.Time
 		`FILTER FirstEvent.signedup < "now-2h"`,                    // Date Math on map[string]time
 		`FILTER FirstEvent.signedup == "12/18/2015"`,               // Date equality on map[string]time
@@ -140,11 +143,11 @@ func TestFilterQlVm(t *testing.T) {
 		`FILTER lastevent NOT IN ("not-gonna-happen")`,
 		`FILTER *`, // match all
 		`FILTER OR (
-			name == "Rey"     -- false 
+			name == "Rey"     -- false
 			INCLUDE match_all_include
 		)`,
 		`FILTER OR (
-			name == "Rey"     -- false 
+			name == "Rey"     -- false
 			INCLUDE is_yoda_true
 		)`,
 		`FILTER OR (
@@ -163,13 +166,14 @@ func TestFilterQlVm(t *testing.T) {
 		// Coerce strings to numbers when appropriate
 		`FILTER AND (zip == "5", BankAmount > "50")`,
 		`FILTER bankamount > "9.4"`,
+		`FILTER bankamount < "100001"`,
 		`FILTER AND (zip == 5, "Yoda" == name, OR ( city IN ( "Portland, OR", "New York, NY", "Peoria, IL" ) ) )`,
 		`FILTER OR (
-			EXISTS q, 
-			AND ( 
-				zip > 0, 
-				OR ( zip > 10000, zip < 100 ) 
-			), 
+			EXISTS q,
+			AND (
+				zip > 0,
+				OR ( zip > 10000, zip < 100 )
+			),
 			NOT ( name == "Yoda" ) )`,
 		`FILTER hits.foo > 1.5`,
 		`FILTER hits.foo > "1.5"`,
@@ -182,12 +186,16 @@ func TestFilterQlVm(t *testing.T) {
 	//u.Debugf("len hits: %v", len(hitsx))
 	//expr.Trace = true
 
+	optimizedVM := filterqlvm.NewOptimizedVM()
 	for _, q := range hits {
 		fs, err := rel.ParseFilterQL(q)
 		assert.Equal(t, nil, err)
 		match, ok := vm.Matches(incctx, fs)
 		assert.True(t, ok, "should be ok matching on query %q: %v", q, ok)
 		assert.True(t, match, q)
+		match, ok = optimizedVM.Matches(incctx, fs)
+		require.True(t, ok, "should be ok matching on query %q: %v", q, ok)
+		require.True(t, match, q)
 		match, ok = vm.MatchesExpr(incctx, fs.Filter)
 		assert.True(t, ok, "should be ok matching on query %q: %v", q, ok)
 		assert.True(t, match, q)
@@ -229,23 +237,23 @@ func TestFilterQlVm(t *testing.T) {
 		SELECT
 			name
 			, zip  IF zip > 2
-		FROM mycontext 
+		FROM mycontext
 		FILTER name == "Yoda"`, map[string]interface{}{"name": "Yoda", "zip": 5}},
 		{`
 		SELECT
 			name
 			, zip  IF zip > 200
-		FROM mycontext 
+		FROM mycontext
 		FILTER name == "Yoda"`, map[string]interface{}{"name": "Yoda"}},
 		{`
 		SELECT
 			name IF name < true
-		FROM mycontext 
+		FROM mycontext
 		FILTER name == "Yoda"`, nil},
 		{`
 		SELECT
 			name IF zip + 5
-		FROM mycontext 
+		FROM mycontext
 		FILTER name == "Yoda"`, nil},
 	}
 	for _, test := range filterSelects {
