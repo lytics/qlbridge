@@ -209,3 +209,7 @@ func wcFunc(val string, addStars bool) string {
 func Wildcard(field, value string, addStars bool) *wildcard {
 	return &wildcard{Wildcard: map[string]string{field: wcFunc(value, addStars)}}
 }
+
+type GeoDistanceFilter struct {
+	GeoDistance map[string]any `json:"geo_distance"`
+}

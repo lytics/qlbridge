@@ -283,6 +283,14 @@ func makeDateBetweenQuery(fieldName string, lower, upper any) (query.Query, erro
 	return dateRangeQuery, nil
 }
 
+func makeGeoDistanceQuery(lhs *gentypes.FieldType, lat, lon, distance float64) (query.Query, error) {
+	// Create a geo distance query
+	distanceQuery := query.NewGeoDistanceQuery(lon, lat, fmt.Sprintf("%fkm", distance))
+	distanceQuery.SetField(lhs.Field)
+
+	return distanceQuery, nil
+}
+
 // makeWildcard returns a wildcard/prefix query for Bleve
 func makeWildcard(lhs *gentypes.FieldType, value string, addStars bool) (query.Query, error) {
 	fieldName := lhs.Field

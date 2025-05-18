@@ -36,16 +36,16 @@ func NewBleveIndexerMemOnly() (*BleveIndexer, error) {
 	documentMapping := bleve.NewDocumentMapping()
 	keywordFieldMapping := bleve.NewKeywordFieldMapping()
 	keywordFieldMapping.Name = "title"
-	//keywordFieldMapping.Store = false
-	// keywordFieldMapping.IncludeTermVectors = false
-	// keywordFieldMapping.IncludeInAll = false
-	// keywordFieldMapping.DocValues = false
+	keywordFieldMapping.Store = false
+	keywordFieldMapping.IncludeTermVectors = false
+	keywordFieldMapping.IncludeInAll = false
+	keywordFieldMapping.DocValues = false
 	documentMapping.Fields = append(documentMapping.Fields, keywordFieldMapping)
 	indexMapping.AddDocumentMapping("book", documentMapping)
 	allDocumentMapping := bleve.NewDocumentMapping()
-	// allDocumentMapping.Enabled = false
+	allDocumentMapping.Enabled = false
 	indexMapping.AddDocumentMapping("_all", allDocumentMapping)
-	// indexMapping.StoreDynamic = false
+	indexMapping.StoreDynamic = false
 	// indexMapping.DocValuesDynamic = false
 	// indexMapping.IndexDynamic = false
 
