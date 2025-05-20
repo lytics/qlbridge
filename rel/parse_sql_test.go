@@ -633,7 +633,7 @@ func TestSqlCreate(t *testing.T) {
 	require.True(t, ok, "wanted SqlCreate got %T", req)
 	assert.True(t, cs.IfNotExists, "Expected IfNotExists to be true")
 	assert.Equal(t, "idx_users_id", cs.Identity)
-	assert.Equal(t, "new_table", cs.Engine["table"])
+	assert.Equal(t, "new_table", cs.Parent)
 	assert.Equal(t, 1, len(cs.Cols))
 	sql = `
 	CREATE TABLE articles
