@@ -42,10 +42,9 @@ func CalcBoundaryFns(n expr.Node) BoundaryFns {
 	return findDateMathFn(n)
 }
 
-// NewDateConverter takes a node expression
-func NewDateConverter(ctx expr.EvalIncludeContext, n expr.Node) (*DateConverter, error) {
+func NewDateConverterWithAnchorTime(ctx expr.EvalIncludeContext, n expr.Node, at time.Time) (*DateConverter, error) {
 	dc := &DateConverter{
-		at: time.Now(),
+		at: at,
 	}
 	fns := findDateMathFn(n)
 	dc.bt, dc.err = FindBoundary(dc.at, ctx, fns)
@@ -53,6 +52,11 @@ func NewDateConverter(ctx expr.EvalIncludeContext, n expr.Node) (*DateConverter,
 		dc.HasDateMath = true
 	}
 	return dc, dc.err
+}
+
+// NewDateConverter takes a node expression
+func NewDateConverter(ctx expr.EvalIncludeContext, n expr.Node) (*DateConverter, error) {
+	return NewDateConverterWithAnchorTime(ctx, n, time.Now())
 }
 func compareBoundaries(currBoundary, newBoundary time.Time) time.Time {
 	// Should we check for is zero on the newBoundary?
@@ -183,6 +187,19 @@ func findDateMathFn(node expr.Node) BoundaryFns {
 	case *expr.UnaryNode:
 		return findDateMathFn(n.Arg)
 	case *expr.TriNode:
+		// Only handle BETWEEN operator with specific node types
+		if n.Operator.T == lex.TokenBetween && len(n.Args) == 3 {
+			// Check if first arg is IdentityNode and other two are StringNodes
+			_, isFirstIdentity := n.Args[0].(*expr.IdentityNode)
+			_, isSecondString := n.Args[1].(*expr.StringNode)
+			_, isThirdString := n.Args[2].(*expr.StringNode)
+
+			if isFirstIdentity && isSecondString && isThirdString {
+				fns = append(fns, findBoundaryForBetween(n))
+				return fns
+			}
+		}
+
 		for _, arg := range n.Args {
 			fns = append(fns, findDateMathFn(arg)...)
 		}
@@ -203,4 +220,89 @@ func findDateMathFn(node expr.Node) BoundaryFns {
 		// Scalar/	Literal values cannot be datemath, must be binary-expression
 	}
 	return fns
+}
+
+// Ct = Comparison time, left hand side of expression
+// Lb = Relative time result of Lower Bound Anchor Time offset by datemath "now-3d"
+// Ub = Relative time result of Upper Bound Anchor Time offset by datemath "now+3d"
+// Bt = Boundary time = calculated time at which expression will change boolean expression value
+// example: FILTER Ct BETWEEN Lb AND Ub
+// WHERE "now" = 01/22/2025 00:00:00
+//
+//	"Lb" = 01/19/2025 00:00:00
+//	"Ub" = 01/25/2025 00:00:00
+//
+// NOTE: When evaluating expressions like this, an entity "enters" the expression by passing the upper bound and sliding into the window
+// and "exits" the expression by passing the lower bound and sliding out of the window. Although the "Upper Bound" is after the "Lower Bound",
+// the order of entry and exit is reversed. This example should show how the entity appears to move backwards as the window moves forward.
+// Example timeline: Ct = 01/22/2025 00:00:00
+// Day 0: now = 01/22/2025 00:00:00 === Lb--Ct++Ub+++++++++
+// Day 1: now = 01/23/2025 00:00:00 === -Lb-Ct+++Ub++++++++
+// Day 2: now = 01/24/2025 00:00:00 === --LbCt++++Ub+++++++
+// Day 3: now = 01/25/2025 00:00:00 === ---CLtb+++++Ub+++++  Ct == Lb
+// Day 4: now = 01/26/2025 00:00:00 === ---CtLb++++++Ub++++
+// Day 5: now = 01/27/2025 00:00:00 === ---Ct-Lb++++++Ub+++
+// Day 6: now = 01/28/2025 00:00:00 === ---Ct--Lb++++++Ub++
+// Day 7: now = 01/29/2025 00:00:00 === ---Ct---Lb++++++Ub+
+// Day 8: now = 01/30/2025 00:00:00 === ---Ct----Lb++++++Ub
+//
+// Notice how it appears as if the entity is moving backwards through the window as the window slides forward in relation to "now".
+// Ct = 01/01/2025 00:00:00
+// In this case the expression itself currently evaluates to false, and is already PRIOR to the lower bound.
+// As such it will always evaluate to false, so we can skip queueing for reevaluation.
+// // Ct = 01/30/2025 00:00:00
+// In this case the expression itself currently evaluates to false, and is AFTER of the prior to the upper bound.
+// The next evaluation time should be on the day the upper bound is reached. Queue for reevaluation at (Ct - 3d) [since the Ub is now+3d].
+// // Ct = 01/22/2025 00:00:00
+// In this case the expression itself currently evaluates to true, and is BETWEEN the lower and upper bounds.
+// The next evaluation time should be on the day the lower bound is reached. Queue for reevaluation at (Ct + 3d) [since the Lb is now-3d].
+// Notice that we are queuing for reevaluation based on the inverse of the corresponding bound's offset.  This is made a bit easier if
+// the expression is a static date, rather than a relative one. As we can use that directly as the re-evaluation time.
+func findBoundaryForBetween(n *expr.TriNode) func(d *DateConverter, ctx expr.EvalIncludeContext) {
+	return func(d *DateConverter, ctx expr.EvalIncludeContext) {
+		arg1, arg2, arg3 := n.Args[0], n.Args[1], n.Args[2]
+
+		lhv, ok := Eval(ctx, arg1)
+		if !ok {
+			return
+		}
+		ct, ok := value.ValueToTime(lhv)
+		if !ok {
+			// may be not a time field, so ignore doing any update
+			return
+		}
+
+		val2 := strings.ToLower(arg2.(*expr.StringNode).Text)
+		date1, err := datemath.EvalAnchor(d.at, val2)
+		if err != nil {
+			// may be not a valid date expression, so ignore doing any update
+			return
+		}
+
+		val3 := strings.ToLower(arg3.(*expr.StringNode).Text)
+		date2, err := datemath.EvalAnchor(d.at, val3)
+		if err != nil {
+			// may be not a valid date expression, so ignore doing any update
+			return
+		}
+
+		// assign lower and upper bounds
+		lower, upper := date1, date2
+		if date1.After(date2) {
+			lower, upper = date2, date1
+		}
+
+		if ct.Before(lower) {
+			// out of window's lower bound, so will always be false
+			return
+		}
+
+		if ct.After(upper) || ct.Equal(upper) {
+			// in the future or right in the border, so will enter the window later sometime in the future, do re-evaluate
+			d.bt = compareBoundaries(d.bt, d.at.Add(ct.Sub(upper)))
+			return
+		}
+		// currently in the window, so will exit the window in the future, do re-evaluate
+		d.bt = compareBoundaries(d.bt, d.at.Add(ct.Sub(lower)))
+	}
 }
