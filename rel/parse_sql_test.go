@@ -17,10 +17,9 @@ func init() {
 }
 
 func parseSqlTest(t *testing.T, sql string) {
-	u.Debugf("parsing sql: %s", sql)
 	sqlRequest, err := rel.ParseSql(sql)
-	assert.Equal(t, nil, err, "%v", err)
-	assert.NotEqual(t, nil, sqlRequest, "Must parse: %s  \n\t%v", sql, err)
+	require.NoError(t, err)
+	require.NotEqual(t, nil, sqlRequest, "Must parse: %s  \n\t%v", sql, err)
 }
 func parseSqlError(t *testing.T, sql string) {
 	u.Debugf("parse looking for error sql: %s", sql)
@@ -76,6 +75,7 @@ func TestSqlParseFail(t *testing.T) {
 func TestSqlParseOnly(t *testing.T) {
 	t.Parallel()
 
+	parseSqlTest(t, `insert into mytable (id, str, arr) values (0, "a", [1.0]),(1,"b", [2.3]);`)
 	parseSqlTest(t, `
 	SELECT exists(firstname), x
 	-- lets use the user table
@@ -86,6 +86,7 @@ func TestSqlParseOnly(t *testing.T) {
 	`)
 
 	parseSqlTest(t, "SELECT exists(firstname), user_id FROM user")
+	parseSqlTest(t, "SELECT count(*) FROM user")
 
 	parseSqlTest(t, `
 	SELECT exists(firstname), x
@@ -624,7 +625,17 @@ func TestSqlUpdate(t *testing.T) {
 
 func TestSqlCreate(t *testing.T) {
 	t.Parallel()
-	sql := `
+	// Test IF NOT EXISTS
+	sql := `CREATE INDEX IF NOT EXISTS idx_users_id ON new_table (id)`
+	req, err := rel.ParseSql(sql)
+	require.NoError(t, err)
+	cs, ok := req.(*rel.SqlCreate)
+	require.True(t, ok, "wanted SqlCreate got %T", req)
+	assert.True(t, cs.IfNotExists, "Expected IfNotExists to be true")
+	assert.Equal(t, "idx_users_id", cs.Identity)
+	assert.Equal(t, "new_table", cs.Parent)
+	assert.Equal(t, 1, len(cs.Cols))
+	sql = `
 	CREATE TABLE articles
 		 (
 		  ID int(11) NOT NULL AUTO_INCREMENT,
@@ -633,10 +644,10 @@ func TestSqlCreate(t *testing.T) {
 		  CONSTRAINT emails_fk FOREIGN KEY (Email) REFERENCES Emails (Email) COMMENT "hello constraint"
 		) ENGINE=InnoDB, AUTO_INCREMENT=4080, DEFAULT CHARSET=utf8
 	WITH stuff = "hello";`
-	req, err := rel.ParseSql(sql)
+	req, err = rel.ParseSql(sql)
 	require.NoError(t, err)
 	assert.NotNil(t, req)
-	cs, ok := req.(*rel.SqlCreate)
+	cs, ok = req.(*rel.SqlCreate)
 	assert.True(t, ok, "wanted SqlCreate got %T", req)
 	assert.NotEmpty(t, cs.Engine)
 	assert.NotEmpty(t, cs.With)
@@ -668,7 +679,7 @@ func TestSqlCreate(t *testing.T) {
 		name VARCHAR(100) DEFAULT 'anonymous',
 		description TEXT NOT NULL,
 		created_ts TIME,
-		score FLOAT,
+		embedding FLOAT[128],
 		is_active BOOLEAN,
 		PRIMARY KEY (user_id, name)
 	)`
@@ -682,12 +693,12 @@ func TestSqlCreate(t *testing.T) {
 	// Check specific columns
 	col0 := cs.Cols[0]
 	assert.Equal(t, "user_id", col0.Name)
-	assert.Equal(t, "BIGINT", col0.DataType)
+	assert.Equal(t, "bigint", col0.DataType)
 	assert.Equal(t, col0.Key, lex.TokenUnique, "Expected user_id to be UNIQUE")
 
 	col1 := cs.Cols[1]
 	assert.Equal(t, "name", col1.Name)
-	assert.Equal(t, "VARCHAR", col1.DataType)
+	assert.Equal(t, "varchar", col1.DataType)
 	assert.Equal(t, 100, col1.DataTypeSize)
 	assert.Equal(t, `"anonymous"`, col1.Default.String(), "Expected default value for name")
 
@@ -696,7 +707,11 @@ func TestSqlCreate(t *testing.T) {
 
 	col3 := cs.Cols[3]
 	assert.Equal(t, "created_ts", col3.Name)
-	assert.Equal(t, "TIME", col3.DataType)
+	assert.Equal(t, "time", col3.DataType)
+	col4 := cs.Cols[4]
+	assert.Equal(t, "embedding", col4.Name)
+	assert.Equal(t, "float[]", col4.DataType)
+	assert.Equal(t, 128, col4.DataTypeSize)
 
 	// Check primary key constraint (represented as a column definition in this parser)
 	pkCol := cs.Cols[6]

@@ -53,7 +53,7 @@ func TestStructWrapper(t *testing.T) {
 
 	readers := []expr.ContextReader{
 		datasource.NewContextWrapper(user),
-		datasource.NewContextSimpleNative(map[string]interface{}{
+		datasource.NewContextSimpleNative(map[string]any{
 			"str1": "str1",
 			"int1": 1,
 			"t1":   t1,
@@ -62,7 +62,7 @@ func TestStructWrapper(t *testing.T) {
 	}
 
 	nc := datasource.NewNestedContextReader(readers, time.Now())
-	expected := value.NewMapValue(map[string]interface{}{
+	expected := value.NewMapValue(map[string]any{
 		"str1":          "str1",
 		"int1":          1,
 		"Name":          "Yoda",

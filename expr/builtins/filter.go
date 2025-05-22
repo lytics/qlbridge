@@ -96,7 +96,7 @@ func FilterEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 	switch val := val.(type) {
 	case value.MapValue:
 
-		mv := make(map[string]interface{})
+		mv := make(map[string]any)
 
 		for rowKey, v := range val.Val() {
 			filteredOut := false
@@ -218,7 +218,7 @@ func FilterMatchEval(ctx expr.EvalContext, vals []value.Value) (value.Value, boo
 	switch val := val.(type) {
 	case value.MapValue:
 
-		mv := make(map[string]interface{})
+		mv := make(map[string]any)
 
 		for rowKey, v := range val.Val() {
 			filteredIn := false

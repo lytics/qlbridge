@@ -24,7 +24,7 @@ var (
 // TestingT is an interface wrapper around *testing.T so when we import
 // this go dep, govendor don't import "testing"
 type TestingT interface {
-	Errorf(format string, args ...interface{})
+	Errorf(format string, args ...any)
 }
 
 // Setup enables -vv verbose logging or sends logs to /dev/null
@@ -40,10 +40,10 @@ type QuerySpec struct {
 	Exec            string
 	HasErr          bool
 	Cols            []string
-	ValidateRow     func([]interface{})
+	ValidateRow     func([]any)
 	ExpectRowCt     int
 	ExpectColCt     int
-	RowData         interface{}
+	RowData         any
 	Expect          [][]driver.Value
 	ValidateRowData func()
 }

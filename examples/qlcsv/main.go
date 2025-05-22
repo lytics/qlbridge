@@ -71,7 +71,7 @@ func main() {
 	cols, _ := rows.Columns()
 
 	// this is just stupid hijinx for getting pointers for unknown len columns
-	readCols := make([]interface{}, len(cols))
+	readCols := make([]any, len(cols))
 	writeCols := make([]string, len(cols))
 	for i := range writeCols {
 		readCols[i] = &writeCols[i]

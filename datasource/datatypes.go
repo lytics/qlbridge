@@ -61,7 +61,7 @@ func (m *TimeValue) Time() time.Time {
 	return time.Time(*m)
 }
 
-func (m *TimeValue) Scan(src interface{}) error {
+func (m *TimeValue) Scan(src any) error {
 
 	var t time.Time
 	var dstr string
@@ -113,7 +113,7 @@ func (m JsonWrapper) Value() (driver.Value, error) {
 	return []byte(m), nil
 }
 
-func (m *JsonWrapper) Scan(src interface{}) error {
+func (m *JsonWrapper) Scan(src any) error {
 	var jsonBytes []byte
 	switch src.(type) {
 	case string:
@@ -127,7 +127,7 @@ func (m *JsonWrapper) Scan(src interface{}) error {
 	return nil
 }
 
-func (m *JsonWrapper) Unmarshal(v interface{}) error {
+func (m *JsonWrapper) Unmarshal(v any) error {
 	return json.Unmarshal([]byte(*m), v)
 }
 
@@ -160,7 +160,7 @@ func (m JsonHelperScannable) Value() (driver.Value, error) {
 
 // Scan the database/sql interface for scanning sql byte vals into this
 // typed structure.
-func (m *JsonHelperScannable) Scan(src interface{}) error {
+func (m *JsonHelperScannable) Scan(src any) error {
 	var jsonBytes []byte
 	switch tv := src.(type) {
 	case string:
@@ -203,7 +203,7 @@ func (m StringArray) Value() (driver.Value, error) {
 
 // Scan the database/sql interface for scanning sql byte vals into this
 // typed structure.
-func (m *StringArray) Scan(src interface{}) error {
+func (m *StringArray) Scan(src any) error {
 
 	var srcBytes []byte
 	switch val := src.(type) {

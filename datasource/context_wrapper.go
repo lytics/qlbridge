@@ -20,7 +20,7 @@ type ContextWrapper struct {
 	s   *state
 }
 
-func NewContextWrapper(val interface{}) *ContextWrapper {
+func NewContextWrapper(val any) *ContextWrapper {
 	s := state{}
 	return &ContextWrapper{reflect.ValueOf(val), &s}
 }
@@ -80,7 +80,7 @@ var (
 	fmtStringerType = reflect.TypeOf((*fmt.Stringer)(nil)).Elem()
 )
 
-func (s *state) errorf(format string, args ...interface{}) reflect.Value {
+func (s *state) errorf(format string, args ...any) reflect.Value {
 	s.err = fmt.Errorf(format, args...)
 	return zero
 }
@@ -90,7 +90,7 @@ func (s *state) errorf(format string, args ...interface{}) reflect.Value {
 // receiver is the value being walked along the chain.
 func (s *state) evalFieldChain(dot, receiver reflect.Value, node *expr.IdentityNode, ident []string, args []expr.Node, final reflect.Value) reflect.Value {
 	n := len(ident)
-	for i := 0; i < n-1; i++ {
+	for i := range n - 1 {
 		receiver = s.evalField(dot, ident[i], node, nil, zero, receiver)
 	}
 	// Now if it's a method, it gets the arguments.
@@ -152,7 +152,7 @@ func (s *state) evalField(dot reflect.Value, fieldName string, node expr.Node, a
 				tagName := strings.ToLower(fieldName)
 				// Wow, this is pretty bruttaly expensive
 				// Iterate over all available fields and read the tag value
-				for i := 0; i < receiver.NumField(); i++ {
+				for i := range receiver.NumField() {
 					// Get the field, returns https://golang.org/pkg/reflect/#StructField
 					field := receiver.Type().Field(i)
 

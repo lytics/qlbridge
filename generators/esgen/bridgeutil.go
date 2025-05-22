@@ -16,7 +16,7 @@ type floatval interface {
 
 // makeRange returns a range filter for Elasticsearch given the 3 nodes that
 // make up a comparison.
-func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (interface{}, error) {
+func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (any, error) {
 
 	rhsval, ok := scalar(rhs)
 	if !ok {
@@ -130,7 +130,7 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (interf
 
 // makeBetween returns a range filter for Elasticsearch given the 3 nodes that
 // make up a comparison.
-func makeBetween(lhs *gentypes.FieldType, lower, upper interface{}) (interface{}, error) {
+func makeBetween(lhs *gentypes.FieldType, lower, upper any) (any, error) {
 	/*
 		"nested": {
 			"query": {
@@ -173,7 +173,7 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper interface{}) (interface{}
 
 	lr := &RangeFilter{Range: map[string]RangeQry{lhs.Field: {GT: lower}}}
 	ur := &RangeFilter{Range: map[string]RangeQry{lhs.Field: {LT: upper}}}
-	fl := []interface{}{lr, ur}
+	fl := []any{lr, ur}
 
 	if lhs.Nested() {
 		fl = append(fl, Term("k", lhs.Field))
@@ -189,7 +189,7 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper interface{}) (interface{}
 // makeWildcard returns a wildcard/like query
 //
 //	{"wildcard": {field: value}}
-func makeWildcard(lhs *gentypes.FieldType, value string, addStars bool) (interface{}, error) {
+func makeWildcard(lhs *gentypes.FieldType, value string, addStars bool) (any, error) {
 	/*
 		"nested": {
 			"query": {
@@ -216,7 +216,7 @@ func makeWildcard(lhs *gentypes.FieldType, value string, addStars bool) (interfa
 	}
 	wc := Wildcard(fieldName, value, addStars)
 	if lhs.Nested() {
-		fl := []interface{}{wc, Term(fmt.Sprintf("%s.k", lhs.Path), lhs.Field)}
+		fl := []any{wc, Term(fmt.Sprintf("%s.k", lhs.Path), lhs.Field)}
 		return &nested{&NestedQuery{
 			Query:          &boolean{must{fl}},
 			Path:           lhs.Path,
@@ -227,7 +227,7 @@ func makeWildcard(lhs *gentypes.FieldType, value string, addStars bool) (interfa
 }
 
 // makeTimeWindowQuery maps the provided threshold and window arguments to the indexed time buckets
-func makeTimeWindowQuery(lhs *gentypes.FieldType, threshold, window, ts int64) (interface{}, error) {
+func makeTimeWindowQuery(lhs *gentypes.FieldType, threshold, window, ts int64) (any, error) {
 	/*
 		"nested": {
 			"query": {
@@ -256,7 +256,7 @@ func makeTimeWindowQuery(lhs *gentypes.FieldType, threshold, window, ts int64) (
 		}
 	*/
 
-	fl := []interface{}{
+	fl := []any{
 		Term(lhs.Field+".threshold", strconv.FormatInt(threshold, 10)),
 		Term(lhs.Field+".window", strconv.FormatInt(window, 10)),
 		&RangeFilter{Range: map[string]RangeQry{lhs.Field + ".enter": {LTE: ts}}},

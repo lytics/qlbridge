@@ -12,8 +12,8 @@ import (
 )
 
 type vtest struct {
-	in  interface{}
-	out interface{}
+	in  any
+	out any
 	t   ValueType
 	s   string
 }
@@ -41,9 +41,9 @@ var (
 	nilFloat32 *float32
 	f32        = float32(1.56)
 	f64        = float64(1.57)
-	slv        = NewSliceValuesNative([]interface{}{"a", "b"})
-	sliv       = NewSliceValuesNative([]interface{}{1, 2})
-	slmv       = []interface{}{"a", 2}
+	slv        = NewSliceValuesNative([]any{"a", "b"})
+	sliv       = NewSliceValuesNative([]any{1, 2})
+	slmv       = []any{"a", 2}
 	stv        = struct{ Name string }{Name: "world"}
 	jval       = NewJsonValue(json.RawMessage(`{"name":"world"}`))
 	vals       = []vtest{
@@ -80,19 +80,19 @@ var (
 		{"hello", "hello", StringType, "hello"},
 		{[]byte("hello"), []byte("hello"), ByteSliceType, "hello"},
 		{[]string{"hello", "world"}, []string{"hello", "world"}, StringsType, "hello,world"},
-		{[]interface{}{"hello", "world"}, []string{"hello", "world"}, StringsType, "hello,world"},
+		{[]any{"hello", "world"}, []string{"hello", "world"}, StringsType, "hello,world"},
 		{true, true, BoolType, "true"},
 		{slv, slv.Val(), SliceValueType, "a,b"},
 		{sliv, sliv.Val(), SliceValueType, "1,2"},
 		{slmv, []Value{NewStringValue("a"), NewIntValue(2)}, SliceValueType, "a,2"},
-		{[]interface{}{1, "b"}, []Value{NewIntValue(1), NewStringValue("b")}, SliceValueType, "1,b"},
+		{[]any{1, "b"}, []Value{NewIntValue(1), NewStringValue("b")}, SliceValueType, "1,b"},
 		{[]time.Time{t1}, []Value{NewTimeValue(t1)}, SliceValueType, "1451606400000"},
 		{[]int{1}, []Value{NewIntValue(1)}, SliceValueType, "1"},
 		{stv, stv, StructType, "{world}"},
 		{jval, jval.Val(), JsonType, `{"name":"world"}`},
 	}
 	ms      = map[string]string{"k1": "hello", "k2": "world"}
-	mv      = map[string]interface{}{"k1": "hello", "k2": "world"}
+	mv      = map[string]any{"k1": "hello", "k2": "world"}
 	mvout   = map[string]Value{"k1": NewStringValue("hello"), "k2": NewStringValue("world")}
 	mi      = map[string]int64{"k1": 1, "k2": 2}
 	mint    = map[string]int{"k1": 1, "k2": 2}
@@ -339,7 +339,7 @@ func TestStrings(t *testing.T) {
 	assert.Equal(t, 1, len(m))
 }
 func TestSliceValues(t *testing.T) {
-	v := NewSliceValuesNative([]interface{}{"a"})
+	v := NewSliceValuesNative([]any{"a"})
 	assert.Equal(t, 1, v.Len())
 	assert.Equal(t, "a", v.Val()[0].ToString())
 	v.Append(NewStringValue("b"))
@@ -348,7 +348,7 @@ func TestSliceValues(t *testing.T) {
 	assert.Equal(t, 2, len(v.Values()))
 }
 func TestMapValue(t *testing.T) {
-	mv := map[string]interface{}{"k1": 10}
+	mv := map[string]any{"k1": 10}
 	v := NewMapValue(mv)
 	_, ok := v.Get("k1")
 	assert.True(t, ok)
@@ -364,10 +364,10 @@ func TestMapValue(t *testing.T) {
 	ms := v.MapString()
 	assert.Equal(t, 1, len(mf))
 	assert.Equal(t, "10", ms["k1"])
-	v = NewMapValue(map[string]interface{}{"k1": "hello"})
+	v = NewMapValue(map[string]any{"k1": "hello"})
 	mt := v.MapTime()
 	assert.Equal(t, 0, mt.Len())
-	v = NewMapValue(map[string]interface{}{"k1": "now-4d"})
+	v = NewMapValue(map[string]any{"k1": "now-4d"})
 	mt = v.MapTime()
 	assert.Equal(t, 1, mt.Len())
 	assert.True(t, mt.Val()["k1"].Unix() > 10000)

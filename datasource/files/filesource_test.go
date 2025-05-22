@@ -56,7 +56,7 @@ func (m *testSource) Setup(s *schema.Schema) error {
 		fileStore = os.Getenv("FILESTORE")
 	}
 
-	settings := u.JsonHelper(map[string]interface{}{
+	settings := u.JsonHelper(map[string]any{
 		"path":     "baseball",
 		"filetype": "csv",
 		"type":     fileStore,

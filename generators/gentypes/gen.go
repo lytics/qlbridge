@@ -49,7 +49,7 @@ type (
 	// Payload is the top Level Request to Elasticsearch
 	Payload struct {
 		Size   *int                   `json:"size,omitempty"`
-		Filter interface{}            `json:"filter,omitempty"`
+		Filter any                    `json:"filter,omitempty"`
 		Fields []string               `json:"fields,omitempty"`
 		Sort   []map[string]SortOrder `json:"sort,omitempty"`
 	}
@@ -92,7 +92,7 @@ func (f *FieldType) PathAndPrefix(val string) string {
 	}
 	return f.Path + "." + f.Prefix
 }
-func (f *FieldType) PrefixAndValue(val interface{}) (string, interface{}) {
+func (f *FieldType) PrefixAndValue(val any) (string, any) {
 	if f.Type == value.MapValueType {
 		val, pfx := ValueAndPrefix(val)
 		return f.Path + "." + pfx, val
@@ -110,7 +110,7 @@ func (p *Payload) SortDesc(field string) {
 
 // For Fields declared as map[string]type  (type  = int, string, time, bool, value)
 // in lql, we need to determine which nested key/value combo to search for
-func ValueAndPrefix(val interface{}) (interface{}, string) {
+func ValueAndPrefix(val any) (any, string) {
 
 	switch vt := val.(type) {
 	case string:

@@ -228,7 +228,7 @@ func mapEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 		return value.EmptyMapValue, false
 	}
 	// What should the map function be if lh is slice/map?
-	return value.NewMapValue(map[string]interface{}{args[0].ToString(): args[1].Value()}), true
+	return value.NewMapValue(map[string]any{args[0].ToString(): args[1].Value()}), true
 }
 
 // MapTime()    Create a map[string]time of each key
@@ -299,7 +299,7 @@ func (m *Match) Validate(n *expr.FuncNode) (expr.EvaluatorFunc, error) {
 
 func matchEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
-	mv := make(map[string]interface{})
+	mv := make(map[string]any)
 	for _, item := range args {
 		switch node := item.(type) {
 		case value.StringValue:

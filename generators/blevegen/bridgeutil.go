@@ -79,21 +79,21 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (query.
 		case int:
 			vf := float64(v)
 			rangeQuery.Max = &vf
-			rangeQuery.InclusiveMin = &t
+			rangeQuery.InclusiveMax = &t
 		case int64:
 			vf := float64(v)
 			rangeQuery.Max = &vf
-			rangeQuery.InclusiveMin = &t
+			rangeQuery.InclusiveMax = &t
 		case float64:
 			rangeQuery.Max = &v
-			rangeQuery.InclusiveMin = &t
+			rangeQuery.InclusiveMax = &t
 		}
 	case lex.TokenGT:
 		switch v := rhsval.(type) {
 		case int:
 			vf := float64(v)
 			rangeQuery.Min = &vf
-			rangeQuery.InclusiveMax = &f
+			rangeQuery.InclusiveMin = &f
 		case int64:
 			vf := float64(v)
 			rangeQuery.Min = &vf
@@ -130,7 +130,7 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (query.
 }
 
 // makeDateRangeQuery creates a date range query for time-based fields
-func makeDateRangeQuery(fieldName string, op lex.TokenType, rhsval interface{}) (query.Query, error) {
+func makeDateRangeQuery(fieldName string, op lex.TokenType, rhsval any) (query.Query, error) {
 	var timeVal time.Time
 
 	var ok bool
@@ -185,7 +185,7 @@ func makeDateRangeQuery(fieldName string, op lex.TokenType, rhsval interface{}) 
 
 // makeBetween returns a range query for Bleve given the 3 nodes that
 // make up a between comparison.
-func makeBetween(lhs *gentypes.FieldType, lower, upper interface{}) (query.Query, error) {
+func makeBetween(lhs *gentypes.FieldType, lower, upper any) (query.Query, error) {
 	fieldName := lhs.Field
 	if lhs.Nested() {
 		// Handle nested fields with dot notation for Bleve
@@ -236,7 +236,7 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper interface{}) (query.Query
 }
 
 // makeDateBetweenQuery creates a date range query for BETWEEN operations on time fields
-func makeDateBetweenQuery(fieldName string, lower, upper interface{}) (query.Query, error) {
+func makeDateBetweenQuery(fieldName string, lower, upper any) (query.Query, error) {
 	// Create a date range query
 	dateRangeQuery := query.NewDateRangeQuery(time.Time{}, time.Time{})
 	dateRangeQuery.SetField(fieldName)
@@ -281,6 +281,14 @@ func makeDateBetweenQuery(fieldName string, lower, upper interface{}) (query.Que
 	dateRangeQuery.InclusiveEnd = &t
 
 	return dateRangeQuery, nil
+}
+
+func makeGeoDistanceQuery(lhs *gentypes.FieldType, lat, lon, distance float64) (query.Query, error) {
+	// Create a geo distance query
+	distanceQuery := query.NewGeoDistanceQuery(lon, lat, fmt.Sprintf("%fkm", distance))
+	distanceQuery.SetField(lhs.Field)
+
+	return distanceQuery, nil
 }
 
 // makeWildcard returns a wildcard/prefix query for Bleve

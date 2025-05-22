@@ -3,6 +3,7 @@ package esgen
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,12 +52,12 @@ func (fg *FilterGenerator) WalkExpr(node expr.Node) (*gentypes.Payload, error) {
 }
 
 // expr dispatches to node-type-specific methods
-func (fg *FilterGenerator) walkExpr(node expr.Node, depth int) (interface{}, error) {
+func (fg *FilterGenerator) walkExpr(node expr.Node, depth int) (any, error) {
 	if depth > MaxDepth {
 		return nil, errors.New("hit max depth on segment generation. bad query?")
 	}
 	var err error
-	var filter interface{}
+	var filter any
 	switch n := node.(type) {
 	case *expr.UnaryNode:
 		// Urnaries do their own negation
@@ -116,7 +117,7 @@ func (fg *FilterGenerator) walkExpr(node expr.Node, depth int) (interface{}, err
 	return filter, nil
 }
 
-func (fg *FilterGenerator) unaryExpr(node *expr.UnaryNode, depth int) (interface{}, error) {
+func (fg *FilterGenerator) unaryExpr(node *expr.UnaryNode, depth int) (any, error) {
 	switch node.Operator.T {
 	case lex.TokenExists:
 		ft, err := fg.fieldType(node.Arg)
@@ -137,7 +138,7 @@ func (fg *FilterGenerator) unaryExpr(node *expr.UnaryNode, depth int) (interface
 }
 
 // filters returns a boolean expression
-func (fg *FilterGenerator) booleanExpr(bn *expr.BooleanNode, depth int) (interface{}, error) {
+func (fg *FilterGenerator) booleanExpr(bn *expr.BooleanNode, depth int) (any, error) {
 	if depth > MaxDepth {
 		return nil, errors.New("hit max depth on segment generation. bad query?")
 	}
@@ -150,7 +151,7 @@ func (fg *FilterGenerator) booleanExpr(bn *expr.BooleanNode, depth int) (interfa
 		return nil, fmt.Errorf("unexpected op %v", bn.Operator)
 	}
 
-	items := make([]interface{}, 0, len(bn.Args))
+	items := make([]any, 0, len(bn.Args))
 	for _, fe := range bn.Args {
 		it, err := fg.walkExpr(fe, depth+1)
 		if err != nil {
@@ -184,7 +185,7 @@ func (fg *FilterGenerator) booleanExpr(bn *expr.BooleanNode, depth int) (interfa
 	return bf, nil
 }
 
-func (fg *FilterGenerator) binaryExpr(node *expr.BinaryNode, _ int) (interface{}, error) {
+func (fg *FilterGenerator) binaryExpr(node *expr.BinaryNode, _ int) (any, error) {
 	// Type check binary expression arguments as they must be:
 	// Identifier-Operator-Literal
 	lhs, err := fg.fieldType(node.Args[0])
@@ -253,7 +254,7 @@ func (fg *FilterGenerator) binaryExpr(node *expr.BinaryNode, _ int) (interface{}
 		if !ok {
 			return nil, fmt.Errorf("second argument to node must be an array, found: %v expr: %v", node.Args[1].NodeType(), node.Args[1])
 		}
-		args := make([]interface{}, 0, len(array.Args))
+		args := make([]any, 0, len(array.Args))
 		for _, nodearg := range array.Args {
 			strarg, ok := scalar(nodearg)
 			if !ok {
@@ -269,7 +270,7 @@ func (fg *FilterGenerator) binaryExpr(node *expr.BinaryNode, _ int) (interface{}
 	}
 }
 
-func (fg *FilterGenerator) triExpr(node *expr.TriNode, _ int) (interface{}, error) {
+func (fg *FilterGenerator) triExpr(node *expr.TriNode, _ int) (any, error) {
 	switch op := node.Operator.T; op {
 	case lex.TokenBetween: // a BETWEEN b AND c
 		// Type check ternary expression arguments as they must be:
@@ -291,7 +292,7 @@ func (fg *FilterGenerator) triExpr(node *expr.TriNode, _ int) (interface{}, erro
 	return nil, fmt.Errorf("unsupported ternary expression: %s", node.Operator.T)
 }
 
-func (fg *FilterGenerator) funcExpr(node *expr.FuncNode, _ int) (interface{}, error) {
+func (fg *FilterGenerator) funcExpr(node *expr.FuncNode, _ int) (any, error) {
 	switch node.Name {
 	case "timewindow":
 		// see entity.EvalTimeWindow for code implementation. Checks if the contextual time is within the time buckets provided
@@ -326,6 +327,53 @@ func (fg *FilterGenerator) funcExpr(node *expr.FuncNode, _ int) (interface{}, er
 		}
 
 		return makeTimeWindowQuery(lhs, threshold.Int64, window.Int64, int64(DayBucket(fg.ts)))
+	case "geodistance":
+		if len(node.Args) != 3 {
+			return nil, fmt.Errorf("'geodistance' function requires 3 arguments, got %d", len(node.Args))
+		}
+		lhs, err := fg.fieldType(node.Args[0])
+		if err != nil {
+			return nil, err
+		}
+		n, ok := node.Args[1].(*expr.StringNode)
+		if !ok {
+			return nil, fmt.Errorf("qlindex: unsupported type for 'geodistance' location argument. must be string, got %s", node.Args[1].NodeType())
+		}
+		lat, lon, ok := gentypes.StringToLatLng(n.Text)
+		if !ok {
+			return nil, fmt.Errorf("qlindex: unsupported format for 'geodistance' location. must be \"latitude,longitude\", got %s", n.Text)
+		}
+		var distance float64
+		switch n := node.Args[2].(type) {
+		case *expr.NumberNode:
+			if n.IsFloat {
+				distance = n.Float64
+			} else {
+				distance = float64(n.Int64)
+			}
+		case *expr.StringNode:
+			f, err := strconv.ParseFloat(n.Text, 64)
+			if err != nil {
+				return nil, fmt.Errorf("qlindex: unsupported format for 'geodistance' distance. must be number, got %s", n.Text)
+			}
+			distance = f
+		default:
+			return nil, fmt.Errorf("qlindex: unsupported type for 'geodistance' distance argument. must be number, got %s", node.Args[2].NodeType())
+		}
+		return makeGeoDistanceQuery(lhs, lat, lon, distance), nil
 	}
 	return nil, fmt.Errorf("qlindex: unsupported function: %s", node.Name)
+}
+
+func makeGeoDistanceQuery(lhs *gentypes.FieldType, lat, lon, distance float64) any {
+	return &GeoDistanceFilter{
+		GeoDistance: map[string]any{
+			"distance": fmt.Sprintf("%fkm", distance),
+			fmt.Sprintf("%s.location", lhs.Field): map[string]any{
+				"lat": lat,
+				"lon": lon,
+			},
+			"distance_type": "plane",
+		},
+	}
 }

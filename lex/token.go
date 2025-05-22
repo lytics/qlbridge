@@ -178,6 +178,7 @@ const (
 	TokenView           TokenType = 404 // VIEW
 	TokenContinuousView TokenType = 405 // CONTINUOUSVIEW
 	TokenTemp           TokenType = 406 // TEMP or TEMPORARY
+	TokenIndex          TokenType = 407 // INDEX
 
 	// ddl other
 	TokenChange       TokenType = 410 // change

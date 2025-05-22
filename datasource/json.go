@@ -170,7 +170,7 @@ func (m *JsonSource) Next() schema.Message {
 }
 
 func (m *JsonSource) jsonDefaultLine(line []byte) (schema.Message, error) {
-	jm := make(map[string]interface{})
+	jm := make(map[string]any)
 	err := json.Unmarshal(line, &jm)
 	if err != nil {
 		return nil, fmt.Errorf("could not read json line: %w %s", err, string(line))

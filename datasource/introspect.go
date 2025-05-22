@@ -71,7 +71,7 @@ func IntrospectTable(tbl *schema.Table, iter schema.Iterator) error {
 						//u.Debugf("add field? %+v", fld)
 						//u.Debugf("%s = %v   type: %T   vt:%s new? %v", k, val, val, valType, !exists)
 					}
-				case map[string]interface{}:
+				case map[string]any:
 					tbl.AddFieldType(k, value.JsonType)
 				default:
 					u.Debugf("not implemented: %T", val)
@@ -116,9 +116,9 @@ func IntrospectTable(tbl *schema.Table, iter schema.Iterator) error {
 						//u.Debugf("add field? %+v", fld)
 						//u.Debugf("%s = %v   type: %T   vt:%s new? %v", k, val, val, valType, !exists)
 					}
-				case map[string]interface{}:
+				case map[string]any:
 					tbl.AddFieldType(k, value.JsonType)
-				case []interface{}:
+				case []any:
 					tbl.AddFieldType(k, value.JsonType)
 				case nil:
 					// hm.....

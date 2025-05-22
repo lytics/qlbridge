@@ -84,13 +84,13 @@ func TestFilterQlVm(t *testing.T) {
 	}
 	readers := []expr.ContextReader{
 		datasource.NewContextWrapper(user),
-		datasource.NewContextMap(map[string]interface{}{
+		datasource.NewContextMap(map[string]any{
 			"city":            "Peoria, IL",
 			"zip":             5,
 			"lastevent":       map[string]time.Time{"signedup": t1},
 			"last.event":      map[string]time.Time{"has.period": t1},
-			"transactions":    []interface{}{t1.Add(-1 * time.Hour * 24), t1.Add(1 * time.Hour * 24)},
-			"transactionsnil": []interface{}{},
+			"transactions":    []any{t1.Add(-1 * time.Hour * 24), t1.Add(1 * time.Hour * 24)},
+			"transactionsnil": []any{},
 		}, true),
 	}
 
@@ -224,19 +224,19 @@ func TestFilterQlVm(t *testing.T) {
 
 	// Filter Select Statements
 	filterSelects := []fsel{
-		{`select name, zip FROM mycontext FILTER name == "Yoda"`, map[string]interface{}{"name": "Yoda", "zip": 5}},
+		{`select name, zip FROM mycontext FILTER name == "Yoda"`, map[string]any{"name": "Yoda", "zip": 5}},
 		{`
 		SELECT
 			name
 			, zip  IF zip > 2
 		FROM mycontext 
-		FILTER name == "Yoda"`, map[string]interface{}{"name": "Yoda", "zip": 5}},
+		FILTER name == "Yoda"`, map[string]any{"name": "Yoda", "zip": 5}},
 		{`
 		SELECT
 			name
 			, zip  IF zip > 200
 		FROM mycontext 
-		FILTER name == "Yoda"`, map[string]interface{}{"name": "Yoda"}},
+		FILTER name == "Yoda"`, map[string]any{"name": "Yoda"}},
 		{`
 		SELECT
 			name IF name < true
@@ -269,7 +269,7 @@ func TestFilterQlVm(t *testing.T) {
 
 type fsel struct {
 	query  string
-	expect map[string]interface{}
+	expect map[string]any
 }
 
 type includer struct {
@@ -294,8 +294,8 @@ func (includer) Include(name string) (expr.Node, error) {
 func TestInclude(t *testing.T) {
 	t.Parallel()
 
-	e1 := datasource.NewContextSimpleNative(map[string]interface{}{"x": 6, "y": "1"})
-	e2 := datasource.NewContextSimpleNative(map[string]interface{}{"x": 4, "y": "1"})
+	e1 := datasource.NewContextSimpleNative(map[string]any{"x": 6, "y": "1"})
+	e2 := datasource.NewContextSimpleNative(map[string]any{"x": 4, "y": "1"})
 
 	q, err := rel.ParseFilterQL("FILTER AND (x < 9000, INCLUDE test)")
 	assert.Equal(t, nil, err)
@@ -375,7 +375,7 @@ func (i *contextWithCache) GetCachedValue(name string) (expr.CachedValue, bool) 
 func TestIncludeCache(t *testing.T) {
 	t.Parallel()
 
-	e := datasource.NewContextSimpleNative(map[string]interface{}{"x": 6})
+	e := datasource.NewContextSimpleNative(map[string]any{"x": 6})
 
 	q1, _ := rel.ParseFilterQL("FILTER INCLUDE cached_include")
 	q2, err := rel.ParseFilterQL("FILTER INCLUDE test")
@@ -419,7 +419,7 @@ func TestIncludeCache(t *testing.T) {
 // shouldn't, but they do, so we need to be defensive.
 func TestFilterContexts(t *testing.T) {
 	t.Parallel()
-	readCtx := datasource.NewContextSimpleNative(map[string]interface{}{"x": 6, "key": "abc"})
+	readCtx := datasource.NewContextSimpleNative(map[string]any{"x": 6, "key": "abc"})
 
 	// Test a non-include context
 	sel, err := rel.ParseFilterSelect("SELECT x FROM context FILTER exists x")

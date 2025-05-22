@@ -3,6 +3,7 @@ package blevegen
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -205,7 +206,7 @@ func (fg *FilterGenerator) booleanExpr(bn *expr.BooleanNode, depth int) (query.Q
 	return boolQuery, nil
 }
 
-func convertToFloat64(value interface{}) float64 {
+func convertToFloat64(value any) float64 {
 	switch v := value.(type) {
 	case int:
 		return float64(v)
@@ -396,6 +397,40 @@ func (fg *FilterGenerator) funcExpr(node *expr.FuncNode, _ int) (query.Query, er
 		}
 
 		return makeTimeWindowQuery(lhs, threshold.Int64, window.Int64, int64(DayBucket(fg.ts)))
+	case "geodistance":
+		if len(node.Args) != 3 {
+			return nil, fmt.Errorf("'geodistance' function requires 3 arguments, got %d", len(node.Args))
+		}
+		lhs, err := fg.fieldType(node.Args[0])
+		if err != nil {
+			return nil, err
+		}
+		n, ok := node.Args[1].(*expr.StringNode)
+		if !ok {
+			return nil, fmt.Errorf("qlindex: unsupported type for 'geodistance' location argument. must be string, got %s", node.Args[1].NodeType())
+		}
+		lat, lon, ok := gentypes.StringToLatLng(n.Text)
+		if !ok {
+			return nil, fmt.Errorf("qlindex: unsupported format for 'geodistance' location. must be \"latitude,longitude\", got %s", n.Text)
+		}
+		var distance float64
+		switch n := node.Args[2].(type) {
+		case *expr.NumberNode:
+			if n.IsFloat {
+				distance = n.Float64
+			} else {
+				distance = float64(n.Int64)
+			}
+		case *expr.StringNode:
+			f, err := strconv.ParseFloat(n.Text, 64)
+			if err != nil {
+				return nil, fmt.Errorf("qlindex: unsupported format for 'geodistance' distance. must be number, got %s", n.Text)
+			}
+			distance = f
+		default:
+			return nil, fmt.Errorf("qlindex: unsupported type for 'geodistance' distance argument. must be number, got %s", node.Args[2].NodeType())
+		}
+		return makeGeoDistanceQuery(lhs, lat, lon, distance)
 	}
 	return nil, fmt.Errorf("qlindex: unsupported function: %s", node.Name)
 }

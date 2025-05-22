@@ -31,7 +31,7 @@ func init() {
 	}
 }
 
-func debugf(f string, args ...interface{}) {
+func debugf(f string, args ...any) {
 	if Trace {
 		u.DoLog(3, u.DEBUG, fmt.Sprintf(f, args...))
 	}
@@ -239,7 +239,7 @@ func (l *Lexer) Next() (r rune) {
 }
 
 func (l *Lexer) skipX(ct int) {
-	for i := 0; i < ct; i++ {
+	for range ct {
 		l.Next()
 	}
 }
@@ -432,7 +432,7 @@ func (l *Lexer) ConsumeWord(word string) {
 
 // error returns an error token and terminates the scan by passing
 // back a nil pointer that will be the next state, terminating l.nextToken.
-func (l *Lexer) errorf(format string, args ...interface{}) StateFn {
+func (l *Lexer) errorf(format string, args ...any) StateFn {
 	l.tokens <- Token{T: TokenError, V: fmt.Sprintf(format, args...)}
 	return nil
 }
@@ -549,7 +549,7 @@ func (l *Lexer) tryMatch(matchTo string) bool {
 // Emits an error token and terminates the scan
 // by passing back a nil ponter that will be the next state
 // terminating lexer.next function
-func (l *Lexer) errorToken(format string, args ...interface{}) StateFn {
+func (l *Lexer) errorToken(format string, args ...any) StateFn {
 	//fmt.Sprintf(format, args...)
 	l.Emit(TokenError)
 	return nil
@@ -585,7 +585,7 @@ func (l *Lexer) isExpr() bool {
 	}
 	// Expressions are terminated by either a parenthesis
 	// never by spaces
-	for i := 0; i < len(l.input)-l.pos; i++ {
+	for i := range len(l.input) - l.pos {
 		r, _ := utf8.DecodeRuneInString(l.input[l.pos+i:])
 		if r == '(' && i > 0 {
 			return true
@@ -1175,17 +1175,28 @@ func LexUrnaryNot(l *Lexer) StateFn {
 	return nil
 }
 
-// LexParenRight:  look for end of paren, of which we have descended and consumed start
-func LexParenRight(l *Lexer) StateFn {
+// LexMatchingEnd:  look for end rune, of which we have descended and consumed start
+// For parens and brackets
+func LexMatchingEnd(l *Lexer, end rune, endTokenType TokenType) StateFn {
 	l.SkipWhiteSpaces()
 	// first rune must be closing Parenthesis
 	r := l.Next()
 	//u.Debugf("LexParenRight:  %v  eof?%v", string(r), r == eof)
-	if r != ')' {
-		return l.errorToken("expression must end with a paren: ) " + l.current())
+	if r != end {
+		return l.errorToken(fmt.Sprintf("expression must end with %c but got: :%s", end, l.current()))
 	}
-	l.Emit(TokenRightParenthesis)
+	l.Emit(endTokenType)
 	return nil // ascend
+}
+
+// LexBracketRight:  look for end of bracket, of which we have descended and consumed start
+func LexBracketRight(l *Lexer) StateFn {
+	return LexMatchingEnd(l, ']', TokenRightBracket)
+}
+
+// LexParenRight:  look for end of paren, of which we have descended and consumed start
+func LexParenRight(l *Lexer) StateFn {
+	return LexMatchingEnd(l, ')', TokenRightParenthesis)
 }
 
 // LexParenLeft:  look for end of paren, of which we have descended and consumed start
@@ -1265,6 +1276,10 @@ func LexListOfArgs(l *Lexer) StateFn {
 		l.Emit(TokenLeftParenthesis)
 		//l.Push("LexParenRight", LexParenRight)
 		return LexListOfArgs
+		// TODO (ajr) Why was this here? It messes up array parsing?
+		// 	case '[':
+		// 		l.emit(tokenleftbracket)
+		// 		return LexListOfArgs
 	case ',':
 		l.Emit(TokenComma)
 		return LexListOfArgs
@@ -1282,6 +1297,7 @@ func LexListOfArgs(l *Lexer) StateFn {
 		l.backup()
 		return nil
 	case ']':
+		l.backup()
 		return nil
 	default:
 		// So, not comma, * so either is Expression, Identity, Value
@@ -3012,7 +3028,6 @@ func LexNumber(l *Lexer) StateFn {
 func LexNumberOrDuration(l *Lexer) StateFn {
 	l.SkipWhiteSpaces()
 	typ, ok := scanNumericOrDuration(l, true)
-	u.Debugf("typ%T   %v", typ, ok)
 	if !ok {
 		return l.errorf("bad number syntax: %q", l.input[l.start:l.pos])
 	}

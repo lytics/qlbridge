@@ -44,7 +44,7 @@ func (m KeyCol) Key() driver.Value                   { return m.Val }
 // Given a Where expression, lets try to create a key which
 //
 //	requires form    `idenity = "value"`
-func KeyFromWhere(wh interface{}) schema.Key {
+func KeyFromWhere(wh any) schema.Key {
 	switch n := wh.(type) {
 	case *rel.SqlWhere:
 		return KeyFromWhere(n.Expr)

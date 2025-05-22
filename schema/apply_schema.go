@@ -15,9 +15,9 @@ type (
 		// Init initialize the applyer with registry.
 		Init(r *Registry)
 		// AddOrUpdateOnSchema Add or Update object (Table, Index)
-		AddOrUpdateOnSchema(s *Schema, obj interface{}) error
+		AddOrUpdateOnSchema(s *Schema, obj any) error
 		// Drop an object from schema
-		Drop(s *Schema, obj interface{}) error
+		Drop(s *Schema, obj any) error
 	}
 
 	// SchemaSourceProvider is factory for creating schema storage
@@ -48,7 +48,7 @@ func (m *InMemApplyer) Init(r *Registry) {
 // AddOrUpdateOnSchema we have a schema change to apply.  A schema change is
 // a new table, index, or whole new schema being registered.  We provide the first
 // argument which is which schema it is being applied to (ie, add table x to schema y).
-func (m *InMemApplyer) AddOrUpdateOnSchema(s *Schema, v interface{}) error {
+func (m *InMemApplyer) AddOrUpdateOnSchema(s *Schema, v any) error {
 
 	// All Schemas must also have an info-schema
 	if s.InfoSchema == nil {
@@ -105,7 +105,7 @@ func (m *InMemApplyer) AddOrUpdateOnSchema(s *Schema, v interface{}) error {
 }
 
 // Drop we have a schema change to apply.
-func (m *InMemApplyer) Drop(s *Schema, v interface{}) error {
+func (m *InMemApplyer) Drop(s *Schema, v any) error {
 
 	// Find the type of operation being updated.
 	switch v := v.(type) {

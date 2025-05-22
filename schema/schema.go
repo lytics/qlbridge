@@ -97,15 +97,15 @@ type (
 	// and can be used to create a Datasource used to read this table.
 	Table struct {
 		TablePb
-		Fields         []*Field               // List of Fields, in order
-		Context        map[string]interface{} // During schema discovery of underlying source, may need to store additional info
-		FieldPositions map[string]int         // Maps name of column to ordinal position in array of []driver.Value's
-		FieldMap       map[string]*Field      // Map of Field-name -> Field
-		Schema         *Schema                // The schema this is member of
-		Source         Source                 // The source
-		tblID          uint64                 // internal tableid, hash of table name + schema?
-		cols           []string               // array of column names
-		lastRefreshed  time.Time              // Last time we refreshed this schema
+		Fields         []*Field          // List of Fields, in order
+		Context        map[string]any    // During schema discovery of underlying source, may need to store additional info
+		FieldPositions map[string]int    // Maps name of column to ordinal position in array of []driver.Value's
+		FieldMap       map[string]*Field // Map of Field-name -> Field
+		Schema         *Schema           // The schema this is member of
+		Source         Source            // The source
+		tblID          uint64            // internal tableid, hash of table name + schema?
+		cols           []string          // array of column names
+		lastRefreshed  time.Time         // Last time we refreshed this schema
 		rows           [][]driver.Value
 	}
 
@@ -116,7 +116,7 @@ type (
 		idx uint64         // Positional index in array of fields
 		row []driver.Value // memoized values of this fields descriptors for describe
 		FieldPb
-		Context map[string]interface{} // During schema discovery of underlying source, may need to store additional info
+		Context map[string]any // During schema discovery of underlying source, may need to store additional info
 	}
 	// FieldData is the byte value of a "Described" field ready to write to the wire so we don't have
 	// to continually re-serialize it.
@@ -502,7 +502,7 @@ func (m *Table) FieldsAsMessages() []Message {
 func (m *Table) Id() uint64 { return m.tblID }
 
 // Body satisifies Message Interface
-func (m *Table) Body() interface{} { return m }
+func (m *Table) Body() any { return m }
 
 // AddField register a new field
 func (m *Table) AddField(fld *Field) {
@@ -604,9 +604,9 @@ func (m *Table) Since(dur time.Duration) bool {
 }
 
 // AddContext add key/value pairs to context (settings, metatadata).
-func (m *Table) AddContext(key string, value interface{}) {
+func (m *Table) AddContext(key string, value any) {
 	if len(m.Context) == 0 {
-		m.Context = make(map[string]interface{})
+		m.Context = make(map[string]any)
 	}
 	m.Context[key] = value
 }
@@ -641,7 +641,7 @@ func NewField(name string, valType value.ValueType, size int, allowNulls bool, d
 }
 func (m *Field) ValueType() value.ValueType { return value.ValueType(m.Type) }
 func (m *Field) Id() uint64                 { return m.idx }
-func (m *Field) Body() interface{}          { return m }
+func (m *Field) Body() any                  { return m }
 func (m *Field) AsRow() []driver.Value {
 	if len(m.row) > 0 {
 		return m.row
@@ -659,9 +659,9 @@ func (m *Field) AsRow() []driver.Value {
 	m.row[8] = m.Description // should we put native type in here?
 	return m.row
 }
-func (m *Field) AddContext(key string, value interface{}) {
+func (m *Field) AddContext(key string, value any) {
 	if len(m.Context) == 0 {
-		m.Context = make(map[string]interface{})
+		m.Context = make(map[string]any)
 	}
 	m.Context[key] = value
 }

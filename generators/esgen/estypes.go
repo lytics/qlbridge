@@ -19,14 +19,14 @@ type BoolFilter struct {
 }
 
 type BoolOccurrence struct {
-	Filter  []interface{} `json:"filter,omitempty"`
-	Should  []interface{} `json:"should,omitempty"`
-	MustNot interface{}   `json:"must_not,omitempty"`
+	Filter  []any `json:"filter,omitempty"`
+	Should  []any `json:"should,omitempty"`
+	MustNot any   `json:"must_not,omitempty"`
 }
 
-func AndFilter(v []interface{}) *BoolFilter { return &BoolFilter{Occurs: BoolOccurrence{Filter: v}} }
-func OrFilter(v []interface{}) *BoolFilter  { return &BoolFilter{Occurs: BoolOccurrence{Should: v}} }
-func NotFilter(v interface{}) *BoolFilter   { return &BoolFilter{Occurs: BoolOccurrence{MustNot: v}} }
+func AndFilter(v []any) *BoolFilter { return &BoolFilter{Occurs: BoolOccurrence{Filter: v}} }
+func OrFilter(v []any) *BoolFilter  { return &BoolFilter{Occurs: BoolOccurrence{Should: v}} }
+func NotFilter(v any) *BoolFilter   { return &BoolFilter{Occurs: BoolOccurrence{MustNot: v}} }
 
 // Filter structs
 
@@ -35,7 +35,7 @@ type exists struct {
 }
 
 // Exists creates a new Elasticsearch filter {"exists": {"field": field}}
-func Exists(field *gentypes.FieldType) interface{} {
+func Exists(field *gentypes.FieldType) any {
 	if field.Nested() {
 		/*
 			"nested": {
@@ -61,14 +61,14 @@ func Exists(field *gentypes.FieldType) interface{} {
 //		Filters []interface{} `json:"and"`
 //	}
 type boolean struct {
-	Bool interface{} `json:"bool"`
+	Bool any `json:"bool"`
 }
 type must struct {
-	Filters []interface{} `json:"must"`
+	Filters []any `json:"must"`
 }
 
 type in struct {
-	Terms map[string][]interface{} `json:"terms"`
+	Terms map[string][]any `json:"terms"`
 }
 
 // In creates a new Elasticsearch terms filter
@@ -85,13 +85,13 @@ type in struct {
 //	     } ,
 //	     "path":"path_to_obj"
 //	 }}
-func In(field *gentypes.FieldType, values []interface{}) interface{} {
+func In(field *gentypes.FieldType, values []any) any {
 	if field.Nested() {
 		return &nested{&NestedQuery{
 			Query: &boolean{
 				&must{
-					Filters: []interface{}{
-						&in{map[string][]interface{}{field.PathAndPrefix(""): values}},
+					Filters: []any{
+						&in{map[string][]any{field.PathAndPrefix(""): values}},
 						Term(field.Path+".k", field.Field),
 					},
 				},
@@ -100,7 +100,7 @@ func In(field *gentypes.FieldType, values []interface{}) interface{} {
 			IgnoreUnmapped: true,
 		}}
 	}
-	return &in{map[string][]interface{}{field.Field: values}}
+	return &in{map[string][]any{field.Field: values}}
 }
 
 // Nested creates a new Elasticsearch nested filter
@@ -115,11 +115,11 @@ func In(field *gentypes.FieldType, values []interface{}) interface{} {
 //	     } ,
 //	     "path":"path_to_obj"
 //	 }}
-func Nested(field *gentypes.FieldType, filter interface{}) *nested {
+func Nested(field *gentypes.FieldType, filter any) *nested {
 
 	// Hm.  Elasticsearch doc seems to insinuate we don't need
 	// this path + ".k" but unit tests say otherwise
-	fl := []interface{}{
+	fl := []any{
 		Term(field.Path+".k", field.Field),
 		filter,
 	}
@@ -138,16 +138,16 @@ type nested struct {
 }
 
 type NestedQuery struct {
-	Query          interface{} `json:"query"`
-	Path           string      `json:"path"`
-	IgnoreUnmapped bool        `json:"ignore_unmapped,omitempty"`
+	Query          any    `json:"query"`
+	Path           string `json:"path"`
+	IgnoreUnmapped bool   `json:"ignore_unmapped,omitempty"`
 }
 
 type RangeQry struct {
-	GTE interface{} `json:"gte,omitempty"`
-	LTE interface{} `json:"lte,omitempty"`
-	GT  interface{} `json:"gt,omitempty"`
-	LT  interface{} `json:"lt,omitempty"`
+	GTE any `json:"gte,omitempty"`
+	LTE any `json:"lte,omitempty"`
+	GT  any `json:"gt,omitempty"`
+	LT  any `json:"lt,omitempty"`
 }
 
 type RangeFilter struct {
@@ -155,12 +155,12 @@ type RangeFilter struct {
 }
 
 type term struct {
-	Term map[string]interface{} `json:"term"`
+	Term map[string]any `json:"term"`
 }
 
 // Term creates a new Elasticsearch term filter {"term": {field: value}}
-func Term(fieldName string, value interface{}) *term {
-	return &term{map[string]interface{}{fieldName: value}}
+func Term(fieldName string, value any) *term {
+	return &term{map[string]any{fieldName: value}}
 }
 
 type matchall struct {
@@ -208,4 +208,8 @@ func wcFunc(val string, addStars bool) string {
 //	}
 func Wildcard(field, value string, addStars bool) *wildcard {
 	return &wildcard{Wildcard: map[string]string{field: wcFunc(value, addStars)}}
+}
+
+type GeoDistanceFilter struct {
+	GeoDistance map[string]any `json:"geo_distance"`
 }

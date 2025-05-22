@@ -96,7 +96,7 @@ func TestLexSqlCreate(t *testing.T) {
 
 	// CREATE {DATABASE | SCHEMA | SOURCE | VIEW | CONTINUOUSVIEW} [IF NOT EXISTS] db_name
 	// [create_specification] ...
-	verifyTokens(t, `CREATE SCHEMA IF NOT EXISTS mysource 
+	verifyTokens(t, `CREATE SCHEMA IF NOT EXISTS mysource
 		WITH stuff = "hello";
 		`,
 		[]Token{
@@ -145,8 +145,8 @@ func TestLexSqlCreate(t *testing.T) {
 			tv(TokenValue, "hello"),
 		})
 
-	verifyTokens(t, `CREATE OR REPLACE VIEW viewx 
-			AS SELECT a, b FROM mydb.tbl 
+	verifyTokens(t, `CREATE OR REPLACE VIEW viewx
+			AS SELECT a, b FROM mydb.tbl
 			WITH stuff = "hello";`,
 		[]Token{
 			tv(TokenCreate, "CREATE"),
@@ -167,7 +167,7 @@ func TestLexSqlCreate(t *testing.T) {
 			tv(TokenValue, "hello"),
 		})
 
-	verifyTokens(t, `CREATE TABLE articles 
+	verifyTokens(t, `CREATE TABLE articles
 		 (
 		  ID int(11) NOT NULL AUTO_INCREMENT,
 		  Email char(150) NOT NULL DEFAULT '',
@@ -235,6 +235,29 @@ func TestLexSqlCreate(t *testing.T) {
 			tv(TokenIdentity, "stuff"),
 			tv(TokenEqual, "="),
 			tv(TokenValue, "hello"),
+		})
+
+	verifyTokens(t, `CREATE INDEX IF NOT EXISTS my_index ON my_table (col1, col2) WITH { "key": "value" };`,
+		[]Token{
+			tv(TokenCreate, "CREATE"),
+			tv(TokenIndex, "INDEX"), // Assuming INDEX is treated as an Identity for now
+			tv(TokenIf, "IF"),
+			tv(TokenNegate, "NOT"),
+			tv(TokenExists, "EXISTS"),
+			tv(TokenIdentity, "my_index"),
+			tv(TokenOn, "ON"),
+			tv(TokenIdentity, "my_table"),
+			tv(TokenLeftParenthesis, "("),
+			tv(TokenIdentity, "col1"),
+			tv(TokenComma, ","),
+			tv(TokenIdentity, "col2"),
+			tv(TokenRightParenthesis, ")"),
+			tv(TokenWith, "WITH"),
+			tv(TokenLeftBrace, "{"),
+			tv(TokenIdentity, "key"),
+			tv(TokenColon, ":"),
+			tv(TokenValue, "value"),
+			tv(TokenRightBrace, "}"),
 		})
 }
 func TestLexSqlDrop(t *testing.T) {

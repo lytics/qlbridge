@@ -49,7 +49,7 @@ var (
 	// This is the message context which will be added to all tests below
 	//  and be available to the VM runtime for evaluation by using
 	//  key's such as "int5" or "user_id"
-	msgContext = datasource.NewContextMap(map[string]interface{}{
+	msgContext = datasource.NewContextMap(map[string]any{
 		"int5":    value.NewIntValue(5),
 		"str5":    value.NewStringValue("5"),
 		"created": value.NewTimeValue(tcreated),
@@ -349,12 +349,12 @@ type vmTest struct {
 	parseok bool
 	evalok  bool
 	context expr.EvalContext
-	result  interface{} // ?? what is this?
+	result  any // ?? what is this?
 }
 
-func vmt(qltext string, result interface{}, ok bool) vmTest {
+func vmt(qltext string, result any, ok bool) vmTest {
 	return vmTest{qlText: qltext, parseok: ok, evalok: ok, result: result, context: &includer{msgContext}}
 }
-func vmtall(qltext string, result interface{}, parseOk, evalOk bool) vmTest {
+func vmtall(qltext string, result any, parseOk, evalOk bool) vmTest {
 	return vmTest{qlText: qltext, parseok: parseOk, evalok: evalOk, result: result, context: &includer{msgContext}}
 }

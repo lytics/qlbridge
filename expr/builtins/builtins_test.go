@@ -34,7 +34,7 @@ type emptySlice struct{}
 func (m *emptySlice) Type() value.ValueType { return value.SliceValueType }
 func (m *emptySlice) Validate(n *expr.FuncNode) (expr.EvaluatorFunc, error) {
 	return func(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
-		vals := make([]interface{}, 0)
+		vals := make([]any, 0)
 		return value.NewSliceValuesNative(vals), true
 	}, nil
 }
@@ -55,8 +55,8 @@ type User struct {
 	HasSession    *bool
 	Roles         []string
 	EmptyStrings  []string
-	Labels        []interface{}
-	EmptyLabels   []interface{}
+	Labels        []any
+	EmptyLabels   []any
 	BankAmount    float64
 	Address       Address
 	AddressNil    *Address
@@ -76,8 +76,8 @@ func (m *User) FullName() string {
 	return m.Name + ", Jedi"
 }
 
-func makeDataMap(data map[string][]string) map[string]interface{} {
-	vals := make(map[string]interface{}, len(data))
+func makeDataMap(data map[string][]string) map[string]any {
+	vals := make(map[string]any, len(data))
 	for k, v := range data {
 		if len(v) == 1 {
 			vals[k] = v[0]
@@ -240,8 +240,8 @@ var builtinTests = []testBuiltins{
 	{`oneof(email, email(not_a_field)) IN ("b",10, 4.5) `, value.NewBoolValue(false)},
 	{`oneof("","")`, value.ErrValue},
 
-	{`map(event, 22)`, value.NewMapValue(map[string]interface{}{"hello": 22})},
-	{`map(event, toint(score_amount))`, value.NewMapValue(map[string]interface{}{"hello": 22})},
+	{`map(event, 22)`, value.NewMapValue(map[string]any{"hello": 22})},
+	{`map(event, toint(score_amount))`, value.NewMapValue(map[string]any{"hello": 22})},
 	{`map("",6)`, value.ErrValue},
 	{`map("key","")`, value.ErrValue},
 
@@ -253,8 +253,8 @@ var builtinTests = []testBuiltins{
 	{`maptime(Address,"")`, value.ErrValue},
 
 	{`filtermatch(split(sval,","),"event4=")`, value.NewStringsValue([]string{"event4=63.00"})},
-	{`filtermatch(match("score_","tag_"),"amo*")`, value.NewMapValue(map[string]interface{}{"amount": "22"})},
-	{`filtermatch(match("score_","tag_"),"amo")`, value.NewMapValue(map[string]interface{}{"amount": "22"})},
+	{`filtermatch(match("score_","tag_"),"amo*")`, value.NewMapValue(map[string]any{"amount": "22"})},
+	{`filtermatch(match("score_","tag_"),"amo")`, value.NewMapValue(map[string]any{"amount": "22"})},
 	{`filtermatch(match("score_","tag_"),"aaa")`, value.ErrValue},
 	{`filtermatch("apples","app*")`, value.NewStringValue("apples")},
 	{`filtermatch("apples","app")`, value.NewStringValue("apples")},
@@ -267,8 +267,8 @@ var builtinTests = []testBuiltins{
 	{`filtermatch(Address,"app")`, value.ErrValue},
 	{`filtermatch("","")`, value.ErrValue},
 
-	{`filter(match("score_","tag_"),"nam*")`, value.NewMapValue(map[string]interface{}{"amount": "22"})},
-	{`filter(match("score_","tag_"),"name")`, value.NewMapValue(map[string]interface{}{"amount": "22"})},
+	{`filter(match("score_","tag_"),"nam*")`, value.NewMapValue(map[string]any{"amount": "22"})},
+	{`filter(match("score_","tag_"),"name")`, value.NewMapValue(map[string]any{"amount": "22"})},
 	{`filter(match("score_"),"amo")`, value.ErrValue},
 	{`filter(split("apples,oranges",","),"ora*")`, value.NewStringsValue([]string{"apples"})},
 	{`filter(split("apples,oranges",","),"ora")`, value.NewStringsValue([]string{"apples"})},
@@ -283,8 +283,8 @@ var builtinTests = []testBuiltins{
 	{`filter(split("apples",","),"app")`, value.ErrValue},
 	{`filter("","")`, value.ErrValue},
 
-	{`match("score_")`, value.NewMapValue(map[string]interface{}{"amount": "22"})},
-	{`match("score_","tag_")`, value.NewMapValue(map[string]interface{}{"amount": "22", "name": "bob"})},
+	{`match("score_")`, value.NewMapValue(map[string]any{"amount": "22"})},
+	{`match("score_","tag_")`, value.NewMapValue(map[string]any{"amount": "22", "name": "bob"})},
 	{`match(Address)`, value.ErrValue},
 	{`match("nonfield_")`, value.ErrValue},
 
@@ -334,12 +334,12 @@ var builtinTests = []testBuiltins{
 	{`array.slice(tags,"hello",77)`, value.ErrValue},
 	{`array.slice(tags,1,"hello")`, value.ErrValue},
 
-	{`array.slice(Labels,2)`, value.NewSliceValuesNative([]interface{}{"c", "d", 5, 6, 7})},
+	{`array.slice(Labels,2)`, value.NewSliceValuesNative([]any{"c", "d", 5, 6, 7})},
 	// {`array.slice(Labels,-2)`, value.NewStringsValue([]string{"c", "d"})},
 	// {`array.slice(Labels,-1)`, value.NewStringsValue([]string{"d"})},
 	// {`array.slice(Labels,1,3)`, value.NewStringsValue([]string{"b", "c"})},
 	// {`array.slice(Labels,1,4)`, value.NewStringsValue([]string{"b", "c", "d"})},
-	{`array.slice(Labels,-6,-4)`, value.NewSliceValuesNative([]interface{}{"b", "c"})},
+	{`array.slice(Labels,-6,-4)`, value.NewSliceValuesNative([]any{"b", "c"})},
 	{`array.slice(Labels,1, 10)`, value.ErrValue},
 	{`array.slice(Labels,1,-7)`, value.ErrValue},
 	{`array.slice(Labels,-1,77)`, value.ErrValue},
@@ -993,7 +993,7 @@ func TestBuiltins(t *testing.T) {
 		HasSession:    &tr,
 		Address:       Address{"Detroit", 55},
 		Roles:         []string{"admin", "api"},
-		Labels:        []interface{}{"a", "b", "c", "d", 5, 6, 7},
+		Labels:        []any{"a", "b", "c", "d", 5, 6, 7},
 		BankAmount:    55.5,
 		Floats:        map[string]float64{"foo": 55.5, "foo2": 56.7},
 		Hits:          map[string]int64{"foo": 5, "foo2": 5},

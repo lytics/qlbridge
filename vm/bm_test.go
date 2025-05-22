@@ -47,7 +47,7 @@ type FakeNode interface {
 type FakeNodeStuff struct {
 	ot  OurType
 	rv  reflect.Value
-	val interface{}
+	val any
 }
 
 func (m *FakeNodeStuff) Kind() reflect.Kind {
@@ -93,7 +93,7 @@ func BenchmarkReflectionKind(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := FakeNodeStuff{ot: OurString, rv: reflect.ValueOf("hello")}
-		for j := 0; j < 20; j++ {
+		for range 20 {
 			if k := n.Kind(); k != reflect.String {
 				//
 			}
@@ -104,7 +104,7 @@ func BenchmarkReflectionKind2(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := FakeNodeStuff{ot: OurString, val: "hello"}
-		for j := 0; j < 20; j++ {
+		for range 20 {
 			if k := n.Kind2(); k != reflect.String {
 				//
 			}
@@ -115,7 +115,7 @@ func BenchmarkReflectionOurType(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := FakeNodeStuff{ot: OurString, rv: reflect.ValueOf("hello")}
-		for j := 0; j < 20; j++ {
+		for range 20 {
 			if k := n.OurType(); k != OurString {
 				//
 			}
@@ -126,7 +126,7 @@ func BenchmarkReflectionOurType2(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := FakeNodeStuff{ot: OurString, rv: reflect.ValueOf("hello")}
-		for j := 0; j < 20; j++ {
+		for range 20 {
 			if k := n.OurType2(); k != OurString {
 				//
 			}
@@ -137,7 +137,7 @@ func BenchmarkReflectionOurType3(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := FakeNodeStuff{ot: OurString}
-		for j := 0; j < 20; j++ {
+		for range 20 {
 			if k := n.OurType(); k != OurString {
 				//
 			}
@@ -148,7 +148,7 @@ func BenchmarkReflectionOurType4(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := FakeNodeStuff{ot: OurString}
-		for j := 0; j < 20; j++ {
+		for range 20 {
 			if k := n.OurType2(); k != OurString {
 				//
 			}
@@ -159,7 +159,7 @@ func BenchmarkReflectionOurType5(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		n := FakeNodeStuff{ot: OurString}
-		for j := 0; j < 20; j++ {
+		for range 20 {
 			switch n.OurType() {
 			case OurInt:
 				//

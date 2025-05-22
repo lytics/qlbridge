@@ -27,7 +27,7 @@ var (
 )
 
 // MessageConversion convert values of type schema.Message.
-func MessageConversion(vals []interface{}) []schema.Message {
+func MessageConversion(vals []any) []schema.Message {
 	msgs := make([]schema.Message, len(vals))
 	for i, v := range vals {
 		msgs[i] = v.(schema.Message)
@@ -69,8 +69,8 @@ type (
 func NewSqlDriverMessage(id uint64, row []driver.Value) *SqlDriverMessage {
 	return &SqlDriverMessage{IdVal: id, Vals: row}
 }
-func (m *SqlDriverMessage) Id() uint64        { return m.IdVal }
-func (m *SqlDriverMessage) Body() interface{} { return m.Vals }
+func (m *SqlDriverMessage) Id() uint64 { return m.IdVal }
+func (m *SqlDriverMessage) Body() any  { return m.Vals }
 func (m *SqlDriverMessage) ToMsgMap(colidx map[string]int) *SqlDriverMessageMap {
 	return NewSqlDriverMessageMap(m.IdVal, m.Vals, colidx)
 }
@@ -111,7 +111,7 @@ func (m *SqlDriverMessageMap) SetKeyHashed(key string) {
 	hasher64.Write([]byte(key))
 	m.IdVal = hasher64.Sum64()
 }
-func (m *SqlDriverMessageMap) Body() interface{}         { return m }
+func (m *SqlDriverMessageMap) Body() any                 { return m }
 func (m *SqlDriverMessageMap) Values() []driver.Value    { return m.Vals }
 func (m *SqlDriverMessageMap) SetRow(row []driver.Value) { m.Vals = row }
 func (m *SqlDriverMessageMap) Ts() time.Time             { return time.Time{} }
@@ -150,21 +150,21 @@ func NewContextSimple() *ContextSimple {
 func NewContextSimpleData(data map[string]value.Value) *ContextSimple {
 	return &ContextSimple{Data: data, ts: time.Now(), cursor: 0}
 }
-func NewContextSimpleNative(data map[string]interface{}) *ContextSimple {
+func NewContextSimpleNative(data map[string]any) *ContextSimple {
 	vals := make(map[string]value.Value)
 	for k, v := range data {
 		vals[k] = value.NewValue(v)
 	}
 	return &ContextSimple{Data: vals, ts: time.Now(), cursor: 0, namespacing: true}
 }
-func NewContextMap(data map[string]interface{}, namespacing bool) *ContextSimple {
+func NewContextMap(data map[string]any, namespacing bool) *ContextSimple {
 	vals := make(map[string]value.Value)
 	for k, v := range data {
 		vals[k] = value.NewValue(v)
 	}
 	return &ContextSimple{Data: vals, ts: time.Now(), cursor: 0, namespacing: namespacing}
 }
-func NewContextMapTs(data map[string]interface{}, namespacing bool, ts time.Time) *ContextSimple {
+func NewContextMapTs(data map[string]any, namespacing bool, ts time.Time) *ContextSimple {
 	vals := make(map[string]value.Value)
 	for k, v := range data {
 		vals[k] = value.NewValue(v)
@@ -178,7 +178,7 @@ func NewContextSimpleTs(data map[string]value.Value, ts time.Time) *ContextSimpl
 func (m *ContextSimple) SupportNamespacing()         { m.namespacing = true }
 func (m *ContextSimple) All() map[string]value.Value { return m.Data }
 func (m *ContextSimple) Row() map[string]value.Value { return m.Data }
-func (m *ContextSimple) Body() interface{}           { return m }
+func (m *ContextSimple) Body() any                   { return m }
 func (m *ContextSimple) Id() uint64                  { return m.keyval }
 func (m *ContextSimple) Ts() time.Time               { return m.ts }
 func (m ContextSimple) Get(key string) (value.Value, bool) {

@@ -37,14 +37,14 @@ var (
 	})
 	// list of tests
 	sqlTests = []sqlTest{
-		st(`select int5 FROM mycontext`, map[string]interface{}{"int5": 5}),
-		st(`select int5 FROM mycontext WHERE created < "now-1M"`, map[string]interface{}{"int5": 5}),
-		st(`select int5 FROM mycontext WHERE not_a_field < "now-1M"`, map[string]interface{}{}),
-		st(`select int5 IF EXISTS urls FROM mycontext WHERE created < "now-1M"`, map[string]interface{}{"int5": 5}),
-		st(`select int5, str5 IF EXISTS not_a_field FROM mycontext WHERE created < "now-1M"`, map[string]interface{}{"int5": 5}),
-		st(`select int5, str5 IF toint(str5) FROM mycontext WHERE created < "now-1M"`, map[string]interface{}{"int5": 5}),
-		st(`select int5, "hello" AS hello IF user_id > true FROM mycontext WHERE created < "now-1M"`, map[string]interface{}{"int5": 5}),
-		st(`select int5, todate("hello") AS hello FROM mycontext WHERE created < "now-1M"`, map[string]interface{}{"int5": 5}),
+		st(`select int5 FROM mycontext`, map[string]any{"int5": 5}),
+		st(`select int5 FROM mycontext WHERE created < "now-1M"`, map[string]any{"int5": 5}),
+		st(`select int5 FROM mycontext WHERE not_a_field < "now-1M"`, map[string]any{}),
+		st(`select int5 IF EXISTS urls FROM mycontext WHERE created < "now-1M"`, map[string]any{"int5": 5}),
+		st(`select int5, str5 IF EXISTS not_a_field FROM mycontext WHERE created < "now-1M"`, map[string]any{"int5": 5}),
+		st(`select int5, str5 IF toint(str5) FROM mycontext WHERE created < "now-1M"`, map[string]any{"int5": 5}),
+		st(`select int5, "hello" AS hello IF user_id > true FROM mycontext WHERE created < "now-1M"`, map[string]any{"int5": 5}),
+		st(`select int5, todate("hello") AS hello FROM mycontext WHERE created < "now-1M"`, map[string]any{"int5": 5}),
 		// this should fail
 		st(`select int5 FROM mycontext WHERE not_a_field > 10`, nil),
 		st(`select int5 FROM mycontext WHERE user_id > true`, nil),
@@ -80,6 +80,6 @@ type sqlTest struct {
 	result  *datasource.ContextSimple // ?? what is this?
 }
 
-func st(sql string, results map[string]interface{}) sqlTest {
+func st(sql string, results map[string]any) sqlTest {
 	return sqlTest{sql: sql, result: datasource.NewContextSimpleNative(results), context: sqlData}
 }

@@ -716,9 +716,9 @@ func (m *Sqlbridge) parseCreate() (*SqlCreate, error) {
 		}
 		req.OrReplace = true
 	}
-	// CREATE {DATABASE|SCHEMA|TABLE|VIEW|SOURCE|CONTINUOUSVIEW} <identity>
+	// CREATE {INDEX|DATABASE|SCHEMA|TABLE|VIEW|SOURCE|CONTINUOUSVIEW} <identity>
 	switch m.Cur().T {
-	case lex.TokenTable, lex.TokenSource, lex.TokenDatabase, lex.TokenSchema:
+	case lex.TokenTable, lex.TokenSource, lex.TokenIndex, lex.TokenDatabase, lex.TokenSchema:
 		req.Tok = m.Next()
 	case lex.TokenView, lex.TokenContinuousView:
 		req.Tok = m.Next()
@@ -744,7 +744,7 @@ func (m *Sqlbridge) parseCreate() (*SqlCreate, error) {
 		req.Select = sel
 		return req, nil
 	default:
-		return nil, m.ErrMsg("Expected view, table, source, schema, database, continuousview for CREATE got")
+		return nil, m.ErrMsg("Expected index, view, table, source, schema, database, continuousview for CREATE got")
 	}
 
 	// [IF NOT EXISTS]
@@ -803,6 +803,35 @@ func (m *Sqlbridge) parseCreate() (*SqlCreate, error) {
 		// just with
 	case lex.TokenSchema:
 		// just with for now
+	case lex.TokenIndex:
+		if m.Cur().T != lex.TokenOn {
+			return nil, m.ErrMsg("Expected ON")
+		}
+		m.Next() // consume ON
+
+		if m.Cur().T != lex.TokenIdentity {
+			return nil, m.ErrMsg("Expected Identity table name")
+		}
+
+		req.Parent = m.Cur().V
+		m.Next() // consume Identity
+
+		discardComments(m)
+		if m.Cur().T != lex.TokenLeftParenthesis {
+			return nil, m.ErrMsg("Expected (cols) ")
+		}
+		m.Next() // consume paren
+
+		// list of columns comma separated
+		cols, err := m.parseCreateCols()
+		if err != nil {
+			u.Error(err)
+			return nil, err
+		}
+		req.Cols = cols
+
+		// ENGINE
+		discardComments(m)
 	default:
 		return nil, fmt.Errorf("not implemented %v", req.Tok.V)
 	}
@@ -1092,7 +1121,6 @@ func (m *Sqlbridge) parseValueList() ([][]*ValueColumn, error) {
 	values := make([][]*ValueColumn, 0)
 
 	for {
-
 		//u.Debug(m.Cur().String())
 		switch m.Cur().T {
 		case lex.TokenLeftParenthesis:
@@ -1145,7 +1173,6 @@ func (m *Sqlbridge) parseValueList() ([][]*ValueColumn, error) {
 				return nil, err
 			}
 			row = append(row, &ValueColumn{Value: arrayVal})
-			u.Infof("what is token?  %v peek:%v", m.Cur(), m.Peek())
 		case lex.TokenComma:
 			// don't need to do anything
 		case lex.TokenUdfExpr:
@@ -1778,31 +1805,8 @@ func (m *Sqlbridge) parseDdlConstraint(col *DdlColumn) error {
 	}
 	col.Name = m.Next().V
 
-	switch m.Cur().T {
-	case lex.TokenTypeDef, lex.TokenTypeBool, lex.TokenTypeTime,
-		lex.TokenTypeText, lex.TokenTypeJson:
-
-		col.DataType = m.Next().V
-	case lex.TokenTypeFloat, lex.TokenTypeInteger, lex.TokenTypeString,
-		lex.TokenTypeVarChar, lex.TokenTypeChar, lex.TokenTypeBigInt:
-		col.DataType = m.Next().V
-		if m.Cur().T == lex.TokenLeftParenthesis {
-			m.Next()
-			if m.Cur().T != lex.TokenInteger {
-				return m.ErrMsg("expected 'type(integer)'")
-			}
-			iv, err := strconv.ParseInt(m.Next().V, 10, 64)
-			if err != nil {
-				return m.ErrMsg("Expected integer")
-			}
-			col.DataTypeSize = int(iv)
-			if m.Next().T != lex.TokenRightParenthesis {
-				m.Backup()
-				return m.ErrMsg("expected 'type(integer)'")
-			}
-		}
-	default:
-		col.Null = true
+	if err := m.parseDdlDataType(col); err != nil {
+		return err
 	}
 
 	// [UNIQUE [KEY] | [PRIMARY] KEY]
@@ -1872,6 +1876,64 @@ func (m *Sqlbridge) parseDdlConstraint(col *DdlColumn) error {
 	return nil
 }
 
+func (m *Sqlbridge) parseDdlDataType(col *DdlColumn) error {
+	// ID int(11)
+	// Email char(150)
+	// Foo float[150]
+	switch m.Cur().T {
+	case lex.TokenTypeDef, lex.TokenTypeBool, lex.TokenTypeTime,
+		lex.TokenTypeText, lex.TokenTypeJson:
+		col.DataType = strings.ToLower(m.Next().V)
+	case lex.TokenTypeFloat, lex.TokenTypeInteger, lex.TokenTypeString,
+		lex.TokenTypeVarChar, lex.TokenTypeChar, lex.TokenTypeBigInt:
+		col.DataType = strings.ToLower(m.Next().V)
+		switch m.Cur().T {
+		case lex.TokenLeftBracket:
+			arrayLen := -1
+		BracketLoop:
+			for {
+				m.Next()
+				switch m.Cur().T {
+				case lex.TokenInteger:
+					if arrayLen != -1 {
+						return m.ErrMsg("Expected only one element in array")
+					}
+					var err error
+					v := m.Cur().V
+					arrayLen, err = strconv.Atoi(v)
+					if err != nil {
+						return m.ErrMsg(fmt.Sprintf("Error parsing %s as integer: %v ", v, err))
+					}
+					col.DataTypeSize = int(arrayLen)
+				case lex.TokenRightBracket:
+					col.DataType += "[]"
+					m.Next()
+					break BracketLoop
+				default:
+					return m.ErrMsg("expected 'type[integer]'")
+				}
+			}
+		case lex.TokenLeftParenthesis:
+			m.Next()
+			if m.Cur().T != lex.TokenInteger {
+				return m.ErrMsg("expected 'type(integer)'")
+			}
+			iv, err := strconv.ParseInt(m.Next().V, 10, 64)
+			if err != nil {
+				return m.ErrMsg("Expected integer")
+			}
+			col.DataTypeSize = int(iv)
+			if m.Next().T != lex.TokenRightParenthesis {
+				m.Backup()
+				return m.ErrMsg("expected 'type(integer)'")
+			}
+		}
+	default:
+		col.Null = true
+	}
+
+	return nil
+}
 func (m *Sqlbridge) parseDdlColumn(col *DdlColumn) error {
 
 	/*
@@ -1895,31 +1957,8 @@ func (m *Sqlbridge) parseDdlColumn(col *DdlColumn) error {
 		  Email char(150) NOT NULL DEFAULT '',
 	*/
 
-	switch m.Cur().T {
-	case lex.TokenTypeDef, lex.TokenTypeBool, lex.TokenTypeTime,
-		lex.TokenTypeText, lex.TokenTypeJson:
-
-		col.DataType = m.Next().V
-	case lex.TokenTypeFloat, lex.TokenTypeInteger, lex.TokenTypeString,
-		lex.TokenTypeVarChar, lex.TokenTypeChar, lex.TokenTypeBigInt:
-		col.DataType = m.Next().V
-		if m.Cur().T == lex.TokenLeftParenthesis {
-			m.Next()
-			if m.Cur().T != lex.TokenInteger {
-				return m.ErrMsg("expected 'type(integer)'")
-			}
-			iv, err := strconv.ParseInt(m.Next().V, 10, 64)
-			if err != nil {
-				return m.ErrMsg("Expected integer")
-			}
-			col.DataTypeSize = int(iv)
-			if m.Next().T != lex.TokenRightParenthesis {
-				m.Backup()
-				return m.ErrMsg("expected 'type(integer)'")
-			}
-		}
-	default:
-		col.Null = true
+	if err := m.parseDdlDataType(col); err != nil {
+		return err
 	}
 
 	// [NOT NULL | NULL]
@@ -2198,12 +2237,12 @@ func parseJsonKeyValue(pg expr.TokenPager, jh u.JsonHelper) error {
 	}
 }
 
-func ParseJsonArray(pg expr.TokenPager) ([]interface{}, error) {
+func ParseJsonArray(pg expr.TokenPager) ([]any, error) {
 	if pg.Cur().T != lex.TokenLeftBracket {
 		return nil, pg.ErrMsg("Expected json [")
 	}
 
-	la := make([]interface{}, 0)
+	la := make([]any, 0)
 	pg.Next() // Consume [
 	for {
 		//u.Debug(pg.Cur())

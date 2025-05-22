@@ -324,10 +324,10 @@ type AggPartial struct {
 }
 
 type AggFunc func(v value.Value)
-type resultFunc func() interface{}
+type resultFunc func() any
 type Aggregator interface {
 	Do(v value.Value)
-	Result() interface{}
+	Result() any
 	Reset()
 	Merge(*AggPartial)
 }
@@ -336,11 +336,11 @@ type agg struct {
 	result resultFunc
 }
 type groupByFunc struct {
-	last interface{}
+	last any
 }
 
 func (m *groupByFunc) Do(v value.Value)    { m.last = v.Value() }
-func (m *groupByFunc) Result() interface{} { return m.last }
+func (m *groupByFunc) Result() any         { return m.last }
 func (m *groupByFunc) Reset()              { m.last = nil }
 func (m *groupByFunc) Merge(a *AggPartial) {}
 func NewGroupByValue(col *rel.Column) Aggregator {
@@ -362,7 +362,7 @@ func (m *sum) Do(v value.Value) {
 		m.n += vt.Val()
 	}
 }
-func (m *sum) Result() interface{} {
+func (m *sum) Result() any {
 	if !m.partial {
 		return m.n
 	}
@@ -395,7 +395,7 @@ func (m *avg) Do(v value.Value) {
 		m.n += vt.Val()
 	}
 }
-func (m *avg) Result() interface{} {
+func (m *avg) Result() any {
 	if !m.partial {
 		return m.n / float64(m.ct)
 	}
@@ -423,7 +423,7 @@ func (m *count) Do(v value.Value) {
 	}
 	m.n++
 }
-func (m *count) Result() interface{} {
+func (m *count) Result() any {
 	return m.n
 }
 func (m *count) Reset() { m.n = 0 }
