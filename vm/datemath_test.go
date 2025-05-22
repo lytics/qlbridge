@@ -253,3 +253,113 @@ func TestDateMath(t *testing.T) {
 	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
 	assert.Equal(t, nil, err)
 }
+
+func TestDateBoundaryForBetween(t *testing.T) {
+	today := time.Now()
+
+	type testCase struct {
+		testName             string
+		filter               string
+		match                bool
+		expectedBoundaryTime time.Time
+		lastEvtTs            time.Time
+	}
+
+	tests := []testCase{
+		{
+			testName:             "within_window_1_day_before_lower_bound",
+			filter:               `FILTER last_event BETWEEN "now-2d" AND "now+3d"`,
+			match:                true,
+			expectedBoundaryTime: today.AddDate(0, 0, 1), // Will exit after 1 day since lower bound is after 2 days
+			lastEvtTs:            today.AddDate(0, 0, -1),
+		},
+		{
+			testName:             "within_window_including_other_filters",
+			filter:               `FILTER AND( last_event BETWEEN "now-2d" AND "now+3d", exists subscription_expires )`,
+			match:                true,
+			expectedBoundaryTime: today.AddDate(0, 0, 1), // Will exit after 1 day since lower bound is after 2 days
+			lastEvtTs:            today.AddDate(0, 0, -1),
+		},
+		{
+			testName:             "exact_current_time",
+			filter:               `FILTER last_event BETWEEN "now-2d" AND "now+3d"`,
+			match:                true,
+			expectedBoundaryTime: today.AddDate(0, 0, 2), // Will exit after two days
+			lastEvtTs:            today,
+		},
+		{
+			testName:             "just_inside_lower",
+			filter:               `FILTER last_event BETWEEN "now-2d" AND "now+3d"`,
+			match:                true,
+			expectedBoundaryTime: today.Add(time.Minute),                   // will be after a minute
+			lastEvtTs:            today.AddDate(0, 0, -2).Add(time.Minute), // 2 days ago + 1 minute
+		},
+		{
+			testName:             "just_inside_upper",
+			filter:               `FILTER last_event BETWEEN "now-2d" AND "now+3d"`,
+			match:                true,
+			expectedBoundaryTime: today.AddDate(0, 0, 5).Add(-time.Minute), // as window is of 5 days and this one just entered
+			lastEvtTs:            today.AddDate(0, 0, 3).Add(-time.Minute), // will exit after 2 days later
+		},
+		{
+			testName:             "exact_boundary_lower",
+			filter:               `FILTER last_event BETWEEN "now-2d" AND "now+3d"`,
+			match:                false,                   // going to be false as it thinks it is out of window
+			expectedBoundaryTime: today,                   // already in the lowerbound, so should exit now
+			lastEvtTs:            today.AddDate(0, 0, -2), // Exactly 2 days ago
+		},
+		{
+			testName:             "exact_boundary_upper",
+			filter:               `FILTER last_event BETWEEN "now-2d" AND "now+3d"`,
+			match:                false,                  // not entered yet
+			expectedBoundaryTime: today,                  // should enter right now
+			lastEvtTs:            today.AddDate(0, 0, 3), // Exactly 3 days in future
+		},
+		{
+			testName:             "multiple_date_math",
+			filter:               `FILTER AND(last_event BETWEEN "now-2d" AND "now+3d", subscription_expires > "now+1d")`,
+			match:                true,
+			expectedBoundaryTime: today.AddDate(0, 0, 2), // Will exit after 2 days last_event is in window and subscription_expires date is 6 days later
+			lastEvtTs:            today,                  // today
+		},
+		{
+			testName:             "not_condition",
+			filter:               `FILTER NOT(last_event BETWEEN "now-2d" AND "now+3d")`,
+			match:                true,
+			expectedBoundaryTime: today.AddDate(0, 0, 1), // Will enter after a day as it will be inside of window
+			lastEvtTs:            today.AddDate(0, 0, 4), // 4 days in the future (right of window)
+		},
+		{
+			testName:             "multiple_between",
+			filter:               `FILTER AND( last_event BETWEEN "now-2d" AND "now+3d", subscription_expires BETWEEN "now+1d" AND "now+7d")`,
+			match:                true,
+			expectedBoundaryTime: today.AddDate(0, 0, 1),  // Will exit after 1 day due to last_event sliding out of window after 1 day
+			lastEvtTs:            today.AddDate(0, 0, -1), // 1 day ago
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.testName, func(t *testing.T) {
+			evalCtx := datasource.NewContextMapTs(map[string]interface{}{
+				"last_event":           tc.lastEvtTs,
+				"subscription_expires": today.Add(time.Hour * 24 * 6),
+				"lastevent":            map[string]time.Time{"signedup": today},
+				"first.event":          map[string]time.Time{"has.period": today},
+			}, true, today)
+
+			includeCtx := &includectx{ContextReader: evalCtx}
+
+			fs := rel.MustParseFilter(tc.filter)
+
+			dc, err := vm.NewDateConverterWithAnchorTime(includeCtx, fs.Filter, today)
+			require.NoError(t, err)
+			require.True(t, dc.HasDateMath)
+
+			matched, evalOk := vm.Matches(includeCtx, fs)
+			assert.True(t, evalOk)
+			assert.Equal(t, tc.match, matched)
+
+			assert.Equal(t, tc.expectedBoundaryTime.Unix(), dc.Boundary().Unix())
+		})
+	}
+}
