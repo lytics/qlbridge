@@ -190,12 +190,9 @@ func findDateMathFn(node expr.Node) BoundaryFns {
 		// Only handle BETWEEN operator with specific node types
 		if n.Operator.T == lex.TokenBetween && len(n.Args) == 3 {
 			// Check if first arg is IdentityNode and other two are StringNodes
-			_, isFirstIdentity := n.Args[0].(*expr.IdentityNode)
-			_, isSecondString := n.Args[1].(*expr.StringNode)
-			_, isThirdString := n.Args[2].(*expr.StringNode)
-
-			if isFirstIdentity && isSecondString && isThirdString {
-				fns = append(fns, findBoundaryForBetween(n))
+			fn := findBoundaryForBetween(n)
+			if fn != nil {
+				fns = append(fns, fn)
 				return fns
 			}
 		}
@@ -222,45 +219,56 @@ func findDateMathFn(node expr.Node) BoundaryFns {
 	return fns
 }
 
-// Ct = Comparison time, left hand side of expression
-// Lb = Relative time result of Lower Bound Anchor Time offset by datemath "now-3d"
-// Ub = Relative time result of Upper Bound Anchor Time offset by datemath "now+3d"
-// Bt = Boundary time = calculated time at which expression will change boolean expression value
-// example: FILTER Ct BETWEEN Lb AND Ub
-// WHERE "now" = 01/22/2025 00:00:00
+// findBoundaryForBetween calculates the next time boundary for a BETWEEN expression
+// with date math boundaries. It handles expressions like:
 //
-//	"Lb" = 01/19/2025 00:00:00
-//	"Ub" = 01/25/2025 00:00:00
+//	time_column BETWEEN "now-3d" AND "now+3d"
 //
-// NOTE: When evaluating expressions like this, an entity "enters" the expression by passing the upper bound and sliding into the window
-// and "exits" the expression by passing the lower bound and sliding out of the window. Although the "Upper Bound" is after the "Lower Bound",
-// the order of entry and exit is reversed. This example should show how the entity appears to move backwards as the window moves forward.
-// Example timeline: Ct = 01/22/2025 00:00:00
-// Day 0: now = 01/22/2025 00:00:00 === Lb--Ct++Ub+++++++++
-// Day 1: now = 01/23/2025 00:00:00 === -Lb-Ct+++Ub++++++++
-// Day 2: now = 01/24/2025 00:00:00 === --LbCt++++Ub+++++++
-// Day 3: now = 01/25/2025 00:00:00 === ---CLtb+++++Ub+++++  Ct == Lb
-// Day 4: now = 01/26/2025 00:00:00 === ---CtLb++++++Ub++++
-// Day 5: now = 01/27/2025 00:00:00 === ---Ct-Lb++++++Ub+++
-// Day 6: now = 01/28/2025 00:00:00 === ---Ct--Lb++++++Ub++
-// Day 7: now = 01/29/2025 00:00:00 === ---Ct---Lb++++++Ub+
-// Day 8: now = 01/30/2025 00:00:00 === ---Ct----Lb++++++Ub
+// The function returns a boundary function that:
+// 1. Evaluates the comparison time (Ct) against the window boundaries
+// 2. Determines when the expression's boolean value will change
+// 3. Returns the appropriate re-evaluation time
 //
-// Notice how it appears as if the entity is moving backwards through the window as the window slides forward in relation to "now".
-// Ct = 01/01/2025 00:00:00
-// In this case the expression itself currently evaluates to false, and is already PRIOR to the lower bound.
-// As such it will always evaluate to false, so we can skip queueing for reevaluation.
-// // Ct = 01/30/2025 00:00:00
-// In this case the expression itself currently evaluates to false, and is AFTER of the prior to the upper bound.
-// The next evaluation time should be on the day the upper bound is reached. Queue for reevaluation at (Ct - 3d) [since the Ub is now+3d].
-// // Ct = 01/22/2025 00:00:00
-// In this case the expression itself currently evaluates to true, and is BETWEEN the lower and upper bounds.
-// The next evaluation time should be on the day the lower bound is reached. Queue for reevaluation at (Ct + 3d) [since the Lb is now-3d].
-// Notice that we are queuing for reevaluation based on the inverse of the corresponding bound's offset.  This is made a bit easier if
-// the expression is a static date, rather than a relative one. As we can use that directly as the re-evaluation time.
+// Example:
+//
+//	Input:  time_column BETWEEN "now-3d" AND "now+3d"
+//	When:   now = 2025-01-22
+//	Window: 2025-01-19 to 2025-01-25
+//
+//	If Ct = 2025-01-01 (left side of window):
+//	- Expression is false
+//	- Will always be false as window is moving forward
+//	- Returns zero time (no re-evaluation needed)
+//
+//	If Ct = 2025-01-30 (right side of window):
+//	- Expression is false
+//	- Will become true when window catches up (enter event)
+//	- Returns re-evaluation time when this will enter the window
+//
+//	If Ct = 2025-01-22 (inside window):
+//	- Expression is true
+//	- Will become false when Ct passes lower bound (exit event)
+//	- Returns re-evaluation time when this will be exit the window
 func findBoundaryForBetween(n *expr.TriNode) func(d *DateConverter, ctx expr.EvalIncludeContext) {
+
+	// Check if first arg is IdentityNode and other two are StringNodes
+	_, isFirstIdentity := n.Args[0].(*expr.IdentityNode)
+	_, isSecondString := n.Args[1].(*expr.StringNode)
+	_, isThirdString := n.Args[2].(*expr.StringNode)
+
+	if !isFirstIdentity || !isSecondString || !isThirdString {
+		return nil
+	}
+	arg1, arg2, arg3 := n.Args[0], n.Args[1], n.Args[2]
+
+	// datemath only if both date args are relative to an anchor time like "now-1d"
+	val2 := strings.ToLower(arg2.(*expr.StringNode).Text)
+	val3 := strings.ToLower(arg3.(*expr.StringNode).Text)
+	if !nowRegex.MatchString(val2) || !nowRegex.MatchString(val3) {
+		return nil
+	}
+
 	return func(d *DateConverter, ctx expr.EvalIncludeContext) {
-		arg1, arg2, arg3 := n.Args[0], n.Args[1], n.Args[2]
 
 		lhv, ok := Eval(ctx, arg1)
 		if !ok {
@@ -268,21 +276,19 @@ func findBoundaryForBetween(n *expr.TriNode) func(d *DateConverter, ctx expr.Eva
 		}
 		ct, ok := value.ValueToTime(lhv)
 		if !ok {
-			// may be not a time field, so ignore doing any update
+			d.err = fmt.Errorf("could not convert %T: %v to time.Time", lhv, lhv)
 			return
 		}
 
-		val2 := strings.ToLower(arg2.(*expr.StringNode).Text)
 		date1, err := datemath.EvalAnchor(d.at, val2)
 		if err != nil {
-			// may be not a valid date expression, so ignore doing any update
+			d.err = err
 			return
 		}
 
-		val3 := strings.ToLower(arg3.(*expr.StringNode).Text)
 		date2, err := datemath.EvalAnchor(d.at, val3)
 		if err != nil {
-			// may be not a valid date expression, so ignore doing any update
+			d.err = err
 			return
 		}
 
