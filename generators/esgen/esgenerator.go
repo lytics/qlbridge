@@ -80,7 +80,8 @@ func (fg *FilterGenerator) walkExpr(node expr.Node, depth int) (any, error) {
 		if n.Bool() {
 			return MatchAll, nil
 		}
-		return nil, fmt.Errorf("unsupported identity node in expression: %s expr: %s", node.NodeType(), node)
+		// TODO: We rely on this in tests in Lytics repos
+		// return nil, fmt.Errorf("unsupported identity node in expression: %s expr: %s", node.NodeType(), node)
 	case *expr.IncludeNode:
 		if incErr := vm.ResolveIncludes(fg.inc, n); incErr != nil {
 			return nil, incErr
