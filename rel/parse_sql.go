@@ -860,28 +860,47 @@ func (m *Sqlbridge) parseDrop() (*SqlDrop, error) {
 		req.Temp = true
 	}
 
-	// DROP (TABLE|VIEW|SOURCE|CONTINUOUSVIEW) <identity>
+	// DROP (TABLE|VIEW|SOURCE|INDEX|CONTINUOUSVIEW) <identity>
 	switch m.Cur().T {
-	case lex.TokenTable, lex.TokenView, lex.TokenSource, lex.TokenContinuousView,
+	case lex.TokenTable, lex.TokenView, lex.TokenIndex, lex.TokenSource, lex.TokenContinuousView,
 		lex.TokenSchema, lex.TokenDatabase:
 		req.Tok = m.Next()
 	case lex.TokenIdentity:
 		// triggers, indexes
 		req.Tok = m.Next()
 	default:
-		return nil, m.ErrMsg("Expected view, database,schema, table, source, continuousview for DROP got")
+		return nil, m.ErrMsg("Expected view, database, index, schema, table, source, continuousview for DROP got")
+	}
+
+	if m.Cur().T == lex.TokenIf {
+		m.Next() // Consume IF
+		if m.Next().T != lex.TokenExists {
+			return nil, m.ErrMsg("Expected CREATE {TABLE|INDEX|SCHEMA|DATABASE} IF EXISTS <identity>")
+		}
+		req.IfExists = true
 	}
 
 	switch m.Cur().T {
 	case lex.TokenTable, lex.TokenIdentity:
 		req.Identity = m.Next().V
 	default:
-		return nil, m.ErrMsg("Expected identity after DROP (TABLE|VIEW|SOURCE|SCHEMA|DATABASE)  ")
+		return nil, m.ErrMsg("Expected identity after DROP (TABLE|INDEX|VIEW|SOURCE|SCHEMA|DATABASE)  ")
 	}
 
 	switch req.Tok.T {
 	case lex.TokenTable:
 		// just table
+	case lex.TokenIndex:
+		t := m.Next() // consume ON
+		if t.T != lex.TokenOn {
+			return nil, m.ErrMsg("Expected ON")
+		}
+		t = m.Next() // consume Identity
+		if t.T != lex.TokenIdentity {
+			return nil, m.ErrMsg("Expected Identity table name")
+		}
+		req.Parent = t.V
+		discardComments(m)
 	case lex.TokenSource, lex.TokenSchema:
 		// schema
 	case lex.TokenContinuousView, lex.TokenView:
