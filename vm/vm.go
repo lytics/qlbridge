@@ -1173,31 +1173,12 @@ func operateTime(op lex.TokenType, lht, rht time.Time) (value.BoolValue, bool) {
 	return value.BoolValueFalse, false
 }
 
-var globber *glob.Globber
-
-func init() {
-	defaultConfig := glob.Default()
-	defaultConfig.Star = '%'
-	var err error
-	globber, err = glob.New(defaultConfig)
-	if err != nil {
-		u.Errorf("failed to create optimized globber: %v", err)
-		return
-	}
-}
-
 // LikeCompare takes two strings and evaluates them for like equality
 func LikeCompare(a, b string) (value.BoolValue, bool) {
 	// Do we want to always do this replacement?   Or do this at parse time or config?
 	//
-	var match bool
-	var err error
-	if globber == nil {
-		b = strings.Replace(b, "%", "*", -1)
-		match, err = glob.Match(b, a)
-	} else {
-		match, err = globber.Match(b, a)
-	}
+	b = strings.Replace(b, "%", "*", -1)
+	match, err := glob.Match(b, a)
 	if err != nil {
 		return value.BoolValueFalse, false
 	}
