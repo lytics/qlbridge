@@ -604,7 +604,7 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 		case value.TimeValue:
 			lht, ok := value.ValueToTime(at)
 			if !ok {
-				return value.BoolValueFalse, false
+				return nil, false
 			}
 			return operateTime(node.Operator.T, lht, bt.Val())
 		default:
@@ -764,7 +764,7 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 		lht := at.Val()
 		rht, ok := value.ValueToTime(br)
 		if !ok {
-			return value.BoolValueFalse, false
+			return nil, false
 		}
 
 		return operateTime(node.Operator.T, lht, rht)
@@ -776,7 +776,7 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 			rhvals = bv.Val()
 		case value.Slice:
 			sliceValue := bv.SliceValue()
-			rhvals := make([]string, len(sliceValue))
+			rhvals = make([]string, len(sliceValue))
 			for i, arg := range sliceValue {
 				rhvals[i] = arg.ToString()
 			}
@@ -816,15 +816,17 @@ func evalBinary(ctx expr.EvalContext, node *expr.BinaryNode, depth int, visitedI
 		case lex.TokenNE:
 			return value.NewBoolValue(true), true
 		case lex.TokenContains, lex.TokenLike, lex.TokenIN, lex.TokenIntersects:
-			return value.NewBoolValue(false), false
+			return nil, false
 		default:
 			return nil, false
 		}
 	default:
-		return value.NewErrorValue(fmt.Errorf("unsupported left side value: %T in %s", at, node)), false
+		// return value.NewErrorValue(fmt.Errorf("unsupported left side value: %T in %s", at, node)), false
+		return nil, false
 	}
 
-	return value.NewErrorValue(fmt.Errorf("unsupported binary expression: %s", node)), false
+	// return value.NewErrorValue(fmt.Errorf("unsupported binary expression: %s", node)), false
+	return nil, false
 }
 
 func walkIdentity(ctx expr.EvalContext, node *expr.IdentityNode) (value.Value, bool) {
@@ -1180,6 +1182,7 @@ func init() {
 	globber, err = glob.New(defaultConfig)
 	if err != nil {
 		u.Errorf("failed to create optimized globber: %v", err)
+		return
 	}
 }
 
