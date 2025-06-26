@@ -26,28 +26,28 @@ type DateConverter struct {
 	err         error
 }
 
-func FindBoundary(anchorTime time.Time, ctx expr.EvalIncludeContext, fns BoundaryFns) (time.Time, error) {
+func FindBoundary(anchorTime time.Time, ctx expr.EvalContext, includer expr.Includer, fns BoundaryFns) (time.Time, error) {
 	dc := &DateConverter{
 		at: anchorTime,
 	}
 	for _, fn := range fns {
-		fn(dc, ctx)
+		fn(dc, ctx, includer)
 	}
 	return dc.bt, dc.err
 }
 
-type BoundaryFns []func(*DateConverter, expr.EvalIncludeContext)
+type BoundaryFns []func(*DateConverter, expr.EvalContext, expr.Includer)
 
 func CalcBoundaryFns(n expr.Node) BoundaryFns {
 	return findDateMathFn(n)
 }
 
-func NewDateConverterWithAnchorTime(ctx expr.EvalIncludeContext, n expr.Node, at time.Time) (*DateConverter, error) {
+func NewDateConverterWithAnchorTime(ctx expr.EvalContext, includer expr.Includer, n expr.Node, at time.Time) (*DateConverter, error) {
 	dc := &DateConverter{
 		at: at,
 	}
 	fns := findDateMathFn(n)
-	dc.bt, dc.err = FindBoundary(dc.at, ctx, fns)
+	dc.bt, dc.err = FindBoundary(dc.at, ctx, includer, fns)
 	if dc.err == nil && len(fns) > 0 {
 		dc.HasDateMath = true
 	}
@@ -55,8 +55,8 @@ func NewDateConverterWithAnchorTime(ctx expr.EvalIncludeContext, n expr.Node, at
 }
 
 // NewDateConverter takes a node expression
-func NewDateConverter(ctx expr.EvalIncludeContext, n expr.Node) (*DateConverter, error) {
-	return NewDateConverterWithAnchorTime(ctx, n, time.Now())
+func NewDateConverter(ctx expr.EvalContext, inc expr.Includer, n expr.Node) (*DateConverter, error) {
+	return NewDateConverterWithAnchorTime(ctx, inc, n, time.Now())
 }
 func compareBoundaries(currBoundary, newBoundary time.Time) time.Time {
 	// Should we check for is zero on the newBoundary?
@@ -136,7 +136,7 @@ func findDateMathFn(node expr.Node) BoundaryFns {
 
 				if nowRegex.MatchString(val) {
 					argIdx := i
-					fns = append(fns, func(d *DateConverter, ctx expr.EvalIncludeContext) {
+					fns = append(fns, func(d *DateConverter, ctx expr.EvalContext, inc expr.Includer) {
 						// If left side is datemath   "now-3d" < ident then re-write to have ident on left
 						var lhv value.Value
 						op := n.Operator.T
@@ -249,7 +249,7 @@ func findDateMathFn(node expr.Node) BoundaryFns {
 //	- Expression is true
 //	- Will become false when Ct passes lower bound (exit event)
 //	- Returns re-evaluation time when this will be exit the window
-func findBoundaryForBetween(n *expr.TriNode) func(d *DateConverter, ctx expr.EvalIncludeContext) {
+func findBoundaryForBetween(n *expr.TriNode) func(d *DateConverter, ctx expr.EvalContext, inc expr.Includer) {
 
 	// Check if first arg is IdentityNode and other two are StringNodes
 	_, isFirstIdentity := n.Args[0].(*expr.IdentityNode)
@@ -268,9 +268,9 @@ func findBoundaryForBetween(n *expr.TriNode) func(d *DateConverter, ctx expr.Eva
 		return nil
 	}
 
-	return func(d *DateConverter, ctx expr.EvalIncludeContext) {
+	return func(d *DateConverter, ctx expr.EvalContext, inc expr.Includer) {
 
-		lhv, ok := Eval(ctx, arg1)
+		lhv, ok := EvalInc(inc, ctx, arg1)
 		if !ok {
 			return
 		}
