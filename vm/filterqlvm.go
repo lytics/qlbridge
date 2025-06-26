@@ -67,29 +67,32 @@ func EvalFilterSelect(sel *rel.FilterSelect, writeContext expr.ContextWriter, re
 // Matches executes a FilterQL statement against an evaluation context
 // returning true if the context matches.
 func MatchesInc(inc expr.Includer, cr expr.EvalContext, stmt *rel.FilterStatement) (bool, bool) {
-	return matchesExpr(filterql{cr, inc}, stmt.Filter)
+	return matchesExpr(cr, inc, stmt.Filter)
 }
 
 // Matches executes a FilterQL statement against an evaluation context
 // returning true if the context matches.
 func Matches(cr expr.EvalContext, stmt *rel.FilterStatement) (bool, bool) {
-	return matchesExpr(cr, stmt.Filter)
+	return matchesExpr(cr, nil, stmt.Filter)
 }
 
 // MatchesExpr executes a expr.Node expression against an evaluation context
 // returning true if the context matches.
 func MatchesExpr(cr expr.EvalContext, node expr.Node) (bool, bool) {
-	return matchesExpr(cr, node)
+	return matchesExpr(cr, nil, node)
+}
+func MatchesExprInc(inc expr.Includer, cr expr.EvalContext, node expr.Node) (bool, bool) {
+	return matchesExpr(cr, inc, node)
 }
 
-func matchesExpr(cr expr.EvalContext, n expr.Node) (bool, bool) {
+func matchesExpr(cr expr.EvalContext, includer expr.Includer, n expr.Node) (bool, bool) {
 	switch exp := n.(type) {
 	case *expr.IdentityNode:
 		if exp.Text == "*" || exp.Text == "match_all" {
 			return true, true
 		}
 	}
-	val, ok := Eval(cr, n)
+	val, ok := EvalInc(includer, cr, n)
 	if !ok || val == nil {
 		return false, ok
 	}
