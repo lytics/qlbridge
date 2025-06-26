@@ -143,9 +143,6 @@ type (
 		Get() (bool, bool, error)
 		Set(bool, bool)
 	}
-	IncludeCacheContextV2 interface {
-		GetOrSet(key string, fn func() (bool, error)) (bool, error)
-	}
 	// ContextReader is a key-value interface to read the context of message/row
 	// using a  Get("key") interface.  Used by vm to evaluate messages
 	ContextReader interface {
