@@ -373,7 +373,6 @@ func makeGeoDistanceQuery(lhs *gentypes.FieldType, lat, lon, distance float64) a
 				"lat": lat,
 				"lon": lon,
 			},
-			"distance_type": "plane",
 		},
 	}
 }
