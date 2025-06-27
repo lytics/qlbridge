@@ -107,6 +107,11 @@ func FilterEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 						filteredOut = true
 						break
 					}
+				} else if filter == "" {
+					if rowKey == "" && v != nil {
+						filteredOut = true
+						break
+					}
 				} else {
 					if strings.HasPrefix(rowKey, filter) && v != nil {
 						filteredOut = true
@@ -132,6 +137,11 @@ func FilterEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 					anyMatches = true
 					break
 				}
+			} else if filter == "" {
+				if val.Val() == "" {
+					anyMatches = true
+					break
+				}
 			} else {
 				if strings.HasPrefix(val.Val(), filter) {
 					anyMatches = true
@@ -154,6 +164,11 @@ func FilterEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 				if strings.Contains(filter, "*") {
 					match, _ := glob.Match(filter, sv)
 					if match {
+						filteredOut = true
+						break
+					}
+				} else if filter == "" {
+					if sv == "" {
 						filteredOut = true
 						break
 					}

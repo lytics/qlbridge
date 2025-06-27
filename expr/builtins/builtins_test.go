@@ -275,6 +275,8 @@ var builtinTests = []testBuiltins{
 	{`filter(split("apples,oranges",","),"ora%")`, value.NewStringsValue([]string{"apples"})},
 	{`filter(split("apples,oranges",","),["ora%","ban*"])`, value.NewStringsValue([]string{"apples"})},
 	{`filter(split("apples,oranges",","), ["ora*","notmatch","stuff"] )`, value.NewStringsValue([]string{"apples"})},
+	{`filter(split("apples,oranges,",","), [""] )`, value.NewStringsValue([]string{"apples", "oranges"})},
+	{`filter("apples","")`, value.NewStringValue("apples")},
 	{`filter("apples","ban*")`, value.NewStringValue("apples")},
 	{`filter("apples","ban")`, value.NewStringValue("apples")},
 	{`filter("apples","app*")`, value.NilValueVal},
