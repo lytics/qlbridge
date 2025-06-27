@@ -132,12 +132,12 @@ func TestDateBoundaries(t *testing.T) {
 		fs := rel.MustParseFilter(tc.filter)
 
 		// Converter to find/calculate date operations
-		dc, err := vm.NewDateConverter(includeCtx, fs.Filter)
+		dc, err := vm.NewDateConverter(includeCtx, includeCtx, fs.Filter)
 		require.Equal(t, nil, err)
 		require.True(t, dc.HasDateMath)
 
 		// initially we should not match
-		matched, evalOk := vm.Matches(includeCtx, fs)
+		matched, evalOk := vm.MatchesInc(includeCtx, includeCtx, fs)
 		assert.True(t, evalOk, tc.filter)
 		assert.Equal(t, tc.match, matched)
 
@@ -191,7 +191,7 @@ func TestDateMath(t *testing.T) {
 		fs := rel.MustParseFilter(tc.filter)
 
 		// Converter to find/calculate date operations
-		dc, err := vm.NewDateConverter(evalCtx, fs.Filter)
+		dc, err := vm.NewDateConverter(evalCtx, evalCtx, fs.Filter)
 		require.NoError(t, err)
 		require.True(t, dc.HasDateMath, tc.filter)
 
@@ -200,12 +200,12 @@ func TestDateMath(t *testing.T) {
 		assert.Equal(t, nil, err)
 
 		// Converter to find/calculate date operations
-		dc, err = vm.NewDateConverter(evalCtx, node)
+		dc, err = vm.NewDateConverter(evalCtx, evalCtx, node)
 		assert.Equal(t, nil, err)
 		assert.True(t, dc.HasDateMath)
 
 		// initially we should not match
-		matched, evalOk := vm.Matches(evalCtx, fs)
+		matched, evalOk := vm.MatchesInc(evalCtx, evalCtx, fs)
 		assert.True(t, evalOk)
 		assert.Equal(t, false, matched)
 		/*
@@ -225,32 +225,32 @@ func TestDateMath(t *testing.T) {
 	}
 
 	fs := rel.MustParseFilter(`FILTER AND (INCLUDE not_valid_lookup)`)
-	_, err := vm.NewDateConverter(evalCtx, fs.Filter)
+	_, err := vm.NewDateConverter(evalCtx, evalCtx, fs.Filter)
 	// We assume that the inclusions are preresolved
 	assert.Nil(t, err)
 
 	fs = rel.MustParseFilter(`FILTER AND ( last_event > "now-3x")`)
-	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	_, err = vm.NewDateConverter(evalCtx, evalCtx, fs.Filter)
 	assert.NotNil(t, err)
 
 	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now-")`)
-	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	_, err = vm.NewDateConverter(evalCtx, evalCtx, fs.Filter)
 	assert.NotEqual(t, nil, err)
 
 	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now+")`)
-	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	_, err = vm.NewDateConverter(evalCtx, evalCtx, fs.Filter)
 	assert.NotEqual(t, nil, err)
 
 	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now+now")`)
-	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	_, err = vm.NewDateConverter(evalCtx, evalCtx, fs.Filter)
 	assert.NotEqual(t, nil, err)
 
 	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now-3d")`)
-	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	_, err = vm.NewDateConverter(evalCtx, evalCtx, fs.Filter)
 	assert.Equal(t, nil, err)
 
 	fs = rel.MustParseFilter(`FILTER AND ( last_event == "now")`)
-	_, err = vm.NewDateConverter(evalCtx, fs.Filter)
+	_, err = vm.NewDateConverter(evalCtx, evalCtx, fs.Filter)
 	assert.Equal(t, nil, err)
 }
 
@@ -351,11 +351,11 @@ func TestDateBoundaryForBetween(t *testing.T) {
 
 			fs := rel.MustParseFilter(tc.filter)
 
-			dc, err := vm.NewDateConverterWithAnchorTime(includeCtx, fs.Filter, today)
+			dc, err := vm.NewDateConverterWithAnchorTime(includeCtx, includeCtx, fs.Filter, today)
 			require.NoError(t, err)
 			require.True(t, dc.HasDateMath)
 
-			matched, evalOk := vm.Matches(includeCtx, fs)
+			matched, evalOk := vm.MatchesInc(includeCtx, includeCtx, fs)
 			assert.True(t, evalOk)
 			assert.Equal(t, tc.match, matched)
 
