@@ -804,6 +804,25 @@ var builtinTests = []testBuiltins{
 	{`json.jmespath(json_field, "[?b].tags | [0 ")`, nil},
 	{`json.jmespath(json_bad, "[?b].tags | [0 ")`, value.ErrValue},
 	{`json.jmespath(json_object, "name")`, value.NewStringValue("bob")},
+
+	// IP Filter tests
+	{`ipfilter("192.168.1.100", "192.168.1.0/24")`, value.BoolValueTrue},
+	{`ipfilter("192.168.1.1", "192.168.1.0/24")`, value.BoolValueTrue},
+	{`ipfilter("192.168.1.254", "192.168.1.0/24")`, value.BoolValueTrue},
+	{`ipfilter("192.168.2.1", "192.168.1.0/24")`, value.BoolValueFalse},
+	{`ipfilter("10.0.0.1", "192.168.1.0/24")`, value.BoolValueFalse},
+	{`ipfilter("127.0.0.1", "127.0.0.0/8")`, value.BoolValueTrue},
+	{`ipfilter("128.0.0.1", "127.0.0.0/8")`, value.BoolValueFalse},
+	{`ipfilter("10.10.10.10", "10.0.0.0/8")`, value.BoolValueTrue},
+	{`ipfilter("11.10.10.10", "10.0.0.0/8")`, value.BoolValueFalse},
+	// IPv6 tests
+	{`ipfilter("2001:db8::1", "2001:db8::/32")`, value.BoolValueTrue},
+	{`ipfilter("2001:db9::1", "2001:db8::/32")`, value.BoolValueFalse},
+	{`ipfilter("::1", "::1/128")`, value.BoolValueTrue},
+	// Invalid inputs should return false
+	{`ipfilter("invalid.ip", "192.168.1.0/24")`, value.BoolValueFalse},
+	{`ipfilter("192.168.1.1", "invalid/cidr")`, value.BoolValueFalse},
+	{`ipfilter("192.168.1.1", "192.168.1.0/35")`, value.BoolValueFalse}, // Invalid CIDR range
 }
 
 var testValidation = []string{
@@ -923,6 +942,11 @@ var testValidation = []string{
 	`json.jmespath(json_field)`,    // Must have 2 args
 	`json.jmespath(json_field, 1)`, // Must have 2 args, 2nd must be string
 	`json.jmespath(json_bad, "")`,
+	
+	// IP Filter validation
+	`ipfilter()`,                     // Must have 2 args
+	`ipfilter("192.168.1.1")`,        // Must have 2 args
+	`ipfilter("192.168.1.1", "192.168.1.0/24", "extra")`, // Must have only 2 args
 }
 var testValidationx = []string{
 	`tolower()`, `lower(a,b)`, // must be one arg
