@@ -30,21 +30,21 @@ func ipFilterEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) 
 	cidrStr, cidrOk := value.ValueToString(args[1])
 
 	if !ipOk || !cidrOk {
-		return value.BoolValueFalse, true
+		return value.BoolValueFalse, false
 	}
 
 	// Parse the IP address
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		// Invalid IP address
-		return value.BoolValueFalse, true
+		return value.BoolValueFalse, false
 	}
 
 	// Parse the CIDR notation
 	_, ipNet, err := net.ParseCIDR(cidrStr)
 	if err != nil {
 		// Invalid CIDR notation
-		return value.BoolValueFalse, true
+		return value.BoolValueFalse, false
 	}
 
 	// Check if IP is contained in the subnet

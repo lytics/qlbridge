@@ -819,10 +819,10 @@ var builtinTests = []testBuiltins{
 	{`ipfilter("2001:db8::1", "2001:db8::/32")`, value.BoolValueTrue},
 	{`ipfilter("2001:db9::1", "2001:db8::/32")`, value.BoolValueFalse},
 	{`ipfilter("::1", "::1/128")`, value.BoolValueTrue},
-	// Invalid inputs should return false
-	{`ipfilter("invalid.ip", "192.168.1.0/24")`, value.BoolValueFalse},
-	{`ipfilter("192.168.1.1", "invalid/cidr")`, value.BoolValueFalse},
-	{`ipfilter("192.168.1.1", "192.168.1.0/35")`, value.BoolValueFalse}, // Invalid CIDR range
+	// Invalid inputs should fail evaluation
+	{`ipfilter("invalid.ip", "192.168.1.0/24")`, nil},
+	{`ipfilter("192.168.1.1", "invalid/cidr")`, nil},
+	{`ipfilter("192.168.1.1", "192.168.1.0/35")`, nil}, // Invalid CIDR range
 }
 
 var testValidation = []string{
