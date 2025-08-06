@@ -135,6 +135,9 @@ func LoadAllBuiltins() {
 		// MySQL Builtins
 		expr.FuncAdd("cast", &Cast{})
 		expr.FuncAdd("char_length", &Length{})
+
+		// Network functions
+		expr.FuncAdd("ipfilter", &IPFilter{})
 	})
 }
 
