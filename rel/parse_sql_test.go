@@ -740,13 +740,35 @@ func TestSqlDrop(t *testing.T) {
 	t.Parallel()
 	sql := `DROP TABLE articles;`
 	req, err := rel.ParseSql(sql)
-	assert.Equal(t, nil, err)
-	assert.NotEqual(t, nil, req)
+	assert.NoError(t, err)
+	assert.NotNil(t, req)
 	ds, ok := req.(*rel.SqlDrop)
 	assert.True(t, ok, "wanted SqlDrop got %T", req)
 	assert.Equal(t, lex.TokenDrop, ds.Keyword(), "Has keyword DROP")
 	assert.Equal(t, "TABLE", ds.Tok.V, "Wanted TABLE: got %q", ds.Tok.V)
 	assert.Equal(t, "articles", ds.Identity, "has articles: %v", ds.Identity)
+
+	sql = `DROP INDEX idx_user_email ON users;`
+	req, err = rel.ParseSql(sql)
+	assert.NoError(t, err)
+	assert.NotNil(t, req)
+	ds, ok = req.(*rel.SqlDrop)
+	assert.True(t, ok, "wanted SqlDrop got %T", req)
+	assert.Equal(t, lex.TokenDrop, ds.Keyword(), "Has keyword DROP")
+	assert.Equal(t, "INDEX", ds.Tok.V, "Wanted INDEX: got %q", ds.Tok.V)
+	assert.Equal(t, "idx_user_email", ds.Identity, "has idx_user_email: %v", ds.Identity)
+
+	sql = `DROP INDEX IF EXISTS idx_user_name ON users;`
+	req, err = rel.ParseSql(sql)
+	assert.NoError(t, err)
+	assert.NotNil(t, req)
+	ds, ok = req.(*rel.SqlDrop)
+	assert.True(t, ok, "wanted SqlDrop got %T", req)
+	assert.Equal(t, lex.TokenDrop, ds.Keyword(), "Has keyword DROP")
+	assert.Equal(t, "INDEX", ds.Tok.V, "Wanted INDEX: got %q", ds.Tok.V)
+	assert.Equal(t, "idx_user_name", ds.Identity, "has idx_user_name: %v", ds.Identity)
+	assert.Equal(t, "users", ds.Parent, "has table users: %v", ds.Parent)
+	assert.True(t, ds.IfExists, "Expected IfExists to be true")
 }
 
 func TestWithNameValue(t *testing.T) {
