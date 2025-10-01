@@ -523,7 +523,7 @@ func timeTruncEvalTwo(ctx expr.EvalContext, args []value.Value) (value.Value, bo
 	switch itemT := args[0].(type) {
 	case value.TimeValue:
 		// Get full Unix timestamps w/ microseconds and milliseconds.
-		microTs = itemT.Time().In(time.UTC).UnixNano() / 1e3
+		microTs = itemT.Time().In(time.UTC).UnixMicro()
 		milliTs = itemT.Int()
 	default:
 		// If not a TimeValue, convert to a TimeValue and get Unix w/ milliseconds.
@@ -531,8 +531,8 @@ func timeTruncEvalTwo(ctx expr.EvalContext, args []value.Value) (value.Value, bo
 		if !ok || t.IsZero() {
 			return value.NewStringValue(""), false
 		}
-		microTs = t.UnixNano() / 1e3
-		milliTs = microTs / 1e3
+		microTs = t.UnixMicro()
+		milliTs = t.UnixMilli()
 	}
 
 	// Look at the seconds argument to determine the truncation.

@@ -144,8 +144,7 @@ func toIntEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) {
 
 	switch val := vals[0].(type) {
 	case value.TimeValue:
-		iv := val.Val().UnixNano() / 1e6 // Milliseconds
-		return value.NewIntValue(iv), true
+		return value.NewIntValue(val.Int()), true
 	case value.NumberValue:
 		return value.NewIntValue(val.Int()), true
 	case value.IntValue:
