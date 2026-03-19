@@ -194,14 +194,14 @@ var builtinTests = []testBuiltins{
 	{`exists(toint(price))`, value.BoolValueTrue},
 	{`exists(-1)`, value.BoolValueTrue},
 	{`exists(non_field)`, value.BoolValueFalse},
-	{`exists("")`, value.BoolValueFalse},
+	{`exists("")`, value.BoolValueTrue},
 	{`exists(true)`, value.BoolValueTrue},
 	{`exists(1.5/6.7)`, value.BoolValueTrue},
 	{`exists(tonumber(10/0))`, value.BoolValueFalse},
 	{`exists(0)`, value.BoolValueTrue},
 	{`exists(Address)`, value.BoolValueTrue},
 	{`exists(emails)`, value.BoolValueTrue},
-	{`exists(ZeroTime)`, value.BoolValueFalse}, // ZeroTime
+	{`exists(ZeroTime)`, value.BoolValueTrue}, // ZeroTime
 	{`exists(Created)`, value.BoolValueTrue},
 	{`exists(Updated)`, value.BoolValueTrue},
 

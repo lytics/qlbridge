@@ -177,7 +177,7 @@ func lessThanEval(ctx expr.EvalContext, vals []value.Value) (value.Value, bool) 
 //
 //	exists(real_field) => true
 //	exists("value") => true
-//	exists("") => false
+//	exists("") => true
 //	exists(empty_field) => false
 //	exists(2) => true
 //	exists(todate(date_field)) => true
@@ -194,7 +194,7 @@ func (m *Exists) Validate(n *expr.FuncNode) (expr.EvaluatorFunc, error) {
 
 func existsEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 
-	switch node := args[0].(type) {
+	switch args[0].(type) {
 	// case *expr.IdentityNode:
 	// 	_, ok := ctx.Get(node.Text)
 	// 	if ok {
@@ -208,9 +208,6 @@ func existsEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 	// 	}
 	// 	return value.BoolValueFalse, true
 	case value.StringValue:
-		if node.Nil() {
-			return value.BoolValueFalse, true
-		}
 		return value.BoolValueTrue, true
 	case value.BoolValue:
 		return value.BoolValueTrue, true
@@ -219,9 +216,6 @@ func existsEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
 	case value.IntValue:
 		return value.BoolValueTrue, true
 	case value.TimeValue:
-		if node.Nil() {
-			return value.BoolValueFalse, true
-		}
 		return value.BoolValueTrue, true
 	case value.StringsValue, value.SliceValue, value.MapIntValue:
 		return value.BoolValueTrue, true

@@ -850,9 +850,6 @@ func walkUnary(ctx expr.EvalContext, includer expr.Includer, node *expr.UnaryNod
 		case nil, value.NilValue:
 			return value.NewBoolValue(false), true
 		}
-		if a.Nil() {
-			return value.NewBoolValue(false), true
-		}
 		return value.NewBoolValue(true), true
 	default:
 		u.Warnf("urnary not implemented for type %s %#v", node.Operator.T.String(), node)
