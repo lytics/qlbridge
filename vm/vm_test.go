@@ -58,7 +58,8 @@ var (
 		"user_id": value.NewStringValue("abc"),
 		"urls":    value.NewStringsValue([]string{"abc", "123"}),
 		"hits":    value.NewMapIntValue(map[string]int64{"google.com": 5, "bing.com": 1}),
-		"email":   value.NewStringValue("bob@bob.com"),
+		"email":     value.NewStringValue("bob@bob.com"),
+		"empty_str": value.NewStringValue(""),
 		"mt":      value.NewMapTimeValue(map[string]time.Time{"event0": t0, "event1": t1}),
 	}, true)
 
@@ -273,6 +274,8 @@ var (
 		vmt(`exists email`, true, noError),
 		vmt(`NOT (NOT EXISTS email)`, true, noError),
 		vmt(`exists not_a_field`, false, noError),
+		vmt(`exists empty_str`, true, noError),
+		vmt(`exists(empty_str)`, true, noError),
 		vmt(`NOT (NOT EXISTS not_a_field)`, false, noError),
 		vmt(`int5 > 10`, false, noError),
 		vmt(`NOT (int5 <= 10)`, false, noError),
