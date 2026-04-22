@@ -131,59 +131,20 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (any, e
 // makeBetween returns a range filter for Elasticsearch given the 3 nodes that
 // make up a comparison.
 func makeBetween(lhs *gentypes.FieldType, lower, upper any) (any, error) {
-	/*
-		"nested": {
-			"query": {
-				"bool": {
-					"must": [
-						{
-							"term": {
-								"k": "open"
-							}
-						},
-						{
-							"range": {
-								"f": {"gt": 7}
-							}
-						},
-						{
-							"range": {
-								"f": {"lt": 15}
-							}
-						}
-					]
-				}
-			},
-			"path": "map_events"
-		}
+	fieldName := lhs.Field
+	if lhs.Nested() {
+		fieldName, lower = lhs.PrefixAndValue(lower)
+		_, upper = lhs.PrefixAndValue(upper)
+	}
 
-		"must": [
-		    {
-		        "range": {
-		            "f": {"gt": 7}
-		        }
-		    },
-		    {
-		        "range": {
-		            "f": {"lt": 15}
-		        }
-		    }
-		]
-	*/
-
-	lr := &RangeFilter{Range: map[string]RangeQry{lhs.Field: {GT: lower}}}
-	ur := &RangeFilter{Range: map[string]RangeQry{lhs.Field: {LT: upper}}}
-	fl := []any{lr, ur}
+	lr := &RangeFilter{Range: map[string]RangeQry{fieldName: {GT: lower}}}
+	ur := &RangeFilter{Range: map[string]RangeQry{fieldName: {LT: upper}}}
+	inner := &boolean{must{[]any{lr, ur}}}
 
 	if lhs.Nested() {
-		fl = append(fl, Term("k", lhs.Field))
-		return &nested{&NestedQuery{
-			Query:          &boolean{must{fl}},
-			Path:           lhs.Path,
-			IgnoreUnmapped: true,
-		}}, nil
+		return Nested(lhs, inner), nil
 	}
-	return &boolean{must{fl}}, nil
+	return inner, nil
 }
 
 // makeWildcard returns a wildcard/like query
