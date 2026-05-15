@@ -49,6 +49,10 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (any, e
 				// rhsval can be converted to a float!
 				rhsval = rhsf
 			}
+			// ISO date string → epoch millis float.
+			if t, err := dateparse.ParseAny(rhsstr); err == nil {
+				rhsval = float64(t.UnixMilli())
+			}
 		}
 	}
 
