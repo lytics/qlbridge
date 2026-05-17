@@ -141,6 +141,12 @@ func LoadAllBuiltins() {
 	})
 }
 
+// GetFunc gets a function from the global registry if it exists.
+func GetFunc(name string) (expr.Func, bool) {
+	LoadAllBuiltins() // This is behind a sync.Once
+	return expr.FuncGet(name)
+}
+
 // uuid generates a new uuid
 //
 //	uuid() =>  "...."
