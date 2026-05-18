@@ -238,6 +238,63 @@ func TestBetweenWalk(t *testing.T) {
 	}
 }
 
+// TestBetweenDateCoercion verifies that BETWEEN on a TimeType field converts
+// string bounds to epoch-millisecond floats before sending them to ES, matching
+// the behavior of makeRange for > / < comparisons.
+func TestBetweenDateCoercion(t *testing.T) {
+	s := schema{
+		cols: map[string]value.ValueType{
+			"date_created": value.TimeType,
+		},
+		fields: map[string]*gentypes.FieldType{
+			"date_created": {Field: "date_created", Type: value.TimeType, TypeName: "time"},
+		},
+	}
+	g := NewGenerator(time.Now(), nil, s)
+
+	tests := []struct {
+		name   string
+		filter string
+		want   string
+	}{
+		{
+			name:   "iso date strings",
+			filter: `FILTER date_created BETWEEN "2026-05-09" AND "2026-05-10"`,
+			// "2026-05-09" UTC midnight = 1778284800000 ms, "2026-05-10" = 1778371200000 ms
+			want: `{
+				"bool": {
+					"must": [
+						{"range": {"date_created": {"gt": 1778284800000}}},
+						{"range": {"date_created": {"lt": 1778371200000}}}
+					]
+				}
+			}`,
+		},
+		{
+			name:   "epoch millis strings",
+			filter: `FILTER date_created BETWEEN "1778310000000" AND "1778396400000"`,
+			want: `{
+				"bool": {
+					"must": [
+						{"range": {"date_created": {"gt": 1778310000000}}},
+						{"range": {"date_created": {"lt": 1778396400000}}}
+					]
+				}
+			}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs, err := rel.ParseFilterQL(tt.filter)
+			require.NoError(t, err)
+			p, err := g.WalkExpr(fs.Filter)
+			require.NoError(t, err)
+			assertJSONEqual(t, tt.want, p.Filter)
+		})
+	}
+}
+
 func assertJSONEqual(t *testing.T, want string, got any) {
 	t.Helper()
 	gotBytes, err := json.Marshal(got)

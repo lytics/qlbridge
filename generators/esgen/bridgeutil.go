@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/araddon/dateparse"
 	"github.com/lytics/qlbridge/expr"
 	"github.com/lytics/qlbridge/generators/gentypes"
 	"github.com/lytics/qlbridge/lex"
@@ -47,6 +48,10 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (any, e
 			if rhsf, err := strconv.ParseFloat(rhsstr, 64); err == nil {
 				// rhsval can be converted to a float!
 				rhsval = rhsf
+			}
+			// ISO date string → epoch millis float.
+			if t, err := dateparse.ParseAny(rhsstr); err == nil {
+				rhsval = float64(t.UnixMilli())
 			}
 		}
 	}
@@ -131,6 +136,9 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (any, e
 // makeBetween returns a range filter for Elasticsearch given the 3 nodes that
 // make up a comparison.
 func makeBetween(lhs *gentypes.FieldType, lower, upper any) (any, error) {
+	lower = coerceScalar(lhs, lower)
+	upper = coerceScalar(lhs, upper)
+
 	fieldName := lhs.Field
 	if lhs.Nested() {
 		fieldName, lower = lhs.PrefixAndValue(lower)
@@ -145,6 +153,45 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper any) (any, error) {
 		return Nested(lhs, inner), nil
 	}
 	return inner, nil
+}
+
+// coerceScalar converts a scalar value to the appropriate Go type for the given
+// field type before embedding it in an Elasticsearch range query. This mirrors
+// the coercion makeRange performs so that BETWEEN and comparison operators
+// produce consistent queries.
+//
+// For IntType fields the value is converted to int64. For NumberType fields it
+// is converted to float64. For all other types (including TimeType) string
+// values are first tried as a float (epoch-millis strings like "1778310000000")
+// and then as an ISO date string (e.g. "2026-05-09"), which is converted to
+// epoch milliseconds. Values that cannot be coerced are returned unchanged so
+// that Elasticsearch can attempt its own parsing.
+func coerceScalar(lhs *gentypes.FieldType, val any) any {
+	rhv := value.NewValue(val)
+	switch lhs.Type {
+	case value.IntType, value.MapIntType:
+		if iv, ok := value.ValueToInt64(rhv); ok {
+			return iv
+		}
+	case value.NumberType, value.MapNumberType:
+		if fv, ok := value.ValueToFloat64(rhv); ok {
+			return fv
+		}
+	default:
+		s, ok := val.(string)
+		if !ok {
+			return val
+		}
+		// Numeric string → epoch millis float.
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
+			return f
+		}
+		// ISO date string → epoch millis float.
+		if t, err := dateparse.ParseAny(s); err == nil {
+			return float64(t.UnixMilli())
+		}
+	}
+	return val
 }
 
 // makeWildcard returns a wildcard/like query
