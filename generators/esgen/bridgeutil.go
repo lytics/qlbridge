@@ -3,6 +3,8 @@ package esgen
 import (
 	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/araddon/dateparse"
 	"github.com/lytics/qlbridge/expr"
@@ -131,6 +133,140 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (any, e
 		return Nested(lhs, r), nil
 	}
 	return r, nil
+}
+
+// makeRecurringQuery builds a Painless script matching documents whose date
+// field lands on a recurrence of itself relative to `now`. `period` is either a
+// string ("yearly"/"monthly"/"weekly"/"daily") or an integer node (every N
+// days). offsetDays shifts the recurrence (e.g. yearly+182 = half-birthday).
+func makeRecurringQuery(lhs *gentypes.FieldType, period expr.Node, offsetDays int, now time.Time) (any, error) {
+	if lhs.Nested() {
+		return nil, fmt.Errorf("'recurring' unsupported for nested/map field %q", lhs.Field)
+	}
+	if lhs.Type != value.TimeType {
+		return nil, fmt.Errorf("'recurring' requires a date field, got %s for %q", lhs.Type, lhs.Field)
+	}
+
+	q := painlessQuote(lhs.Field)
+	exists := fmt.Sprintf("doc[%s].size() != 0", q)
+
+	// Numeric period => every N days.
+	if num, ok := period.(*expr.NumberNode); ok {
+		if !num.IsInt || num.Int64 <= 0 {
+			return nil, fmt.Errorf("'recurring' day period must be a positive integer, got %v", period)
+		}
+		n := num.Int64
+		todayDay := now.UTC().Unix() / 86400
+		src := fmt.Sprintf("if (%s) { long d = params.todayDay - (doc[%s].value.toInstant().getEpochSecond() / 86400) - params.offset; return d >= 0 && d %% params.n == 0; } return false;",
+			exists, q)
+		return Script(src, map[string]any{"todayDay": todayDay, "offset": offsetDays, "n": n}), nil
+	}
+
+	pnode, ok := period.(*expr.StringNode)
+	if !ok {
+		return nil, fmt.Errorf("'recurring' period must be a string or integer, got %s", period.NodeType())
+	}
+
+	target := now.UTC().AddDate(0, 0, -offsetDays)
+	switch strings.ToLower(pnode.Text) {
+	case "yearly", "annual", "annually":
+		src := fmt.Sprintf("%s && doc[%s].value.getMonthValue() == params.month && doc[%s].value.getDayOfMonth() == params.day", exists, q, q)
+		return Script(src, map[string]any{"month": int(target.Month()), "day": target.Day()}), nil
+	case "monthly":
+		src := fmt.Sprintf("%s && doc[%s].value.getDayOfMonth() == params.day", exists, q)
+		return Script(src, map[string]any{"day": target.Day()}), nil
+	case "weekly":
+		src := fmt.Sprintf("%s && doc[%s].value.getDayOfWeek().getValue() == params.dow", exists, q)
+		return Script(src, map[string]any{"dow": isoDayOfWeek(target)}), nil
+	case "daily":
+		return Script(exists, nil), nil
+	default:
+		return nil, fmt.Errorf("'recurring' unsupported period %q (want yearly/monthly/weekly/daily or an integer)", pnode.Text)
+	}
+}
+
+// isoDayOfWeek maps Go's Weekday (Sunday=0) to ISO-8601 (Monday=1..Sunday=7),
+// matching Painless's ZonedDateTime.getDayOfWeek().getValue().
+func isoDayOfWeek(t time.Time) int {
+	if wd := int(t.Weekday()); wd != 0 {
+		return wd
+	}
+	return 7
+}
+
+// makeFieldRange compares two document fields (e.g. `a < b`). Elasticsearch
+// range queries can only compare a field to a constant, so a field-to-field
+// comparison is expressed as a Painless script.
+func makeFieldRange(lhs *gentypes.FieldType, op lex.TokenType, rhs *gentypes.FieldType) (any, error) {
+	if lhs.Nested() || rhs.Nested() {
+		return nil, fmt.Errorf("field-to-field comparison unsupported for nested/map fields: %q, %q", lhs.Field, rhs.Field)
+	}
+	if painlessTypeClass(lhs.Type) != painlessTypeClass(rhs.Type) {
+		return nil, fmt.Errorf("field-to-field comparison requires comparable types, got %s and %s", lhs.Type, rhs.Type)
+	}
+
+	cmp, err := painlessCompareOp(op)
+	if err != nil {
+		return nil, err
+	}
+	laccess, err := painlessFieldAccess(lhs)
+	if err != nil {
+		return nil, err
+	}
+	raccess, err := painlessFieldAccess(rhs)
+	if err != nil {
+		return nil, err
+	}
+
+	src := fmt.Sprintf("doc[%s].size() != 0 && doc[%s].size() != 0 && %s %s %s",
+		painlessQuote(lhs.Field), painlessQuote(rhs.Field), laccess, cmp, raccess)
+	return Script(src, nil), nil
+}
+
+func painlessCompareOp(op lex.TokenType) (string, error) {
+	switch op {
+	case lex.TokenGE:
+		return ">=", nil
+	case lex.TokenLE:
+		return "<=", nil
+	case lex.TokenGT:
+		return ">", nil
+	case lex.TokenLT:
+		return "<", nil
+	default:
+		return "", fmt.Errorf("qlindex: unsupported range operator %s", op)
+	}
+}
+
+// painlessTypeClass groups field types that are mutually comparable.
+func painlessTypeClass(t value.ValueType) string {
+	switch t {
+	case value.TimeType:
+		return "time"
+	case value.IntType, value.NumberType:
+		return "number"
+	default:
+		return "unsupported"
+	}
+}
+
+func painlessFieldAccess(f *gentypes.FieldType) (string, error) {
+	q := painlessQuote(f.Field)
+	switch f.Type {
+	case value.TimeType:
+		return fmt.Sprintf("doc[%s].value.toInstant().toEpochMilli()", q), nil
+	case value.IntType, value.NumberType:
+		return fmt.Sprintf("doc[%s].value", q), nil
+	default:
+		return "", fmt.Errorf("field-to-field comparison unsupported for type %s field %q", f.Type, f.Field)
+	}
+}
+
+// painlessQuote returns a single-quoted Painless string literal.
+func painlessQuote(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `'`, `\'`)
+	return "'" + s + "'"
 }
 
 // makeBetween returns a range filter for Elasticsearch given the 3 nodes that

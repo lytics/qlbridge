@@ -195,6 +195,17 @@ func (fg *FilterGenerator) binaryExpr(node *expr.BinaryNode, _ int) (any, error)
 
 	switch op := node.Operator.T; op {
 	case lex.TokenGE, lex.TokenLE, lex.TokenGT, lex.TokenLT:
+		// Field-to-field comparison (e.g. `a < b`): the RHS is a field
+		// identity rather than a constant, so it cannot be a range query.
+		if rident, ok := node.Args[1].(*expr.IdentityNode); ok {
+			if _, isScalar := scalar(rident); !isScalar {
+				rhs, err := fg.fieldType(node.Args[1])
+				if err != nil {
+					return nil, err
+				}
+				return makeFieldRange(lhs, op, rhs)
+			}
+		}
 		return makeRange(lhs, op, node.Args[1])
 
 	case lex.TokenEqual, lex.TokenEqualEqual: // the VM supports both = and ==
@@ -361,6 +372,26 @@ func (fg *FilterGenerator) funcExpr(node *expr.FuncNode, _ int) (any, error) {
 			return nil, fmt.Errorf("qlindex: unsupported type for 'geodistance' distance argument. must be number, got %s", node.Args[2].NodeType())
 		}
 		return makeGeoDistanceQuery(lhs, lat, lon, distance), nil
+	case "recurring":
+		// recurring(date_field, period [, offsetDays]) matches profiles whose
+		// date_field lands on a recurrence of itself relative to the eval-time
+		// "now" (fg.ts): yearly/monthly/weekly/daily anniversaries, or every N days.
+		if len(node.Args) < 2 || len(node.Args) > 3 {
+			return nil, fmt.Errorf("'recurring' function requires 2 or 3 arguments, got %d", len(node.Args))
+		}
+		lhs, err := fg.fieldType(node.Args[0])
+		if err != nil {
+			return nil, err
+		}
+		offset := 0
+		if len(node.Args) == 3 {
+			off, ok := node.Args[2].(*expr.NumberNode)
+			if !ok || !off.IsInt {
+				return nil, fmt.Errorf("qlindex: 'recurring' offset must be an integer number of days, got %v", node.Args[2])
+			}
+			offset = int(off.Int64)
+		}
+		return makeRecurringQuery(lhs, node.Args[1], offset, fg.ts)
 	}
 	return nil, fmt.Errorf("qlindex: unsupported function: %s", node.Name)
 }

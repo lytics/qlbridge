@@ -213,3 +213,28 @@ func Wildcard(field, value string, addStars bool) *wildcard {
 type GeoDistanceFilter struct {
 	GeoDistance map[string]any `json:"geo_distance"`
 }
+
+type ScriptFilter struct {
+	Script ScriptQry `json:"script"`
+}
+
+type ScriptQry struct {
+	Script ScriptBody `json:"script"`
+}
+
+type ScriptBody struct {
+	Source string         `json:"source"`
+	Lang   string         `json:"lang"`
+	Params map[string]any `json:"params,omitempty"`
+}
+
+// Script builds a Painless script filter. Used for comparisons whose right-hand
+// side is not a constant (field-to-field, or eval-time computed values) and so
+// cannot be expressed as a native range/term query.
+func Script(source string, params map[string]any) *ScriptFilter {
+	return &ScriptFilter{Script: ScriptQry{Script: ScriptBody{
+		Source: source,
+		Lang:   "painless",
+		Params: params,
+	}}}
+}
