@@ -34,12 +34,12 @@ func TestFieldToFieldCompare(t *testing.T) {
 		{
 			name:    "time lt time",
 			filter:  `FILTER consent < signup`,
-			wantSrc: "doc['consent'].size() != 0 && doc['signup'].size() != 0 && doc['consent'].value.toInstant().toEpochMilli() < doc['signup'].value.toInstant().toEpochMilli()",
+			wantSrc: "doc['consent'].size() != 0 && doc['signup'].size() != 0 && doc['consent'].value.toLocalDate().toEpochDay() < doc['signup'].value.toLocalDate().toEpochDay()",
 		},
 		{
 			name:    "time gt time",
 			filter:  `FILTER consent > signup`,
-			wantSrc: "doc['consent'].size() != 0 && doc['signup'].size() != 0 && doc['consent'].value.toInstant().toEpochMilli() > doc['signup'].value.toInstant().toEpochMilli()",
+			wantSrc: "doc['consent'].size() != 0 && doc['signup'].size() != 0 && doc['consent'].value.toLocalDate().toEpochDay() > doc['signup'].value.toLocalDate().toEpochDay()",
 		},
 		{
 			name:    "int ge number",

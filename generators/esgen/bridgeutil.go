@@ -254,7 +254,9 @@ func painlessFieldAccess(f *gentypes.FieldType) (string, error) {
 	q := painlessQuote(f.Field)
 	switch f.Type {
 	case value.TimeType:
-		return fmt.Sprintf("doc[%s].value.toInstant().toEpochMilli()", q), nil
+		// Day-granular: compare calendar dates, not instants, so `a < b` matches
+		// for the whole day. Matches the in-process evaluator's epoch-day floor.
+		return fmt.Sprintf("doc[%s].value.toLocalDate().toEpochDay()", q), nil
 	case value.IntType, value.NumberType:
 		return fmt.Sprintf("doc[%s].value", q), nil
 	default:
