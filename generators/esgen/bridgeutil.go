@@ -169,7 +169,7 @@ func makeRecurringQuery(lhs *gentypes.FieldType, period expr.Node, offsetDays in
 
 	target := now.UTC().AddDate(0, 0, -offsetDays)
 	switch strings.ToLower(pnode.Text) {
-	case "yearly", "annual", "annually":
+	case "yearly":
 		src := fmt.Sprintf("%s && doc[%s].value.getMonthValue() == params.month && doc[%s].value.getDayOfMonth() == params.day", exists, q, q)
 		return Script(src, map[string]any{"month": int(target.Month()), "day": target.Day()}), nil
 	case "monthly":
