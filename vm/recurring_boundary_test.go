@@ -19,8 +19,8 @@ func utcDay(y int, m time.Month, d int) time.Time {
 
 // recurringMatches is an independent copy of the recurring() predicate the
 // evaluators implement, used here as an oracle for the boundary calculation. The
-// n-day path floors toward negative infinity, matching Math.floorDiv in the
-// generated Painless and the in-process evaluator.
+// day flooring is hand-rolled rather than calling vm.EpochDay on purpose: an
+// oracle sharing code with what it checks can't catch a bug in that code.
 func recurringMatches(anchor, now time.Time, period string, n, offsetDays int) bool {
 	anchorU, nowU := anchor.UTC(), now.UTC()
 

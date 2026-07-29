@@ -395,8 +395,8 @@ func RecurringBoundary(anchor, now time.Time, period string, n, offsetDays int) 
 // so a pre-1970 anchor buckets by calendar day. Matches the every-n-days
 // evaluators, which floor the same way.
 func recurringBoundaryNDays(anchor, now time.Time, n, offsetDays int) time.Time {
-	anchorDay := floorDivInt64(anchor.UTC().Unix(), secondsPerDay)
-	nowDay := floorDivInt64(now.UTC().Unix(), secondsPerDay)
+	anchorDay := EpochDay(anchor.UTC().Unix())
+	nowDay := EpochDay(now.UTC().Unix())
 	// The evaluator subtracts the offset from the day difference, so the first
 	// matching day sits offsetDays after the anchor.
 	first := anchorDay + int64(offsetDays)
@@ -481,12 +481,13 @@ func dayStartFromEpochDay(day int64) time.Time {
 	return time.Unix(day*secondsPerDay, 0).UTC()
 }
 
-// floorDivInt64 mirrors Painless's Math.floorDiv: rounds toward negative
-// infinity instead of toward zero.
-func floorDivInt64(a, b int64) int64 {
-	q := a / b
-	if a%b != 0 && (a < 0) != (b < 0) {
-		q--
+// EpochDay returns the UTC calendar day for a unix-seconds timestamp, flooring
+// toward negative infinity so pre-1970 dates don't bucket a day late.
+// The generated Painless uses Math.floorDiv to stay in step with this.
+func EpochDay(sec int64) int64 {
+	d := sec / secondsPerDay
+	if sec%secondsPerDay != 0 && sec < 0 {
+		d--
 	}
-	return q
+	return d
 }
