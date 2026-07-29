@@ -156,8 +156,11 @@ func makeRecurringQuery(lhs *gentypes.FieldType, period expr.Node, offsetDays in
 			return nil, fmt.Errorf("'recurring' day period must be a positive integer, got %v", period)
 		}
 		n := num.Int64
-		todayDay := now.UTC().Unix() / 86400
-		src := fmt.Sprintf("if (%s) { long d = params.todayDay - (doc[%s].value.toInstant().getEpochSecond() / 86400) - params.offset; return d >= 0 && d %% params.n == 0; } return false;",
+		// Floor rather than truncate: Java's and Go's `/` both round toward zero,
+		// which puts a pre-1970 anchor with a non-midnight time one day late. Both
+		// sides of this (here and the in-process evaluator) must floor or neither.
+		todayDay := floorDivInt64(now.UTC().Unix(), secondsPerDay)
+		src := fmt.Sprintf("if (%s) { long d = params.todayDay - Math.floorDiv(doc[%s].value.toInstant().getEpochSecond(), 86400L) - params.offset; return d >= 0 && d %% params.n == 0; } return false;",
 			exists, q)
 		return Script(src, map[string]any{"todayDay": todayDay, "offset": offsetDays, "n": n}), nil
 	}
@@ -414,4 +417,16 @@ func makeTimeWindowQuery(lhs *gentypes.FieldType, threshold, window, ts int64) (
 		Path:           lhs.Field,
 		IgnoreUnmapped: true,
 	}}, nil
+}
+
+const secondsPerDay = 86400
+
+// floorDivInt64 mirrors Painless's Math.floorDiv: rounds toward negative
+// infinity instead of toward zero, so pre-1970 epoch seconds map to the right day.
+func floorDivInt64(a, b int64) int64 {
+	q := a / b
+	if a%b != 0 && (a < 0) != (b < 0) {
+		q--
+	}
+	return q
 }

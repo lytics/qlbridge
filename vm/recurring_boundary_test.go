@@ -18,13 +18,21 @@ func utcDay(y int, m time.Month, d int) time.Time {
 }
 
 // recurringMatches is an independent copy of the recurring() predicate the
-// evaluators implement, used here as an oracle for the boundary calculation.
-// Kept deliberately literal, including the truncating division on the n-day path.
+// evaluators implement, used here as an oracle for the boundary calculation. The
+// n-day path floors toward negative infinity, matching Math.floorDiv in the
+// generated Painless and the in-process evaluator.
 func recurringMatches(anchor, now time.Time, period string, n, offsetDays int) bool {
 	anchorU, nowU := anchor.UTC(), now.UTC()
 
 	if n > 0 {
-		diff := nowU.Unix()/86400 - anchorU.Unix()/86400 - int64(offsetDays)
+		floorDay := func(sec int64) int64 {
+			d := sec / 86400
+			if sec%86400 != 0 && sec < 0 {
+				d--
+			}
+			return d
+		}
+		diff := floorDay(nowU.Unix()) - floorDay(anchorU.Unix()) - int64(offsetDays)
 		return diff >= 0 && diff%int64(n) == 0
 	}
 
@@ -114,9 +122,10 @@ func TestRecurringBoundaryIsExactFlipPoint(t *testing.T) {
 		{"weekly with offset", utcDay(2026, 6, 29), "weekly", 0, 3},
 		{"every 30 days", utcDay(2026, 1, 1), "", 30, 0},
 		{"every 7 days with offset", utcDay(2026, 1, 1), "", 7, 10},
-		// Pre-1970 anchor: the n-day path divides toward zero, so the oracle has
-		// to share that quirk -- which it does, being a copy of the evaluator.
+		// Pre-1970 anchor with a non-midnight time: the case truncating division
+		// got wrong by a day.
 		{"every 90 days pre-1970 anchor", utcDay(1965, 6, 29).Add(12 * time.Hour), "", 90, 0},
+		{"every 30 days pre-1970 anchor", utcDay(1965, 6, 29).Add(23 * time.Hour), "", 30, 0},
 	}
 
 	for _, cfg := range configs {
@@ -216,4 +225,22 @@ func TestRecurringBoundaryNoAnchor(t *testing.T) {
 	dc, err := vm.NewDateConverterWithAnchorTime(inc, inc, fs.Filter, at)
 	require.NoError(t, err)
 	assert.Equal(t, at.Add(12*time.Hour).UTC(), dc.Boundary().UTC())
+}
+
+// TestRecurringBoundaryFloorsPre1970 pins that the n-day path floors epoch days
+// instead of truncating toward zero. Under truncation a pre-1970 anchor whose
+// time-of-day wasn't midnight bucketed one day late, so its recurrences landed a
+// day after those of the same calendar date at midnight.
+func TestRecurringBoundaryFloorsPre1970(t *testing.T) {
+	t.Parallel()
+
+	midnight := utcDay(1965, 6, 29)
+	now := utcDay(2026, 3, 10).Add(9 * time.Hour)
+
+	for _, offset := range []time.Duration{time.Hour, 12 * time.Hour, 23 * time.Hour} {
+		assert.Equal(t,
+			vm.RecurringBoundary(midnight, now, "", 90, 0),
+			vm.RecurringBoundary(midnight.Add(offset), now, "", 90, 0),
+			"anchor at +%v should recur on the same days as the same date at midnight", offset)
+	}
 }
