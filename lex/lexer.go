@@ -1291,6 +1291,13 @@ func LexListOfArgs(l *Lexer) StateFn {
 		l.backup()
 		return LexExpression
 	case '!', '=', '>', '<', '-', '+', '%', '&', '/', '|':
+		if r == '-' && valueExpectedTokens[l.lastToken.T] && l.numericAfterSign() {
+			// A negative literal is a single value, not a binary operator
+			// between two list args: push back onto this list so the
+			// following `,` / `)` is handled here, not by the enclosing
+			// LexParenRight.
+			l.Push("LexListOfArgs", LexListOfArgs)
+		}
 		l.backup()
 		return LexExpression
 	case ';':
@@ -2244,6 +2251,47 @@ func LexLogical(l *Lexer) StateFn {
 	return LexExpression(l)
 }
 
+// valueExpectedTokens are the previously-emitted tokens after which an
+// unquoted `-` begins a signed numeric literal rather than the binary-minus
+// operator: comparators, arithmetic operators, open-paren, comma, logic,
+// IN/BETWEEN, and the start of input (TokenNil).
+var valueExpectedTokens = map[TokenType]bool{
+	TokenNil:             true,
+	TokenEqual:           true,
+	TokenEqualEqual:      true,
+	TokenNE:              true,
+	TokenGE:              true,
+	TokenLE:              true,
+	TokenGT:              true,
+	TokenLT:              true,
+	TokenMinus:           true,
+	TokenPlus:            true,
+	TokenMultiply:        true,
+	TokenDivide:          true,
+	TokenModulus:         true,
+	TokenLeftParenthesis: true,
+	TokenComma:           true,
+	TokenLogicAnd:        true,
+	TokenLogicOr:         true,
+	TokenAnd:             true,
+	TokenOr:              true,
+	TokenIN:              true,
+	TokenBetween:         true,
+}
+
+// numericAfterSign reports whether the upcoming runes (immediately after an
+// already-consumed sign) are a digit, or a `.` followed by a digit.
+func (l *Lexer) numericAfterSign() bool {
+	next := l.PeekX(2)
+	if len(next) == 0 {
+		return false
+	}
+	if isDigit(rune(next[0])) {
+		return true
+	}
+	return next[0] == '.' && len(next) == 2 && isDigit(rune(next[1]))
+}
+
 // <expr>   Handle single logical expression which may be nested and  has
 //
 //	user defined function names that are NOT validated by lexer
@@ -2313,13 +2361,17 @@ func LexExpression(l *Lexer) StateFn {
 		foundLogical := false
 		foundOperator := false
 		switch r {
-		case '-': // comment?  or minus?
+		case '-': // negative numeric literal, comment, or minus?
 			p := l.Peek()
-			if p == '-' {
+			switch {
+			case p == '-':
 				l.backup()
 				l.Push("LexExpression", LexExpression)
 				return LexInlineComment
-			} else {
+			case valueExpectedTokens[l.lastToken.T] && l.numericAfterSign():
+				l.backup()
+				return LexNumber(l)
+			default:
 				l.Emit(TokenMinus)
 				return l.clauseState()
 			}

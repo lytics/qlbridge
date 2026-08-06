@@ -270,6 +270,31 @@ func TestLexDuration(t *testing.T) {
 	}
 }
 
+// Binary minus (subtraction) must be unaffected by the signed-numeric-literal
+// fix: LexExpression is shared with the SQL dialect, and `a - b` / `5 - 3`
+// have an identity/number as the previous token, not a value-expected one.
+func TestLexBinaryMinusUnchanged(t *testing.T) {
+	verifyTokens(t, `SELECT a - b FROM x`,
+		[]Token{
+			tv(TokenSelect, "SELECT"),
+			tv(TokenIdentity, "a"),
+			tv(TokenMinus, "-"),
+			tv(TokenIdentity, "b"),
+			tv(TokenFrom, "FROM"),
+			tv(TokenIdentity, "x"),
+		})
+
+	verifyTokens(t, `SELECT 5 - 3 FROM x`,
+		[]Token{
+			tv(TokenSelect, "SELECT"),
+			tv(TokenInteger, "5"),
+			tv(TokenMinus, "-"),
+			tv(TokenInteger, "3"),
+			tv(TokenFrom, "FROM"),
+			tv(TokenIdentity, "x"),
+		})
+}
+
 func verifyTokens(t *testing.T, sql string, tokens []Token) {
 	l := NewSqlLexer(sql)
 	u.Debugf("sql: %v", sql)

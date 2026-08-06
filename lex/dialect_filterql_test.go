@@ -239,3 +239,56 @@ func TestFilterQLIntersects(t *testing.T) {
 			tv(TokenRightParenthesis, ")"),
 		})
 }
+
+// An unquoted negative numeric literal in a value position must lex as a
+// single signed TokenInteger/TokenFloat, not a TokenMinus followed by a
+// positive number.
+func TestFilterQLNegativeLiteral(t *testing.T) {
+	verifyFilterQLTokens(t, `FILTER visitct = -1`,
+		[]Token{
+			tv(TokenFilter, "FILTER"),
+			tv(TokenIdentity, "visitct"),
+			tv(TokenEqual, "="),
+			tv(TokenInteger, "-1"),
+		})
+
+	verifyFilterQLTokens(t, `FILTER visitct = -1.5`,
+		[]Token{
+			tv(TokenFilter, "FILTER"),
+			tv(TokenIdentity, "visitct"),
+			tv(TokenEqual, "="),
+			tv(TokenFloat, "-1.5"),
+		})
+
+	verifyFilterQLTokens(t, `FILTER visitct IN (-1)`,
+		[]Token{
+			tv(TokenFilter, "FILTER"),
+			tv(TokenIdentity, "visitct"),
+			tv(TokenIN, "IN"),
+			tv(TokenLeftParenthesis, "("),
+			tv(TokenInteger, "-1"),
+			tv(TokenRightParenthesis, ")"),
+		})
+
+	verifyFilterQLTokens(t, `FILTER visitct IN (-1, 3)`,
+		[]Token{
+			tv(TokenFilter, "FILTER"),
+			tv(TokenIdentity, "visitct"),
+			tv(TokenIN, "IN"),
+			tv(TokenLeftParenthesis, "("),
+			tv(TokenInteger, "-1"),
+			tv(TokenComma, ","),
+			tv(TokenInteger, "3"),
+			tv(TokenRightParenthesis, ")"),
+		})
+
+	verifyFilterQLTokens(t, `FILTER city IN (-1)`,
+		[]Token{
+			tv(TokenFilter, "FILTER"),
+			tv(TokenIdentity, "city"),
+			tv(TokenIN, "IN"),
+			tv(TokenLeftParenthesis, "("),
+			tv(TokenInteger, "-1"),
+			tv(TokenRightParenthesis, ")"),
+		})
+}
