@@ -1292,11 +1292,12 @@ func LexListOfArgs(l *Lexer) StateFn {
 		return LexExpression
 	case '!', '=', '>', '<', '-', '+', '%', '&', '/', '|':
 		if r == '-' && valueExpectedTokens[l.lastToken.T] && l.numericAfterSign() {
-			// A negative literal is a single value, not a binary operator
-			// between two list args: push back onto this list so the
-			// following `,` / `)` is handled here, not by the enclosing
-			// LexParenRight.
+			// A negative literal is a single list value, not a binary operator
+			// between two args: push this list back on so the following `,`/`)`
+			// is lexed here rather than by the enclosing LexParenRight.
+			l.backup()
 			l.Push("LexListOfArgs", LexListOfArgs)
+			return LexNumber
 		}
 		l.backup()
 		return LexExpression
@@ -2279,17 +2280,17 @@ var valueExpectedTokens = map[TokenType]bool{
 	TokenBetween:         true,
 }
 
-// numericAfterSign reports whether the upcoming runes (immediately after an
-// already-consumed sign) are a digit, or a `.` followed by a digit.
+// numericAfterSign reports whether the runes after an already-consumed sign
+// begin a literal scanNumericOrDuration will accept. LexNumber runs with
+// SUPPORT_DURATION, so signed durations (`-1d`, `-30d`) are included.
 func (l *Lexer) numericAfterSign() bool {
 	next := l.PeekX(2)
-	if len(next) == 0 {
+	if len(next) == 0 || !isDigit(rune(next[0])) {
 		return false
 	}
-	if isDigit(rune(next[0])) {
-		return true
-	}
-	return next[0] == '.' && len(next) == 2 && isDigit(rune(next[1]))
+	// The scanner refuses a sign before hex, and a committed gate has no
+	// fallback: LexNumber would hard-error instead of emitting TokenMinus.
+	return !(len(next) == 2 && next[0] == '0' && (next[1] == 'x' || next[1] == 'X'))
 }
 
 // <expr>   Handle single logical expression which may be nested and  has
@@ -2369,8 +2370,12 @@ func LexExpression(l *Lexer) StateFn {
 				l.Push("LexExpression", LexExpression)
 				return LexInlineComment
 			case valueExpectedTokens[l.lastToken.T] && l.numericAfterSign():
+				// LexNumber ends with `return nil`, which pops a frame; push the
+				// clause continuation so it unwinds into this clause rather than
+				// consuming the enclosing statement's.
 				l.backup()
-				return LexNumber(l)
+				l.Push("LexExpression", l.clauseState())
+				return LexNumber
 			default:
 				l.Emit(TokenMinus)
 				return l.clauseState()

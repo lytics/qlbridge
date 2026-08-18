@@ -100,14 +100,23 @@ var FilterTests = []string{
         LIMIT 100
         -- and some more
     `,
-	// Unquoted negative numeric literals (LYT-515): must round-trip like any
-	// other value literal, on both int- and string-named fields.
+	// Unquoted negative numeric literals must round-trip like any other value
+	// literal, on both int- and string-named fields.
 	`FILTER visitct = -1`,
 	`FILTER visitct = -1.5`,
 	`FILTER city = -1`,
 	`FILTER visitct IN (-1)`,
 	`FILTER visitct IN (-1, 3)`,
+	`FILTER visitct IN (1, -3)`,
+	`FILTER visitct IN ("a", -1)`,
 	`FILTER city IN (-1)`,
+	// A negative literal must not swallow the clause continuation.
+	`FILTER visitct = -1 AND city = "sf"`,
+	`FILTER visitct = -1 OR city = "sf"`,
+	`FILTER visitct > -1 AND visitct < 5`,
+	`FILTER visitct != -1 AND city = "sf"`,
+	`FILTER visitct = -1.5 AND city = "sf"`,
+	`FILTER visitct BETWEEN 5 AND -1`,
 }
 
 func init() {
@@ -253,6 +262,46 @@ func numberNodesOf(t *testing.T, rhs expr.Node) []*expr.NumberNode {
 	default:
 		t.Fatalf("expected *expr.NumberNode or *expr.ArrayNode, got %T", rhs)
 		return nil
+	}
+}
+
+// A negative literal followed by an infix AND/OR must still parse: the sign
+// handling must leave the clause continuation on the lexer's state stack.
+func TestFilterQLNegativeLiteralsInfix(t *testing.T) {
+	t.Parallel()
+
+	for _, ql := range []string{
+		`FILTER visitct = -1 AND city = "sf" FROM user`,
+		`FILTER visitct = -1 OR city = "sf" FROM user`,
+		`FILTER visitct > -1 AND visitct < 5 FROM user`,
+		`FILTER visitct != -1 AND city = "sf" FROM user`,
+		`FILTER visitct = -1.5 AND city = "sf" FROM user`,
+		`FILTER visitct BETWEEN 5 AND -1 FROM user`,
+		// An IN list only combines via the prefix form; `IN (..) AND ..` is a
+		// pre-existing FilterQL limitation, unrelated to the sign.
+		`FILTER AND ( visitct IN (1, -3), city = "sf" ) FROM user`,
+	} {
+		req, err := rel.ParseFilterQL(ql)
+		require.NoError(t, err, "must parse %s", ql)
+		assert.Equal(t, ql, req.String(), "canonical form for %s", ql)
+
+		req2, err := rel.ParseFilterQL(req.String())
+		require.NoError(t, err, "must reparse %q", req.String())
+		assert.Equal(t, req.String(), req2.String(), "round-trip must be idempotent for %s", ql)
+	}
+}
+
+// A sign the number scanner refuses must stay lexable rather than becoming a
+// hard parse error.
+func TestFilterQLSignedLiteralScannerDisagreement(t *testing.T) {
+	t.Parallel()
+
+	for _, ql := range []string{
+		`FILTER visitct = -.5 FROM user`,
+		`FILTER visitct = -0x1A FROM user`,
+	} {
+		_, err := rel.ParseFilterQL(ql)
+		require.NoError(t, err, "must parse %s", ql)
 	}
 }
 

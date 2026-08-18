@@ -293,6 +293,58 @@ func TestLexBinaryMinusUnchanged(t *testing.T) {
 			tv(TokenFrom, "FROM"),
 			tv(TokenIdentity, "x"),
 		})
+
+	// The column-list cases above never reach the changed branch; a WHERE
+	// clause does, so these are what actually guard it.
+	verifyTokens(t, `SELECT a FROM t WHERE (x - 1) > 5`,
+		[]Token{
+			tv(TokenSelect, "SELECT"),
+			tv(TokenIdentity, "a"),
+			tv(TokenFrom, "FROM"),
+			tv(TokenIdentity, "t"),
+			tv(TokenWhere, "WHERE"),
+			tv(TokenLeftParenthesis, "("),
+			tv(TokenIdentity, "x"),
+			tv(TokenMinus, "-"),
+			tv(TokenInteger, "1"),
+			tv(TokenRightParenthesis, ")"),
+			tv(TokenGT, ">"),
+			tv(TokenInteger, "5"),
+		})
+
+	verifyTokens(t, `SELECT a FROM t WHERE x > 5 - 3`,
+		[]Token{
+			tv(TokenSelect, "SELECT"),
+			tv(TokenIdentity, "a"),
+			tv(TokenFrom, "FROM"),
+			tv(TokenIdentity, "t"),
+			tv(TokenWhere, "WHERE"),
+			tv(TokenIdentity, "x"),
+			tv(TokenGT, ">"),
+			tv(TokenInteger, "5"),
+			tv(TokenMinus, "-"),
+			tv(TokenInteger, "3"),
+		})
+}
+
+// A signed literal in a SQL WHERE clause must lex as one token and leave the
+// infix continuation intact, same as FilterQL.
+func TestLexSignedLiteralInWhere(t *testing.T) {
+	verifyTokens(t, `SELECT a FROM t WHERE age > -1 AND name = "bob"`,
+		[]Token{
+			tv(TokenSelect, "SELECT"),
+			tv(TokenIdentity, "a"),
+			tv(TokenFrom, "FROM"),
+			tv(TokenIdentity, "t"),
+			tv(TokenWhere, "WHERE"),
+			tv(TokenIdentity, "age"),
+			tv(TokenGT, ">"),
+			tv(TokenInteger, "-1"),
+			tv(TokenLogicAnd, "AND"),
+			tv(TokenIdentity, "name"),
+			tv(TokenEqual, "="),
+			tv(TokenValue, "bob"),
+		})
 }
 
 func verifyTokens(t *testing.T, sql string, tokens []Token) {
