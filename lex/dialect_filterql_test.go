@@ -342,6 +342,18 @@ func TestFilterQLNegativeLiteralInfix(t *testing.T) {
 			tv(TokenLogicAnd, "AND"),
 			tv(TokenInteger, "-1"),
 		})
+
+	// Sign directly after BETWEEN: the only shape where the previous token is
+	// TokenBetween itself.
+	verifyFilterQLTokens(t, `FILTER visitct BETWEEN -5 AND -1`,
+		[]Token{
+			tv(TokenFilter, "FILTER"),
+			tv(TokenIdentity, "visitct"),
+			tv(TokenBetween, "BETWEEN"),
+			tv(TokenInteger, "-5"),
+			tv(TokenLogicAnd, "AND"),
+			tv(TokenInteger, "-1"),
+		})
 }
 
 // A negative anywhere but first in a list: the `,` continuation must survive.
