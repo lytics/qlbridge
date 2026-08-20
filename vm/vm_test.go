@@ -136,6 +136,11 @@ var (
 		vmt(`10 BETWEEN int5 AND 50`, true, noError),
 		vmtall(`10 BETWEEN 20 AND true`, nil, parseOk, evalError),
 		vmt(`created BETWEEN "12/18/2015" AND "12/18/2050"`, true, noError),
+		// Byte-order BETWEEN, exclusive on both ends. user_id is "abc".
+		vmt(`user_id BETWEEN "aaa" AND "abd"`, true, noError),
+		vmt(`user_id BETWEEN "abc" AND "abd"`, false, noError),
+		vmt(`user_id BETWEEN "aaa" AND "abc"`, false, noError),
+		vmt(`user_id BETWEEN "b" AND "c"`, false, noError),
 		vmt(`created BETWEEN "now-50w" AND "12/18/2050"`, true, noError),
 
 		// In:  Multi Arg Tests
@@ -169,7 +174,17 @@ var (
 		vmt(`user_id != "abcd"`, true, noError),
 		vmt(`user_id == "abcd"`, false, noError),
 		vmt(`user_id != "abc"`, false, noError),
-		vmtall(`user_id > "abc"`, nil, parseOk, evalError),
+		// Byte-order comparison; user_id is "abc".
+		vmt(`user_id > "abc"`, false, noError),
+		vmt(`user_id >= "abc"`, true, noError),
+		vmt(`user_id < "abd"`, true, noError),
+		vmt(`user_id <= "abb"`, false, noError),
+		vmt(`user_id > "ABC"`, true, noError),
+		vmt(`empty_str < "a"`, true, noError),
+		// Multi-valued field: true when any element satisfies. urls is [abc 123].
+		vmt(`urls > "abb"`, true, noError),
+		vmt(`urls < "2"`, true, noError),
+		vmt(`urls < "0"`, false, noError),
 		vmt(`user_id LIKE "*bc"`, true, noError),
 		vmt(`user_id LIKE "\*bc"`, false, noError),
 		vmt(`user_id != NULL`, true, noError),

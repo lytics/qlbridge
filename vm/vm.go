@@ -728,6 +728,19 @@ func evalBinary(ctx expr.EvalContext, includer expr.Includer, node *expr.BinaryN
 				}
 				return value.BoolValueFalse, true
 			}
+		case lex.TokenLT, lex.TokenLE, lex.TokenGT, lex.TokenGE:
+			// Any-element semantics, matching how a search index evaluates a
+			// term range against a multi-valued field.
+			bv, ok := br.(value.StringValue)
+			if !ok {
+				return nil, false
+			}
+			for _, val := range at.Val() {
+				if compareOrdered(strings.Compare(val, bv.Val()), node.Operator.T) {
+					return value.BoolValueTrue, true
+				}
+			}
+			return value.BoolValueFalse, true
 		case lex.TokenLogicOr, lex.TokenOr, lex.TokenEqualEqual, lex.TokenEqual, lex.TokenLogicAnd,
 			lex.TokenAnd:
 			return value.NewBoolValue(false), true
@@ -941,6 +954,21 @@ func walkTernary(ctx expr.EvalContext, includer expr.Includer, node *expr.TriNod
 			}
 			return value.NewBoolValue(false), true
 
+		case value.StringValue:
+			av := at.Val()
+			// Exclusive on both ends, matching the numeric branches above and
+			// the gt/lt pair the search generators emit for BETWEEN.
+			if strings.Compare(av, b.ToString()) > 0 && strings.Compare(av, c.ToString()) < 0 {
+				if node.Negated() {
+					return value.NewBoolValue(false), true
+				}
+				return value.NewBoolValue(true), true
+			}
+			if node.Negated() {
+				return value.NewBoolValue(true), true
+			}
+			return value.NewBoolValue(false), true
+
 		default:
 			u.Warnf("between not implemented for type %s %#v", a.Type().String(), node)
 		}
@@ -1099,8 +1127,27 @@ func operateStrings(op lex.Token, av, bv value.StringValue) value.Value {
 			return value.BoolValueTrue
 		}
 		return value.BoolValueFalse
+	case lex.TokenLT, lex.TokenLE, lex.TokenGT, lex.TokenGE:
+		// Byte-order comparison, matching a SQL collation-free ORDER BY and the
+		// term-range semantics of a keyword/untokenized index field.
+		return value.NewBoolValue(compareOrdered(strings.Compare(a, b), op.T))
 	}
 	return value.NewErrorValuef("unsupported operator for strings: %s", op.T)
+}
+
+// compareOrdered maps a -1/0/1 comparison result onto an ordering operator.
+func compareOrdered(cmp int, op lex.TokenType) bool {
+	switch op {
+	case lex.TokenLT:
+		return cmp < 0
+	case lex.TokenLE:
+		return cmp <= 0
+	case lex.TokenGT:
+		return cmp > 0
+	case lex.TokenGE:
+		return cmp >= 0
+	}
+	return false
 }
 
 func operateTime(op lex.TokenType, lht, rht time.Time) (value.BoolValue, bool) {
