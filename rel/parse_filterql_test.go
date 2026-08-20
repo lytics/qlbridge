@@ -100,6 +100,23 @@ var FilterTests = []string{
         LIMIT 100
         -- and some more
     `,
+	// Unquoted negative numeric literals must round-trip like any other value
+	// literal, on both int- and string-named fields.
+	`FILTER visitct = -1`,
+	`FILTER visitct = -1.5`,
+	`FILTER city = -1`,
+	`FILTER visitct IN (-1)`,
+	`FILTER visitct IN (-1, 3)`,
+	`FILTER visitct IN (1, -3)`,
+	`FILTER visitct IN ("a", -1)`,
+	`FILTER city IN (-1)`,
+	// A negative literal must not swallow the clause continuation.
+	`FILTER visitct = -1 AND city = "sf"`,
+	`FILTER visitct = -1 OR city = "sf"`,
+	`FILTER visitct > -1 AND visitct < 5`,
+	`FILTER visitct != -1 AND city = "sf"`,
+	`FILTER visitct = -1.5 AND city = "sf"`,
+	`FILTER visitct BETWEEN 5 AND -1`,
 }
 
 func init() {
@@ -225,6 +242,146 @@ func TestFilterQlRoundTrip(t *testing.T) {
 	for _, fql := range FilterTests {
 		parseFilterQlTest(t, fql)
 	}
+}
+
+// numberNodesOf extracts the *expr.NumberNode(s) from a comparison's RHS,
+// which is either a bare NumberNode (`=`) or an ArrayNode of them (`IN`).
+func numberNodesOf(t *testing.T, rhs expr.Node) []*expr.NumberNode {
+	t.Helper()
+	switch rhs := rhs.(type) {
+	case *expr.NumberNode:
+		return []*expr.NumberNode{rhs}
+	case *expr.ArrayNode:
+		nums := make([]*expr.NumberNode, len(rhs.Args))
+		for i, arg := range rhs.Args {
+			n, ok := arg.(*expr.NumberNode)
+			require.True(t, ok, "expected *expr.NumberNode array element, got %T", arg)
+			nums[i] = n
+		}
+		return nums
+	default:
+		t.Fatalf("expected *expr.NumberNode or *expr.ArrayNode, got %T", rhs)
+		return nil
+	}
+}
+
+// A negative literal followed by an infix AND/OR must still parse: the sign
+// handling must leave the clause continuation on the lexer's state stack.
+func TestFilterQLNegativeLiteralsInfix(t *testing.T) {
+	t.Parallel()
+
+	for _, ql := range []string{
+		`FILTER visitct = -1 AND city = "sf" FROM user`,
+		`FILTER visitct = -1 OR city = "sf" FROM user`,
+		`FILTER visitct > -1 AND visitct < 5 FROM user`,
+		`FILTER visitct != -1 AND city = "sf" FROM user`,
+		`FILTER visitct = -1.5 AND city = "sf" FROM user`,
+		`FILTER visitct BETWEEN 5 AND -1 FROM user`,
+		// An IN list only combines via the prefix form; `IN (..) AND ..` is a
+		// pre-existing FilterQL limitation, unrelated to the sign.
+		`FILTER AND ( visitct IN (1, -3), city = "sf" ) FROM user`,
+	} {
+		req, err := rel.ParseFilterQL(ql)
+		require.NoError(t, err, "must parse %s", ql)
+		assert.Equal(t, ql, req.String(), "canonical form for %s", ql)
+
+		req2, err := rel.ParseFilterQL(req.String())
+		require.NoError(t, err, "must reparse %q", req.String())
+		assert.Equal(t, req.String(), req2.String(), "round-trip must be idempotent for %s", ql)
+	}
+}
+
+// A sign the number scanner refuses must stay lexable rather than becoming a
+// hard parse error.
+func TestFilterQLSignedLiteralScannerDisagreement(t *testing.T) {
+	t.Parallel()
+
+	for _, ql := range []string{
+		`FILTER visitct = -.5 FROM user`,
+		`FILTER visitct = -0x1A FROM user`,
+	} {
+		_, err := rel.ParseFilterQL(ql)
+		require.NoError(t, err, "must parse %s", ql)
+	}
+}
+
+func TestFilterQLNegativeLiterals(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		ql       string
+		wantText []string
+	}{
+		{`FILTER visitct = -1 FROM user`, []string{"-1"}},
+		{`FILTER city = -1 FROM user`, []string{"-1"}},
+		{`FILTER visitct = -1.5 FROM user`, []string{"-1.5"}},
+		{`FILTER visitct IN (-1) FROM user`, []string{"-1"}},
+		{`FILTER visitct IN (-1, 3) FROM user`, []string{"-1", "3"}},
+		{`FILTER city IN (-1) FROM user`, []string{"-1"}},
+	}
+
+	for _, tc := range tests {
+		req, err := rel.ParseFilterQL(tc.ql)
+		require.NoError(t, err, "must parse %s", tc.ql)
+
+		bn, ok := req.Filter.(*expr.BinaryNode)
+		require.True(t, ok, "expected *expr.BinaryNode for %s, got %T", tc.ql, req.Filter)
+
+		nums := numberNodesOf(t, bn.Args[1])
+		require.Len(t, nums, len(tc.wantText), "element count for %s", tc.ql)
+		for i, n := range nums {
+			assert.Equal(t, tc.wantText[i], n.Text, "signed literal text for %s", tc.ql)
+		}
+
+		// The canonical form must be bare (e.g. `-1`), never `- (1)`, and
+		// re-parsing it must reproduce the same canonical string.
+		out := req.String()
+		assert.Equal(t, tc.ql, out, "canonical form for %s", tc.ql)
+		req2, err := rel.ParseFilterQL(out)
+		require.NoError(t, err, "must reparse canonical form %q", out)
+		assert.Equal(t, out, req2.String(), "round-trip must be idempotent for %s", tc.ql)
+	}
+
+	// Positive and quoted forms must be unaffected.
+	req, err := rel.ParseFilterQL(`FILTER visitct = 1 FROM user`)
+	require.NoError(t, err)
+	bn := req.Filter.(*expr.BinaryNode)
+	n, ok := bn.Args[1].(*expr.NumberNode)
+	require.True(t, ok, "expected *expr.NumberNode, got %T", bn.Args[1])
+	assert.Equal(t, "1", n.Text)
+
+	req, err = rel.ParseFilterQL(`FILTER visitct = "-1" FROM user`)
+	require.NoError(t, err)
+	bn = req.Filter.(*expr.BinaryNode)
+	sn, ok := bn.Args[1].(*expr.StringNode)
+	require.True(t, ok, "expected *expr.StringNode, got %T", bn.Args[1])
+	assert.Equal(t, "-1", sn.Text)
+}
+
+// TestFilterQLNegativeLiteralDirectASTRoundTrip covers the stored-QL
+// round-trip bug from the ticket: a NumberNode{Text:"-1"} built directly
+// (as expr.NodeFromExpr would from a stored JSON AST, bypassing the lexer)
+// must print bare `-1` and that printed form must re-parse to an equivalent
+// NumberNode.
+func TestFilterQLNegativeLiteralDirectASTRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	num, err := expr.NewNumberStr("-1")
+	require.NoError(t, err)
+
+	fs := rel.NewFilterStatement()
+	fs.Filter = expr.NewBinaryNode(lex.Token{T: lex.TokenEqual, V: "="}, expr.NewIdentityNodeVal("visitct"), num)
+
+	out := fs.String()
+	assert.Equal(t, `FILTER visitct = -1`, out)
+
+	req2, err := rel.ParseFilterQL(out)
+	require.NoError(t, err, "must reparse %q", out)
+	bn2, ok := req2.Filter.(*expr.BinaryNode)
+	require.True(t, ok, "expected *expr.BinaryNode, got %T", req2.Filter)
+	n2, ok := bn2.Args[1].(*expr.NumberNode)
+	require.True(t, ok, "expected *expr.NumberNode, got %T", bn2.Args[1])
+	assert.Equal(t, "-1", n2.Text)
 }
 
 func TestFilterQlFingerPrint(t *testing.T) {

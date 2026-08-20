@@ -1291,6 +1291,14 @@ func LexListOfArgs(l *Lexer) StateFn {
 		l.backup()
 		return LexExpression
 	case '!', '=', '>', '<', '-', '+', '%', '&', '/', '|':
+		if r == '-' && valueExpectedTokens[l.lastToken.T] && l.numericAfterSign() {
+			// A negative literal is a single list value, not a binary operator
+			// between two args: push this list back on so the following `,`/`)`
+			// is lexed here rather than by the enclosing LexParenRight.
+			l.backup()
+			l.Push("LexListOfArgs", LexListOfArgs)
+			return LexNumber
+		}
 		l.backup()
 		return LexExpression
 	case ';':
@@ -2244,6 +2252,47 @@ func LexLogical(l *Lexer) StateFn {
 	return LexExpression(l)
 }
 
+// valueExpectedTokens are the previously-emitted tokens after which an
+// unquoted `-` begins a signed numeric literal rather than the binary-minus
+// operator: comparators, arithmetic operators, open-paren, comma, logic,
+// IN/BETWEEN, and the start of input (TokenNil).
+var valueExpectedTokens = map[TokenType]bool{
+	TokenNil:             true,
+	TokenEqual:           true,
+	TokenEqualEqual:      true,
+	TokenNE:              true,
+	TokenGE:              true,
+	TokenLE:              true,
+	TokenGT:              true,
+	TokenLT:              true,
+	TokenMinus:           true,
+	TokenPlus:            true,
+	TokenMultiply:        true,
+	TokenDivide:          true,
+	TokenModulus:         true,
+	TokenLeftParenthesis: true,
+	TokenComma:           true,
+	TokenLogicAnd:        true,
+	TokenLogicOr:         true,
+	TokenAnd:             true,
+	TokenOr:              true,
+	TokenIN:              true,
+	TokenBetween:         true,
+}
+
+// numericAfterSign reports whether the runes after an already-consumed sign
+// begin a literal scanNumericOrDuration will accept. LexNumber runs with
+// SUPPORT_DURATION, so signed durations (`-1d`, `-30d`) are included.
+func (l *Lexer) numericAfterSign() bool {
+	next := l.PeekX(2)
+	if len(next) == 0 || !isDigit(rune(next[0])) {
+		return false
+	}
+	// The scanner refuses a sign before hex, and a committed gate has no
+	// fallback: LexNumber would hard-error instead of emitting TokenMinus.
+	return !(len(next) == 2 && next[0] == '0' && (next[1] == 'x' || next[1] == 'X'))
+}
+
 // <expr>   Handle single logical expression which may be nested and  has
 //
 //	user defined function names that are NOT validated by lexer
@@ -2313,13 +2362,21 @@ func LexExpression(l *Lexer) StateFn {
 		foundLogical := false
 		foundOperator := false
 		switch r {
-		case '-': // comment?  or minus?
+		case '-': // negative numeric literal, comment, or minus?
 			p := l.Peek()
-			if p == '-' {
+			switch {
+			case p == '-':
 				l.backup()
 				l.Push("LexExpression", LexExpression)
 				return LexInlineComment
-			} else {
+			case valueExpectedTokens[l.lastToken.T] && l.numericAfterSign():
+				// LexNumber ends with `return nil`, which pops a frame; push the
+				// clause continuation so it unwinds into this clause rather than
+				// consuming the enclosing statement's.
+				l.backup()
+				l.Push("LexExpression", l.clauseState())
+				return LexNumber
+			default:
 				l.Emit(TokenMinus)
 				return l.clauseState()
 			}
