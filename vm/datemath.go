@@ -201,6 +201,14 @@ func findDateMathFn(node expr.Node) BoundaryFns {
 			fns = append(fns, findDateMathFn(arg)...)
 		}
 	case *expr.FuncNode:
+		// recurring() is now-relative without containing any datemath literal, so
+		// it needs its own boundary rather than a scan of its args.
+		if strings.EqualFold(n.Name, "recurring") {
+			if fn := findBoundaryForRecurring(n); fn != nil {
+				return BoundaryFns{fn}
+			}
+			return fns
+		}
 		for _, arg := range n.Args {
 			fns = append(fns, findDateMathFn(arg)...)
 		}
@@ -311,4 +319,175 @@ func findBoundaryForBetween(n *expr.TriNode) func(d *DateConverter, ctx expr.Eva
 		// currently in the window, so will exit the window in the future, do re-evaluate
 		d.bt = compareBoundaries(d.bt, d.at.Add(ct.Sub(lower)))
 	}
+}
+
+// findBoundaryForRecurring builds the boundary fn for
+// recurring(date_field, period[, offsetDays]). Unlike the datemath cases there is
+// no "now±N" literal to invert: the expression is true for whole UTC days and
+// flips at midnight, so the boundary is the next day on which its value changes.
+// Returns nil for shapes the evaluators reject, so those don't get flagged as
+// needing recalculation.
+func findBoundaryForRecurring(n *expr.FuncNode) func(d *DateConverter, ctx expr.EvalContext, inc expr.Includer) {
+	if len(n.Args) < 2 || len(n.Args) > 3 {
+		return nil
+	}
+	if _, ok := n.Args[0].(*expr.IdentityNode); !ok {
+		return nil
+	}
+
+	var period string
+	var nDays int
+	switch pn := n.Args[1].(type) {
+	case *expr.StringNode:
+		period = strings.ToLower(pn.Text)
+		switch period {
+		case "yearly", "monthly", "weekly":
+		default:
+			return nil
+		}
+	case *expr.NumberNode:
+		if !pn.IsInt || pn.Int64 <= 0 {
+			return nil
+		}
+		nDays = int(pn.Int64)
+	default:
+		return nil
+	}
+
+	offsetDays := 0
+	if len(n.Args) == 3 {
+		on, ok := n.Args[2].(*expr.NumberNode)
+		if !ok || !on.IsInt {
+			return nil
+		}
+		offsetDays = int(on.Int64)
+	}
+
+	anchorNode := n.Args[0]
+	return func(d *DateConverter, ctx expr.EvalContext, inc expr.Includer) {
+		lhv, ok := EvalInc(inc, ctx, anchorNode)
+		if !ok {
+			return
+		}
+		anchor, ok := value.ValueToTime(lhv)
+		if !ok || anchor.IsZero() {
+			// No anchor date means the expression can't become true for this row.
+			return
+		}
+		if bt := RecurringBoundary(anchor, d.at, period, nDays, offsetDays); !bt.IsZero() {
+			d.bt = compareBoundaries(d.bt, bt)
+		}
+	}
+}
+
+// RecurringBoundary returns the next UTC midnight at which recurring(anchor,
+// period, offsetDays) changes value relative to `now`, or the zero time when it
+// never changes again. Mirrors the evaluators: with n > 0 the recurrence is every
+// n days from the anchor, otherwise period selects yearly/monthly/weekly.
+func RecurringBoundary(anchor, now time.Time, period string, n, offsetDays int) time.Time {
+	if n > 0 {
+		return recurringBoundaryNDays(anchor, now, n, offsetDays)
+	}
+	return recurringBoundaryPeriod(anchor, now, period, offsetDays)
+}
+
+// recurringBoundaryNDays works in epoch-days, flooring toward negative infinity
+// so a pre-1970 anchor buckets by calendar day. Matches the every-n-days
+// evaluators, which floor the same way.
+func recurringBoundaryNDays(anchor, now time.Time, n, offsetDays int) time.Time {
+	anchorDay := EpochDay(anchor.UTC().Unix())
+	nowDay := EpochDay(now.UTC().Unix())
+	// The evaluator subtracts the offset from the day difference, so the first
+	// matching day sits offsetDays after the anchor.
+	first := anchorDay + int64(offsetDays)
+
+	if nowDay < first {
+		return dayStartFromEpochDay(first)
+	}
+	if n == 1 {
+		// Every day from `first` onward matches, so it never flips back.
+		return time.Time{}
+	}
+	if rem := (nowDay - first) % int64(n); rem != 0 {
+		return dayStartFromEpochDay(nowDay + int64(n) - rem)
+	}
+	// Matches today; goes false at the start of tomorrow.
+	return dayStartFromEpochDay(nowDay + 1)
+}
+
+// recurringBoundaryPeriod handles yearly/monthly/weekly, which the evaluators
+// compare on the calendar date of now-offsetDays.
+func recurringBoundaryPeriod(anchor, now time.Time, period string, offsetDays int) time.Time {
+	anchorU := anchor.UTC()
+	today := dayStart(now.UTC())
+	target := today.AddDate(0, 0, -offsetDays)
+
+	next := nextPeriodRecurrence(anchorU, target, period)
+	if next.IsZero() {
+		return time.Time{}
+	}
+	if next.After(target) {
+		// Goes true at the start of that day, shifted back into "now" space.
+		return next.AddDate(0, 0, offsetDays)
+	}
+	// Matches today. yearly/monthly/weekly recurrences are never on consecutive
+	// days, so it goes false at the start of tomorrow.
+	return today.AddDate(0, 0, 1)
+}
+
+// nextPeriodRecurrence returns the first UTC day on or after `from` whose
+// calendar date is a recurrence of anchor. Anchors with no counterpart in a given
+// period are skipped rather than clamped -- Feb 29 only recurs in leap years, and
+// the 31st only in months that have one -- matching the evaluators.
+func nextPeriodRecurrence(anchor, from time.Time, period string) time.Time {
+	switch period {
+	case "yearly":
+		// A Feb-29 anchor can skip up to 7 years across a non-leap century.
+		for y := from.Year(); y <= from.Year()+8; y++ {
+			c := time.Date(y, anchor.Month(), anchor.Day(), 0, 0, 0, 0, time.UTC)
+			if c.Month() != anchor.Month() || c.Day() != anchor.Day() {
+				continue
+			}
+			if !c.Before(from) {
+				return c
+			}
+		}
+	case "monthly":
+		first := time.Date(from.Year(), from.Month(), 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < 14; i++ {
+			m := first.AddDate(0, i, 0)
+			c := time.Date(m.Year(), m.Month(), anchor.Day(), 0, 0, 0, 0, time.UTC)
+			if c.Month() != m.Month() {
+				continue
+			}
+			if !c.Before(from) {
+				return c
+			}
+		}
+	case "weekly":
+		delta := (int(anchor.Weekday()) - int(from.Weekday()) + 7) % 7
+		return from.AddDate(0, 0, delta)
+	}
+	return time.Time{}
+}
+
+const secondsPerDay = 86400
+
+func dayStart(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func dayStartFromEpochDay(day int64) time.Time {
+	return time.Unix(day*secondsPerDay, 0).UTC()
+}
+
+// EpochDay returns the UTC calendar day for a unix-seconds timestamp, flooring
+// toward negative infinity so pre-1970 dates don't bucket a day late.
+// The generated Painless uses Math.floorDiv to stay in step with this.
+func EpochDay(sec int64) int64 {
+	d := sec / secondsPerDay
+	if sec%secondsPerDay != 0 && sec < 0 {
+		d--
+	}
+	return d
 }

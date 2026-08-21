@@ -11,6 +11,7 @@ import (
 	"github.com/lytics/qlbridge/generators/gentypes"
 	"github.com/lytics/qlbridge/lex"
 	"github.com/lytics/qlbridge/value"
+	"github.com/lytics/qlbridge/vm"
 )
 
 type floatval interface {
@@ -156,8 +157,10 @@ func makeRecurringQuery(lhs *gentypes.FieldType, period expr.Node, offsetDays in
 			return nil, fmt.Errorf("'recurring' day period must be a positive integer, got %v", period)
 		}
 		n := num.Int64
-		todayDay := now.UTC().Unix() / 86400
-		src := fmt.Sprintf("if (%s) { long d = params.todayDay - (doc[%s].value.toInstant().getEpochSecond() / 86400) - params.offset; return d >= 0 && d %% params.n == 0; } return false;",
+		// Math.floorDiv, not `/`: Java rounds toward zero, which puts a pre-1970
+		// anchor with a non-midnight time one day late.
+		todayDay := vm.EpochDay(now.UTC().Unix())
+		src := fmt.Sprintf("if (%s) { long d = params.todayDay - Math.floorDiv(doc[%s].value.toInstant().getEpochSecond(), 86400L) - params.offset; return d >= 0 && d %% params.n == 0; } return false;",
 			exists, q)
 		return Script(src, map[string]any{"todayDay": todayDay, "offset": offsetDays, "n": n}), nil
 	}
