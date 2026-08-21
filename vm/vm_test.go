@@ -50,17 +50,19 @@ var (
 	//  and be available to the VM runtime for evaluation by using
 	//  key's such as "int5" or "user_id"
 	msgContext = datasource.NewContextMap(map[string]any{
-		"int5":    value.NewIntValue(5),
-		"str5":    value.NewStringValue("5"),
-		"created": value.NewTimeValue(tcreated),
-		"bvalt":   value.NewBoolValue(true),
-		"bvalf":   value.NewBoolValue(false),
-		"user_id": value.NewStringValue("abc"),
-		"urls":    value.NewStringsValue([]string{"abc", "123"}),
-		"hits":    value.NewMapIntValue(map[string]int64{"google.com": 5, "bing.com": 1}),
-		"email":     value.NewStringValue("bob@bob.com"),
-		"empty_str": value.NewStringValue(""),
-		"mt":      value.NewMapTimeValue(map[string]time.Time{"event0": t0, "event1": t1}),
+		"int5":       value.NewIntValue(5),
+		"str5":       value.NewStringValue("5"),
+		"created":    value.NewTimeValue(tcreated),
+		"bvalt":      value.NewBoolValue(true),
+		"bvalf":      value.NewBoolValue(false),
+		"user_id":    value.NewStringValue("abc"),
+		"urls":       value.NewStringsValue([]string{"abc", "123"}),
+		"hits":       value.NewMapIntValue(map[string]int64{"google.com": 5, "bing.com": 1}),
+		"email":      value.NewStringValue("bob@bob.com"),
+		"empty_str":  value.NewStringValue(""),
+		"empty_strs": value.NewStringsValue([]string{}),
+		"empty_map":  value.NewMapIntValue(map[string]int64{}),
+		"mt":         value.NewMapTimeValue(map[string]time.Time{"event0": t0, "event1": t1}),
 	}, true)
 
 	// list of tests
@@ -230,6 +232,16 @@ var (
 		vmt(`EXISTS bvalt`, true, noError),
 		vmt(`EXISTS bvalf`, true, noError),
 		vmt(`EXISTS toint(not_a_field)`, false, noError),
+
+		// A present-but-empty collection does not exist; a populated one does.
+		vmt(`EXISTS urls`, true, noError),
+		vmt(`EXISTS empty_strs`, false, noError),
+		vmt(`NOT EXISTS empty_strs`, true, noError),
+		vmt(`EXISTS hits`, true, noError),
+		vmt(`EXISTS empty_map`, false, noError),
+		vmt(`NOT EXISTS empty_map`, true, noError),
+		// Scalars are unaffected: an empty string is still present.
+		vmt(`EXISTS empty_str`, true, noError),
 
 		// TODO:  support () wrapping parts of binary expression
 		vmt(`6 == (5 + 1)`, true, noError),

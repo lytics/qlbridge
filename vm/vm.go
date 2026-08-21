@@ -849,6 +849,14 @@ func walkUnary(ctx expr.EvalContext, includer expr.Includer, node *expr.UnaryNod
 		switch a.(type) {
 		case nil, value.NilValue:
 			return value.NewBoolValue(false), true
+		// A present-but-empty collection does not "exist": an empty list/map
+		// carries no value, so EXISTS is false (matches Elasticsearch, which
+		// does not index empty arrays). Scalars (incl. empty string) are left
+		// as present.
+		case value.StringsValue, value.SliceValue, value.ByteSliceValue,
+			value.MapValue, value.MapStringValue, value.MapIntValue,
+			value.MapNumberValue, value.MapTimeValue, value.MapBoolValue:
+			return value.NewBoolValue(!a.Nil()), true
 		}
 		return value.NewBoolValue(true), true
 	default:
