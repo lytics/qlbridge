@@ -461,6 +461,17 @@ func lexAs(l *Lexer) StateFn {
 	}
 	return nil
 }
+func lexOn(l *Lexer) StateFn {
+	l.SkipWhiteSpaces()
+	keyWord := strings.ToLower(l.PeekWord())
+	switch keyWord {
+	case "on":
+		l.ConsumeWord(keyWord)
+		l.Emit(TokenOn)
+		return nil
+	}
+	return nil
+}
 func lexNotExists(l *Lexer) StateFn {
 	l.SkipWhiteSpaces()
 	keyWord := strings.ToLower(l.PeekWord())
@@ -534,6 +545,9 @@ func LexDrop(l *Lexer) StateFn {
 	case "table":
 		l.ConsumeWord(keyWord)
 		l.Emit(TokenTable)
+	case "index":
+		l.ConsumeWord(keyWord)
+		l.Emit(TokenIndex)
 	case "source":
 		l.ConsumeWord(keyWord)
 		l.Emit(TokenSource)
@@ -552,6 +566,8 @@ func LexDrop(l *Lexer) StateFn {
 	default:
 		return nil
 	}
+	l.Push("LexIdentifier", LexIdentifier)
+	l.Push("LexOn", lexOn)
 	l.Push("LexIdentifier", LexIdentifier)
 	return lexNotExists
 }

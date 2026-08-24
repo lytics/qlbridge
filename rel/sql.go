@@ -221,6 +221,8 @@ type (
 		Temp     bool      // Temp?
 		Tok      lex.Token // DROP [TEMP] [TABLE,VIEW,CONTINUOUSVIEW,TRIGGER] etc
 		With     u.JsonHelper
+		IfExists bool
+		Parent   string
 	}
 	// SqlAlter SQL ALTER statement
 	SqlAlter struct {
