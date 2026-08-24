@@ -186,3 +186,22 @@ func encodeB64DecodeEval(ctx expr.EvalContext, args []value.Value) (value.Value,
 	}
 	return value.NewStringValue(string(by)), true
 }
+
+// RandomSalt generates a random ten-digit number as a string
+//
+//	random_salt() => "1234567890"
+type RandomSalt struct{}
+
+// Type string
+func (m *RandomSalt) Type() value.ValueType { return value.StringType }
+func (m *RandomSalt) Validate(n *expr.FuncNode) (expr.EvaluatorFunc, error) {
+	if len(n.Args) != 0 {
+		return nil, fmt.Errorf("Expected 0 args for random_salt() but got %s", n)
+	}
+	return randomSaltEval, nil
+}
+func randomSaltEval(ctx expr.EvalContext, args []value.Value) (value.Value, bool) {
+	// Generate a random number between 1000000000 and 9999999999
+	randomNum := rand.Int63n(9000000000) + 1000000000
+	return value.NewStringValue(fmt.Sprintf("%d", randomNum)), true
+}
