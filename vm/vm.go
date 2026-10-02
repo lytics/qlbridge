@@ -942,7 +942,9 @@ func walkTernary(ctx expr.EvalContext, includer expr.Includer, node *expr.TriNod
 			return value.NewBoolValue(false), true
 
 		default:
-			u.Warnf("between not implemented for type %s %#v", a.Type().String(), node)
+			// Unsupported left-hand types (maps, slices, strings) don't match, silently like evalBinary:
+			// a filter is evaluated per entity, so a warning here fires once per entity.
+			return nil, false
 		}
 	default:
 		u.Warnf("ternary node walk not implemented for node %#v", node)

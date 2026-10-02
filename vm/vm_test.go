@@ -137,6 +137,9 @@ var (
 		vmtall(`10 BETWEEN 20 AND true`, nil, parseOk, evalError),
 		vmt(`created BETWEEN "12/18/2015" AND "12/18/2050"`, true, noError),
 		vmt(`created BETWEEN "now-50w" AND "12/18/2050"`, true, noError),
+		vmtall(`mt BETWEEN "12/18/2015" AND "12/18/2050"`, nil, parseOk, evalError),
+		vmtall(`mt NOT BETWEEN "12/18/2015" AND "12/18/2050"`, nil, parseOk, evalError),
+		vmtall(`urls BETWEEN "a" AND "z"`, nil, parseOk, evalError),
 
 		// In:  Multi Arg Tests
 		vmtall(`10 IN ("a","b",10, 4.5)`, true, parseOk, evalError),
