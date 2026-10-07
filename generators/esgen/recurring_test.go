@@ -57,9 +57,9 @@ func TestRecurring(t *testing.T) {
 		{
 			name:   "every 90 days",
 			filter: `FILTER recurring(signup, 90)`,
-			// Math.floorDiv, not `/`: Java rounds toward zero, which put a pre-1970
-			// anchor with a non-midnight time one day late.
-			wantSrc:    "if (doc['signup'].size() != 0) { long d = params.todayDay - Math.floorDiv(doc['signup'].value.toInstant().getEpochSecond(), 86400L) - params.offset; return d >= 0 && d % params.n == 0; } return false;",
+			// toEpochDay, not `/` (rounds toward zero) or Math.floorDiv (not on
+			// Painless's allowlist; ES rejects the script at compile time).
+			wantSrc:    "if (doc['signup'].size() != 0) { long d = params.todayDay - doc['signup'].value.toLocalDate().toEpochDay() - params.offset; return d >= 0 && d % params.n == 0; } return false;",
 			wantParams: map[string]any{"todayDay": ts.UTC().Unix() / 86400, "offset": 0, "n": int64(90)},
 		},
 		{

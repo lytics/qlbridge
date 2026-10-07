@@ -157,10 +157,10 @@ func makeRecurringQuery(lhs *gentypes.FieldType, period expr.Node, offsetDays in
 			return nil, fmt.Errorf("'recurring' day period must be a positive integer, got %v", period)
 		}
 		n := num.Int64
-		// Math.floorDiv, not `/`: Java rounds toward zero, which puts a pre-1970
-		// anchor with a non-midnight time one day late.
+		// toEpochDay floors like vm.EpochDay; `/` rounds toward zero and puts a
+		// pre-1970 non-midnight anchor a day late. Painless doesn't allow Math.floorDiv.
 		todayDay := vm.EpochDay(now.UTC().Unix())
-		src := fmt.Sprintf("if (%s) { long d = params.todayDay - Math.floorDiv(doc[%s].value.toInstant().getEpochSecond(), 86400L) - params.offset; return d >= 0 && d %% params.n == 0; } return false;",
+		src := fmt.Sprintf("if (%s) { long d = params.todayDay - doc[%s].value.toLocalDate().toEpochDay() - params.offset; return d >= 0 && d %% params.n == 0; } return false;",
 			exists, q)
 		return Script(src, map[string]any{"todayDay": todayDay, "offset": offsetDays, "n": n}), nil
 	}

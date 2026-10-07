@@ -483,7 +483,7 @@ func dayStartFromEpochDay(day int64) time.Time {
 
 // EpochDay returns the UTC calendar day for a unix-seconds timestamp, flooring
 // toward negative infinity so pre-1970 dates don't bucket a day late.
-// The generated Painless uses Math.floorDiv to stay in step with this.
+// The generated Painless uses ZonedDateTime.toLocalDate().toEpochDay(), which floors the same way.
 func EpochDay(sec int64) int64 {
 	d := sec / secondsPerDay
 	if sec%secondsPerDay != 0 && sec < 0 {
