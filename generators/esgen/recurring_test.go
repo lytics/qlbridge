@@ -55,9 +55,11 @@ func TestRecurring(t *testing.T) {
 			wantParams: map[string]any{"month": 12, "day": 29}, // 2026-06-29 minus 182 days = 2025-12-29
 		},
 		{
-			name:       "every 90 days",
-			filter:     `FILTER recurring(signup, 90)`,
-			wantSrc:    "if (doc['signup'].size() != 0) { long d = params.todayDay - (doc['signup'].value.toInstant().getEpochSecond() / 86400) - params.offset; return d >= 0 && d % params.n == 0; } return false;",
+			name:   "every 90 days",
+			filter: `FILTER recurring(signup, 90)`,
+			// toEpochDay, not `/` (rounds toward zero) or Math.floorDiv (not on
+			// Painless's allowlist; ES rejects the script at compile time).
+			wantSrc:    "if (doc['signup'].size() != 0) { long d = params.todayDay - doc['signup'].value.toLocalDate().toEpochDay() - params.offset; return d >= 0 && d % params.n == 0; } return false;",
 			wantParams: map[string]any{"todayDay": ts.UTC().Unix() / 86400, "offset": 0, "n": int64(90)},
 		},
 		{
