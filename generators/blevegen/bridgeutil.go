@@ -41,6 +41,9 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (query.
 			return nil, fmt.Errorf("Could not convert %T %v to float", rhsval, rhsval)
 		}
 		rhsval = fv
+	case value.StringType, value.StringsType, value.MapStringType:
+		// Untokenized string fields range byte-for-byte, so the literal has to
+		// survive as written; see makeTermRange below.
 	default:
 		if rhsstr, ok := rhsval.(string); ok {
 			if rhsf, err := strconv.ParseFloat(rhsstr, 64); err == nil {
@@ -51,6 +54,13 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (query.
 	}
 
 	fieldName := lhs.Field
+
+	switch lhs.Type {
+	case value.StringType, value.StringsType, value.MapStringType:
+		// A NumericRangeQuery leaves both bounds nil for a string literal, which
+		// silently drops the predicate instead of comparing anything.
+		return makeTermRange(fieldName, op, rhsval)
+	}
 
 	// Create a range query
 	rangeQuery := query.NewNumericRangeQuery(nil, nil)
@@ -129,6 +139,38 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (query.
 	return rangeQuery, nil
 }
 
+// makeTermRange returns a byte-order term range for untokenized string fields,
+// matching vm.operateStrings.
+func makeTermRange(fieldName string, op lex.TokenType, rhsval any) (query.Query, error) {
+	term, ok := rhsval.(string)
+	if !ok {
+		return nil, fmt.Errorf("qlindex: string field range needs a string, got %T", rhsval)
+	}
+
+	if term == "" {
+		// bleve reads an empty bound as "unbounded", so it cannot express a
+		// range against the empty string.
+		return nil, fmt.Errorf("qlindex: cannot range %s against an empty string", op)
+	}
+
+	t, f := true, false
+	var rangeQuery *query.TermRangeQuery
+	switch op {
+	case lex.TokenGE:
+		rangeQuery = query.NewTermRangeInclusiveQuery(term, "", &t, &f)
+	case lex.TokenGT:
+		rangeQuery = query.NewTermRangeInclusiveQuery(term, "", &f, &f)
+	case lex.TokenLE:
+		rangeQuery = query.NewTermRangeInclusiveQuery("", term, &f, &t)
+	case lex.TokenLT:
+		rangeQuery = query.NewTermRangeInclusiveQuery("", term, &f, &f)
+	default:
+		return nil, fmt.Errorf("qlindex: unsupported range operator %s", op)
+	}
+	rangeQuery.SetField(fieldName)
+	return rangeQuery, nil
+}
+
 // makeDateRangeQuery creates a date range query for time-based fields
 func makeDateRangeQuery(fieldName string, op lex.TokenType, rhsval any) (query.Query, error) {
 	var timeVal time.Time
@@ -198,6 +240,13 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper any) (query.Query, error)
 		return makeDateBetweenQuery(fieldName, lower, upper)
 	}
 
+	switch lhs.Type {
+	case value.StringType, value.StringsType, value.MapStringType:
+		// Same defect as makeRange had: string bounds match no numeric case
+		// below, leaving both bounds nil and dropping the predicate.
+		return makeTermBetween(fieldName, lower, upper)
+	}
+
 	// Create a numeric range query
 	rangeQuery := query.NewNumericRangeQuery(nil, nil)
 	rangeQuery.SetField(fieldName)
@@ -232,6 +281,26 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper any) (query.Query, error)
 		rangeQuery.InclusiveMax = &t
 	}
 
+	return rangeQuery, nil
+}
+
+// makeTermBetween returns a byte-order term range for an untokenized string
+// field. Exclusive on both ends, matching vm.walkTernary and the gt/lt pair
+// esgen emits.
+func makeTermBetween(fieldName string, lower, upper any) (query.Query, error) {
+	lo, loOK := lower.(string)
+	hi, hiOK := upper.(string)
+	if !loOK || !hiOK {
+		return nil, fmt.Errorf("qlindex: string field BETWEEN needs string bounds, got %T and %T", lower, upper)
+	}
+	if lo == "" || hi == "" {
+		// bleve reads an empty bound as "unbounded".
+		return nil, fmt.Errorf("qlindex: cannot range BETWEEN against an empty string")
+	}
+
+	f := false
+	rangeQuery := query.NewTermRangeInclusiveQuery(lo, hi, &f, &f)
+	rangeQuery.SetField(fieldName)
 	return rangeQuery, nil
 }
 

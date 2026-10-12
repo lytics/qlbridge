@@ -45,6 +45,10 @@ func makeRange(lhs *gentypes.FieldType, op lex.TokenType, rhs expr.Node) (any, e
 			return nil, fmt.Errorf("Could not convert %T %v to float", rhsval, rhsval)
 		}
 		rhsval = fv
+	case value.StringType, value.StringsType, value.MapStringType:
+		// Keyword fields range byte-for-byte, so the literal has to reach ES as
+		// written. Coercing it would compare an epoch-millis number against a
+		// country name, and would not match vm.operateStrings either.
 	default:
 		if rhsstr, ok := rhsval.(string); ok {
 			if rhsf, err := strconv.ParseFloat(rhsstr, 64); err == nil {
@@ -299,11 +303,12 @@ func makeBetween(lhs *gentypes.FieldType, lower, upper any) (any, error) {
 // produce consistent queries.
 //
 // For IntType fields the value is converted to int64. For NumberType fields it
-// is converted to float64. For all other types (including TimeType) string
-// values are first tried as a float (epoch-millis strings like "1778310000000")
-// and then as an ISO date string (e.g. "2026-05-09"), which is converted to
-// epoch milliseconds. Values that cannot be coerced are returned unchanged so
-// that Elasticsearch can attempt its own parsing.
+// is converted to float64. String-typed fields keep the literal verbatim. For
+// all other types (including TimeType) string values are first tried as a float
+// (epoch-millis strings like "1778310000000") and then as an ISO date string
+// (e.g. "2026-05-09"), which is converted to epoch milliseconds. Values that
+// cannot be coerced are returned unchanged so that Elasticsearch can attempt
+// its own parsing.
 func coerceScalar(lhs *gentypes.FieldType, val any) any {
 	rhv := value.NewValue(val)
 	switch lhs.Type {
@@ -315,6 +320,10 @@ func coerceScalar(lhs *gentypes.FieldType, val any) any {
 		if fv, ok := value.ValueToFloat64(rhv); ok {
 			return fv
 		}
+	case value.StringType, value.StringsType, value.MapStringType:
+		// Same reason as makeRange: keyword fields range byte-for-byte, so the
+		// bound has to reach ES as written.
+		return val
 	default:
 		s, ok := val.(string)
 		if !ok {

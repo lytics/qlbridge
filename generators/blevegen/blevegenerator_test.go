@@ -314,3 +314,110 @@ func (s schema) ColumnInfo(f string) (*gentypes.FieldType, bool) {
 		TypeName: c.String(),
 	}, true
 }
+
+// TestStringOrderingTermRange covers ordering operators against a string-typed
+// column. A NumericRangeQuery leaves both bounds nil for a string literal,
+// which silently drops the predicate and matches every document; the term
+// range has to compare byte-for-byte the way vm.operateStrings does.
+func TestStringOrderingTermRange(t *testing.T) {
+	// country must be untokenized; an analyzed field lowercases the terms and
+	// then compares them against a literal that was not lowercased.
+	countryMapping := bleve.NewKeywordFieldMapping()
+	countryMapping.Name = "country"
+	docMapping := bleve.NewDocumentMapping()
+	docMapping.AddFieldMappingsAt("country", countryMapping)
+	indexMapping := bleve.NewIndexMapping()
+	indexMapping.DefaultMapping = docMapping
+
+	idx, err := bleve.NewMemOnly(indexMapping)
+	require.NoError(t, err)
+	t.Cleanup(func() { idx.Close() })
+
+	for id, country := range map[string]string{
+		"d1": "Albania",
+		"d2": "Argentina",
+		"d3": "Zimbabwe",
+	} {
+		require.NoError(t, idx.Index(id, map[string]any{"country": country}))
+	}
+
+	countrySchema := schema{cols: map[string]value.ValueType{"country": value.StringType}}
+
+	tests := []struct {
+		filterQL string
+		want     int
+	}{
+		{`FILTER country < "Argentina"`, 1},  // Albania
+		{`FILTER country <= "Argentina"`, 2}, // Albania, Argentina
+		{`FILTER country > "Argentina"`, 1},  // Zimbabwe
+		{`FILTER country >= "Argentina"`, 2}, // Argentina, Zimbabwe
+		{`FILTER country < "Albania"`, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.filterQL, func(t *testing.T) {
+			filter, err := rel.ParseFilterQL(tc.filterQL)
+			require.NoError(t, err)
+
+			payload, err := NewGenerator(time.Now(), nil, countrySchema).WalkExpr(filter.Filter)
+			require.NoError(t, err)
+
+			q, ok := payload.Filter.(query.Query)
+			require.True(t, ok)
+			res, err := idx.Search(bleve.NewSearchRequest(q))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, int(res.Total))
+		})
+	}
+}
+
+// TestStringBetweenTermRange covers BETWEEN against a string-typed column,
+// which hit the same nil-bounds NumericRangeQuery defect as makeRange.
+func TestStringBetweenTermRange(t *testing.T) {
+	countryMapping := bleve.NewKeywordFieldMapping()
+	countryMapping.Name = "country"
+	docMapping := bleve.NewDocumentMapping()
+	docMapping.AddFieldMappingsAt("country", countryMapping)
+	indexMapping := bleve.NewIndexMapping()
+	indexMapping.DefaultMapping = docMapping
+
+	idx, err := bleve.NewMemOnly(indexMapping)
+	require.NoError(t, err)
+	t.Cleanup(func() { idx.Close() })
+
+	for id, country := range map[string]string{
+		"d1": "Albania",
+		"d2": "Argentina",
+		"d3": "Zimbabwe",
+	} {
+		require.NoError(t, idx.Index(id, map[string]any{"country": country}))
+	}
+
+	countrySchema := schema{cols: map[string]value.ValueType{"country": value.StringType}}
+
+	tests := []struct {
+		filterQL string
+		want     int
+	}{
+		{`FILTER country BETWEEN "AAA" AND "Argentina"`, 1},    // Albania; upper is exclusive
+		{`FILTER country BETWEEN "AAA" AND "Zimbabwe"`, 2},     // Albania, Argentina
+		{`FILTER country BETWEEN "Albania" AND "Zimbabwe"`, 1}, // lower is exclusive
+		{`FILTER country BETWEEN "AAA" AND "AAB"`, 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.filterQL, func(t *testing.T) {
+			filter, err := rel.ParseFilterQL(tc.filterQL)
+			require.NoError(t, err)
+
+			payload, err := NewGenerator(time.Now(), nil, countrySchema).WalkExpr(filter.Filter)
+			require.NoError(t, err)
+
+			q, ok := payload.Filter.(query.Query)
+			require.True(t, ok)
+			res, err := idx.Search(bleve.NewSearchRequest(q))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, int(res.Total))
+		})
+	}
+}

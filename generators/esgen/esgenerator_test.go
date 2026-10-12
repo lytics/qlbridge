@@ -304,3 +304,97 @@ func assertJSONEqual(t *testing.T, want string, got any) {
 	require.NoError(t, json.Unmarshal([]byte(want), &wantNorm))
 	assert.Equal(t, wantNorm, gotNorm, "generated ES filter mismatch\nwant: %s\ngot:  %s", want, string(gotBytes))
 }
+
+// TestStringOrderingRange covers ordering operators against a string-typed
+// column. The literal must reach Elasticsearch as written: a keyword field
+// ranges byte-for-byte, so coercing a numeric- or date-looking literal to a
+// number would compare against a different value than vm.operateStrings does.
+func TestStringOrderingRange(t *testing.T) {
+	s := schema{cols: map[string]value.ValueType{
+		"country":  value.StringType,
+		"score":    value.StringType,
+		"signedup": value.StringType,
+		"visitct":  value.IntType,
+	}}
+	g := NewGenerator(time.Now(), nil, s)
+
+	tests := []struct {
+		name     string
+		filterQL string
+		field    string
+		want     RangeQry
+	}{
+		{"LtWord", `FILTER country < "Argentina"`, "country", RangeQry{LT: "Argentina"}},
+		{"GtWord", `FILTER country > "Argentina"`, "country", RangeQry{GT: "Argentina"}},
+		{"LeWord", `FILTER country <= "Argentina"`, "country", RangeQry{LTE: "Argentina"}},
+		{"GeWord", `FILTER country >= "Argentina"`, "country", RangeQry{GTE: "Argentina"}},
+		// "0.2" must stay a string; as a float it round-trips to a different
+		// term than the one the VM compares against.
+		{"NumericLooking", `FILTER score > "0.20"`, "score", RangeQry{GT: "0.20"}},
+		// Coerced to epoch millis this became a number whose leading digit made
+		// every ISO date in the index compare greater.
+		{"DateLooking", `FILTER signedup < "2026-05-09"`, "signedup", RangeQry{LT: "2026-05-09"}},
+		// Non-string columns keep their coercion.
+		{"IntColumnStillCoerces", `FILTER visitct < "10"`, "visitct", RangeQry{LT: int64(10)}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fs, err := rel.ParseFilterQL(tc.filterQL)
+			require.NoError(t, err)
+			p, err := g.WalkExpr(fs.Filter)
+			require.NoError(t, err)
+			r, ok := p.Filter.(*RangeFilter)
+			require.True(t, ok, "expected a range filter, got %T", p.Filter)
+			assert.Equal(t, tc.want, r.Range[tc.field])
+		})
+	}
+}
+
+// TestStringBetweenRange covers BETWEEN against a string-typed column.
+// coerceScalar coerced date- and numeric-looking bounds the same way makeRange
+// did, so an ISO bound reached ES as epoch millis and every keyword term
+// compared greater.
+func TestStringBetweenRange(t *testing.T) {
+	s := schema{cols: map[string]value.ValueType{
+		"country":  value.StringType,
+		"signedup": value.StringType,
+		"visitct":  value.IntType,
+	}}
+	g := NewGenerator(time.Now(), nil, s)
+
+	tests := []struct {
+		name      string
+		filterQL  string
+		field     string
+		wantLower any
+		wantUpper any
+	}{
+		{"Words", `FILTER country BETWEEN "AAA" AND "Argentina"`, "country", "AAA", "Argentina"},
+		{"DateLooking", `FILTER signedup BETWEEN "2026-01-01" AND "2026-12-31"`, "signedup", "2026-01-01", "2026-12-31"},
+		{"IntColumnStillCoerces", `FILTER visitct BETWEEN "1" AND "10"`, "visitct", int64(1), int64(10)},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fs, err := rel.ParseFilterQL(tc.filterQL)
+			require.NoError(t, err)
+			p, err := g.WalkExpr(fs.Filter)
+			require.NoError(t, err)
+
+			b, ok := p.Filter.(*boolean)
+			require.True(t, ok, "expected a bool filter, got %T", p.Filter)
+			m, ok := b.Bool.(must)
+			require.True(t, ok, "expected a must clause, got %T", b.Bool)
+			require.Len(t, m.Filters, 2)
+
+			lower, ok := m.Filters[0].(*RangeFilter)
+			require.True(t, ok)
+			upper, ok := m.Filters[1].(*RangeFilter)
+			require.True(t, ok)
+
+			assert.Equal(t, tc.wantLower, lower.Range[tc.field].GT)
+			assert.Equal(t, tc.wantUpper, upper.Range[tc.field].LT)
+		})
+	}
+}
